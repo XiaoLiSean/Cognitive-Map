@@ -8,6 +8,7 @@ import copy
 import argparse
 import random
 import logging
+import os
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--scene_type", type=int, default=1,  help="Choose scene type for simulation, 1 for Kitchens, 2 for Living rooms, 3 for Bedrooms, 4 for Bathrooms")
@@ -93,7 +94,7 @@ class Dumb_Navigetion():
 			mid_point_pose['rotation'] = [0, 0, 0]
 			self.__Agent_action.Move_toward(mid_point_pose, rotation_care=False)
 
-		self.__Agent_action.Move_toward({'position': self._point_list[goal_point_index], 'rotation': [0, 0, 0]}, rotation_care=False)
+		self._Agent_action.Move_toward({'position': self._point_list[goal_point_index], 'rotation': [0, 0, 0]}, rotation_care=False)
 		return
 
 
@@ -104,7 +105,7 @@ class Agent_action():
 		self._grid_size = grid_size
 		self._rotation_step = rotation_step
 		self._sleep_time = sleep_time
-		self._scene_name = 'FloorPlan' + scene_setting[self._scene_type] + self._scene_num
+		self._scene_name = 'FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num)
 		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size)
 		self._save_directory = save_directory
 		self._event = self._controller.step('Pass')
@@ -117,7 +118,10 @@ class Agent_action():
 		self.Update_event()
 		frame = self._event.frame
 		img = Image.fromarray(frame, 'RGB')
-		img.save(self._save_directory + '/' + str(time.time() - self._start_time) + '.png')
+		if not os.path.exists(self._save_directory + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num)):
+			os.makedirs(self._save_directory + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num))
+		img.save(self._save_directory + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num) +
+				'/' + str(time.time() - self._start_time) + '.png')
 
 	def Get_agent_position(self):
 		self.Update_event()
@@ -130,6 +134,10 @@ class Agent_action():
 	def Get_reachable_coordinate(self):
 		self._event = self._controller.step(action='GetReachablePositions')
 		return self._event.metadata['actionReturn']
+
+	def Get_object(self):
+		self.Update_event()
+		return event.metadata['objects']
 
 	def Unit_move(self):
 		self._event = self._controller.step(action='MoveAhead')
@@ -144,6 +152,38 @@ class Agent_action():
 			self._event = self._controller.step(action='RotateRight', degrees=np.abs(degree_corrected))
 		else:
 			self._event = self._controller.step(action='RotateLeft', degrees=np.abs(degree_corrected))
+
+	def Set_object_pose(self, object_name, original_position, pose):
+		objects = self.Get_object()
+		object_poses = copy.deepcopy(objects)
+		object_name_exact = []
+		nearest_name = None
+		distance = 100
+
+		goal_position = pose['position']
+		goal_rotation = pose['rotation']
+		if isinstance(goal_position, dict):
+			goal_position = list(goal_position.values())
+			goal_rotation = list(goal_rotation.values())
+
+		target_index = -1
+		for object_index in range(len(objects)):
+			if object_name in objects[object_index]['name'] or object_name.capitaliz in objects[object_index]['name']:
+				object_name_exact.append(objects[object_index]['name'])
+				distance_list = list(objects[object_index]['position'].values())
+				distance_list = list(map(lambda x, y: x - y, goal_position, distance_list))
+				if np.linalg.norm(np.array(distance_list)) < distance:
+					distance = np.linalg.norm(np.array(distance_list))
+					nearest_name = objects[object_index]['name']
+					target_index = object_index
+		if target_index == -1:
+			logging.error('Object {} does not exist in current scene'.format(object_name))
+		object_poses[target_index]['position'] = {'x': goal_position[0], 'y': goal_position[1], 'z': goal_position[2]}
+		object_poses[target_index]['rotation'] = {'x': goal_rotation[0], 'y': goal_rotation[1], 'z': goal_rotation[2]}
+
+		self._event = self._controller.step(action='SetObjectPoses', objectPoses=object_poses)
+
+		return
 
 	# Assume goal is {'position': position, 'rotation': rotation} where position and rotation are dict or list
 	def Move_toward(self, goal, rotation_care=True):
@@ -207,7 +247,7 @@ class Agent_action():
 
 
 if __name__ == '__main__':
-	controller = Controller(scene='FloorPlan28',agentControllerType='physics')
+	controller = Controller(scene='FloorPlan28', agentControllerType='physics')
 	event = controller.step('Pass')
 	test = event.metadata['objects']
 	floor_id = None
