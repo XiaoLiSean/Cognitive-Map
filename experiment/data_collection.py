@@ -23,7 +23,7 @@ args = parser.parse_args()
 
 
 if args.scene_num == 0:
-	scene_num = random.randint(1, 30)
+	args.scene_num = random.randint(1, 30)
 scene_setting = {1: '', 2: '2', 3: '3', 4: '4'}
 
 log_setting = {1: logging.CRITICAL, 2: logging.ERROR, 3: logging.WARNING, 4: logging.INFO, 5: logging.DEBUG}
@@ -32,16 +32,23 @@ logging.basicConfig(level=log_setting[args.log_level])
 
 
 class Dumb_Navigetion():
-	def __init__(self, coordinate_dict, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory):
-		self._coordinate_dict = coordinate_dict
+	def __init__(self, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, debug=False):
 		self._map = {}
-		self._map_searched = [False] * len(self._coordinate_dict)
 		self._point_list = []
 		self._grid_size = grid_size
 		self._point_num = 0
-		self._build_map()
-		self._Agent_action = Agent_action(scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory)
+		self._Agent_action = Agent_action(scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, debug=debug)
 		self._starting_point = self._Agent_action.Get_agent_position()
+		self._coordinate_dict = self._Agent_action.Get_reachable_coordinate()
+		self._map_searched = [False] * len(self._coordinate_dict)
+		self._debug = debug
+		self._build_map()
+
+	def Get_agent_position(self):
+		return self._Agent_action.Get_agent_position()
+
+	def Get_agent_rotation(self):
+		return self._Agent_action.Get_agent_rotation()
 
 	def _build_map(self):
 		self._point_list.append(list(self._starting_point.values()))
@@ -51,13 +58,20 @@ class Dumb_Navigetion():
 		for point_adding in self._coordinate_dict:
 			if self._starting_point == point_adding:
 				continue
-			self._point_list.append([point_adding['x'], point_adding['y'], point_adding['z']])
-			self._map[self._point_num] = []
+			self._point_list.append(list(point_adding.values()))
 			self._point_num += 1
+			self._map[self._point_num - 1] = []
+			
 			for point_added_index in range(self._point_num - 1):
 				point_added = self._point_list[point_added_index]
 				distance = np.linalg.norm(np.array(list(map(lambda x, y: x - y, point_added, self._point_list[self._point_num - 1]))))
-				if distance < self._grid_size + 0.1 * self._grid_size:
+				
+				if distance < self._grid_size + 0.03 * self._grid_size:
+					# if self._debug:
+					# 	print('distance:', distance)
+					# 	print('point_added:', point_added)
+					# 	print('self._point_list[self._point_num - 1]:', self._point_list[self._point_num - 1])
+					# 	print('--------')
 					self._map[self._point_num - 1].append(point_added_index)
 					self._map[point_added_index].append(self._point_num - 1)
 		return
@@ -67,19 +81,35 @@ class Dumb_Navigetion():
 		graph = Graph()
 		nav_starting_point = self._Agent_action.Get_agent_position()
 		nav_starting_point = list(nav_starting_point.values())
-		nav_starting_point_index = self._point_list.index(nav_starting_point)
+		for point in self._point_list:
+			if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, nav_starting_point)))) < 0.15 * self._grid_size:
+				nav_starting_point_index = self._point_list.index(point)
+				break
+		# nav_starting_point_index = self._point_list.index(nav_starting_point)
 
-		goal_point = list(goal_position.values())
-		goal_point_index = self._point_list.index(goal_point)
+		if isinstance(goal_position, dict):
+			goal_point = list(goal_position.values())
+
+		goal_point_index = None
+		for point in self._point_list:
+			if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, goal_point)))) < 0.15 * self._grid_size:
+				goal_point_index = self._point_list.index(point)
+				break
+		if goal_point_index is None or nav_starting_point_index is None:
+			logging.error('No matching point in map')
+			return
 
 		connected_point_index = self._map[goal_point_index]
 		nearest_reachable_index = None
-		for index in connected_point_index:
-			if self._map_searched[index]:
-				nearest_reachable_index = index
-				break
-		if nearest_reachable_index is None:
-			logging.error('Can not reach the point by existing map')
+		if self._map_searched[goal_point_index]:
+			nearest_reachable_index = goal_point_index
+		else:
+			for index in connected_point_index:
+				if self._map_searched[index]:
+					nearest_reachable_index = index
+					break
+			if nearest_reachable_index is None:
+				logging.error('Can not reach the point by existing map')
 
 		for index in range(len(self._map)):
 			for connected_index in range(len(self._map[index])):
@@ -88,18 +118,26 @@ class Dumb_Navigetion():
 		result = find_path(graph, nav_starting_point_index, nearest_reachable_index)
 
 		path = result.nodes
-		for mid_point_index in range(1, len(path)):
-			mid_point_pose = {'position': [], 'rotation': []}
-			mid_point_pose['position'] = self._point_list[mid_point_index]
-			mid_point_pose['rotation'] = [0, 0, 0]
-			self.__Agent_action.Move_toward(mid_point_pose, rotation_care=False)
 
-		self._Agent_action.Move_toward({'position': self._point_list[goal_point_index], 'rotation': [0, 0, 0]}, rotation_care=False)
+		for mid_point_index in range(0, len(path)):
+			mid_point_pose = {'position': [], 'rotation': []}
+			mid_point_pose['position'] = copy.deepcopy(self._point_list[path[mid_point_index]])
+			mid_point_pose['rotation'] = [0, 0, 0]
+			self._Agent_action.Move_toward(mid_point_pose, rotation_care=False)
+
+		if self._debug:
+			print('not moving by path-----------')
+			print('self._point_list[goal_point_index]: ', self._point_list[goal_point_index])
+		self._Agent_action.Move_toward({'position': copy.deepcopy(self._point_list[goal_point_index]), 'rotation': [0, 0, 0]}, rotation_care=False)
+		self._map_searched[goal_point_index] = True
+		if self._debug:
+				time.sleep(1)
+				print('--------------------------------------------------------')
 		return
 
 
 class Agent_action():
-	def __init__(self, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory):
+	def __init__(self, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, debug=False):
 		self._scene_type = scene_type
 		self._scene_num = scene_num
 		self._grid_size = grid_size
@@ -110,11 +148,12 @@ class Agent_action():
 		self._save_directory = save_directory
 		self._event = self._controller.step('Pass')
 		self._start_time = time.time()
+		self._debug = debug
 
 	def Update_event(self):
 		self._event = self._controller.step('Pass')
 
-	def Save_RGB(self):
+	def _Save_RGB(self):
 		self.Update_event()
 		frame = self._event.frame
 		img = Image.fromarray(frame, 'RGB')
@@ -137,16 +176,18 @@ class Agent_action():
 
 	def Get_object(self):
 		self.Update_event()
-		return event.metadata['objects']
+		return self._event.metadata['objects']
 
 	def Unit_move(self):
 		self._event = self._controller.step(action='MoveAhead')
 
 	def Unit_rotate(self, degree):
+		if np.abs(degree) < 2:
+			return
 		degree_corrected = degree
-		while degree_corrected > 360:
+		while degree_corrected > 180:
 			degree_corrected -= 360
-		while degree_corrected < -360:
+		while degree_corrected < -180:
 			degree_corrected += 360
 		if degree > 0:
 			self._event = self._controller.step(action='RotateRight', degrees=np.abs(degree_corrected))
@@ -188,38 +229,51 @@ class Agent_action():
 	# Assume goal is {'position': position, 'rotation': rotation} where position and rotation are dict or list
 	def Move_toward(self, goal, rotation_care=True):
 		self.Update_event()
-		agent_position = self.get_agent_position()
-		agent_rotation = self.get_agent_rotation()
+		agent_position = self.Get_agent_position()
+		agent_rotation = self.Get_agent_rotation()
+
 		agent_position = list(agent_position.values())
 		agent_rotation = list(agent_rotation.values())
+
 		goal_position = goal['position']
 		goal_rotation = goal['rotation']
+
 		if isinstance(goal_position, dict):
 			goal_position = list(goal_position.values())
-			goal_rotation = list(goal_position.values())
-		heading_angle = np.arctan2((agent_position[0] - goal_position[0]) / (agent_position[2] - goal_position[2])) * 180 / np.pi
-		heading_angle_list = agent_rotation
+			goal_rotation = list(goal_rotation.values())
+		heading_angle = np.arctan2((goal_position[0] - agent_position[0]), (goal_position[2] - agent_position[2])) * 180 / np.pi
+		heading_angle_list = copy.deepcopy(agent_rotation)
 		heading_angle_list[1] = heading_angle
-		position_error = list(map(lambda x, y: np.abs(x - y), goal_position,  agent_position))
-		rotation_error = list(map(lambda x, y: np.abs(x - y), heading_angle_list,  agent_rotation))
 
-		rotation_error_corrected = max(rotation_error)
-		while rotation_error_corrected > 360:
+		position_error = list(map(lambda x, y: np.abs(x - y), goal_position,  agent_position))
+		rotation_error = list(map(lambda x, y: x - y, heading_angle_list,  agent_rotation))
+		rotation_error_abs = list(map(lambda x: np.abs(x), rotation_error))
+
+		rotation_error_corrected = rotation_error[rotation_error_abs.index(max(rotation_error_abs))]
+		while rotation_error_corrected > 180:
 			rotation_error_corrected -= 360
-		while rotation_error_corrected < -360:
+		while rotation_error_corrected < -180:
 			rotation_error_corrected += 360
 
-		if position_error > self._grid_size:
+		if np.linalg.norm(np.array(position_error)) > self._grid_size * 1.10:
 			logging.error('Moving step {} greater than grid size {}'.format(position_error, self._grid_size))
+			return
+		elif np.linalg.norm(np.array(position_error)) < self._grid_size * 0.10:
+			logging.info('Moving distance {} too small'.format(position_error))
+			return
 
-		rotate_steps = int(rotation_error_corrected / self._rotation_step)
+		rotate_steps = int(np.abs(rotation_error_corrected / self._rotation_step))
+
 		for _ in range(rotate_steps):
-			self.Unit_rotate(self._rotation_step * rotation_error_corrected / np.abs(rotation_error_corrected))
+			if self._debug:
+				time.sleep(self._sleep_time)
+			self.Unit_rotate(self._rotation_step * np.sign(rotation_error_corrected))
 			self._Save_RGB()
-		self.Unit_rotate((self._rotation_step - rotate_steps * self._rotation_step) *
-						rotation_error_corrected / np.abs(rotation_error_corrected))
+		self.Unit_rotate((rotation_error_corrected - rotate_steps * self._rotation_step * np.sign(rotation_error_corrected)))
 		self._Save_RGB()
 
+		if self._debug:
+				time.sleep(self._sleep_time)
 		self.Unit_move()
 		self._Save_RGB()
 
@@ -227,37 +281,104 @@ class Agent_action():
 			return
 
 		self.Update_event()
-		agent_rotation = self.get_agent_rotation()
+		agent_rotation = self.Get_agent_rotation()
 		agent_rotation = list(agent_rotation.values())
-		rotation_error = list(map(lambda x, y: np.abs(x - y), goal_rotation,  agent_rotation))
-		rotation_error_corrected = max(rotation_error)
-		while rotation_error_corrected > 360:
+		rotation_error = list(map(lambda x, y: x - y, goal_rotation,  agent_rotation))
+		rotation_error_abs = list(map(lambda x: np.abs(x), rotation_error))
+
+		rotation_error_corrected = rotation_error[rotation_error_abs.index(max(rotation_error_abs))]
+		while rotation_error_corrected > 180:
 			rotation_error_corrected -= 360
-		while rotation_error_corrected < -360:
+		while rotation_error_corrected < -180:
 			rotation_error_corrected += 360
-		rotate_steps = int(rotation_error_corrected / self._rotation_step)
+		rotate_steps = int(np.abs(rotation_error_corrected / self._rotation_step))
+
+		if self._debug:
+			print('heading_angle_list: ', heading_angle_list)
+			print('agent_rotation: ', agent_rotation)
+			print('rotation_error: ', rotation_error)
+			print('rotation_error_corrected: ', rotation_error_corrected)
+			print('rotate_steps: ', rotate_steps)
+
 		for _ in range(rotate_steps):
-			self.Unit_rotate(self._rotation_step * rotation_error_corrected / np.abs(rotation_error_corrected))
+			if self._debug:
+				time.sleep(self._sleep_time)
+			self.Unit_rotate(self._rotation_step * np.sign(rotation_error_corrected))
 			self._Save_RGB()
-		self.Unit_rotate((self._rotation_step - rotate_steps * self._rotation_step) *
-						rotation_error_corrected / np.abs(rotation_error_corrected))
+		self.Unit_rotate((rotation_error_corrected - rotate_steps * self._rotation_step * np.sign(rotation_error_corrected)))
 		self._Save_RGB()
 		
 		return
 
 
 if __name__ == '__main__':
-	controller = Controller(scene='FloorPlan28', agentControllerType='physics')
-	event = controller.step('Pass')
-	test = event.metadata['objects']
-	floor_id = None
-	for i in range(len(test)):
-		print(i)
-		if test[i]['objectType'] == 'CounterTop':
-			floor_id = test[i]['objectId']
-			# print('test[i][Receptacle]: ', test[i])
-			print('floor_id: ', floor_id)
-			event = controller.step('GetSpawnCoordinatesAboveReceptacle', objectId=floor_id, anywhere=True)
-			test_position = event.metadata['actionReturn']
-			print('test_position', test_position)
-			break
+	Dumb_Navigetion = Dumb_Navigetion(args.scene_type, args.scene_num, args.grid_size,
+		args.rotation_step, args.sleep_time, args.save_directory, debug=True)
+	position = Dumb_Navigetion.Get_agent_position()
+	position['z'] += args.grid_size
+	Dumb_Navigetion.Dumb_navigate(position)
+	position['z'] += args.grid_size
+	Dumb_Navigetion.Dumb_navigate(position)
+	position['z'] += args.grid_size
+	Dumb_Navigetion.Dumb_navigate(position)
+	position['z'] -= args.grid_size * 4
+	Dumb_Navigetion.Dumb_navigate(position)
+	# Agent_action_test = Agent_action(args.scene_type, args.scene_num, args.grid_size,
+	# 	args.rotation_step, args.sleep_time, args.save_directory, debug=True)
+	# time.sleep(1)
+	# print(Agent_action_test.Get_agent_position())
+	# print('rotation:', Agent_action_test.Get_agent_rotation())
+	# Agent_action_test.Unit_move()
+	# print('move')
+	# time.sleep(1)
+	# print(Agent_action_test.Get_agent_position())
+	# print('rotation:', Agent_action_test.Get_agent_rotation())
+	# Agent_action_test.Unit_rotate(90)
+	# time.sleep(1)
+	# print(Agent_action_test.Get_agent_position())
+	# print('rotation:', Agent_action_test.Get_agent_rotation())
+	# Agent_action_test.Unit_move()
+	# print('move')
+	# time.sleep(1)
+	# print(Agent_action_test.Get_agent_position())
+	# print('rotation:', Agent_action_test.Get_agent_rotation())
+	# Agent_action_test.Unit_rotate(90)
+	# time.sleep(1)
+	# print(Agent_action_test.Get_agent_position())
+	# print('rotation:', Agent_action_test.Get_agent_rotation())
+	# Agent_action_test.Unit_move()
+	# print('move')
+	# time.sleep(1)
+	# print(Agent_action_test.Get_agent_position())
+	# print('rotation:', Agent_action_test.Get_agent_rotation())
+	# Agent_action_test.Unit_rotate(90)
+	# time.sleep(1)
+	# print(Agent_action_test.Get_agent_position())
+	# print('rotation:', Agent_action_test.Get_agent_rotation())
+	# Agent_action_test.Unit_move()
+	# print('move')
+	# time.sleep(1)
+	# print(Agent_action_test.Get_agent_position())
+	# print('rotation:', Agent_action_test.Get_agent_rotation())
+	# goal = {'position': Agent_action_test.Get_agent_position(), 'rotation': Agent_action_test.Get_agent_rotation()}
+	# print(goal)
+	# goal['position']['x'] += 0.25
+	# Agent_action_test.Move_toward(goal, rotation_care=True)
+	# Agent_action_test.Unit_rotate(45)
+	time.sleep(2)
+	# print(Agent_action_test.Get_object())
+	# controller = Controller(scene='FloorPlan28', agentControllerType='physics')
+	# event = controller.step('Pass')
+	# test = event.metadata['objects']
+	# floor_id = None
+	# for i in range(len(test)):
+	# 	print(i)
+	# 	if test[i]['objectType'] == 'CounterTop':
+	# 		floor_id = test[i]['objectId']
+	# 		# print('test[i][Receptacle]: ', test[i])
+	# 		print('floor_id: ', floor_id)
+	# 		event = controller.step('GetSpawnCoordinatesAboveReceptacle', objectId=floor_id, anywhere=True)
+	# 		test_position = event.metadata['actionReturn']
+	# 		print('test_position', test_position)
+	# 		break
+	
