@@ -15,7 +15,7 @@ parser.add_argument("--scene_type", type=int, default=1,  help="Choose scene typ
 parser.add_argument("--scene_num", type=int, default=0,  help="Choose scene num for simulation, from 1 - 30")
 parser.add_argument("--grid_size", type=float, default=0.25,  help="Grid size of AI2THOR simulation")
 parser.add_argument("--rotation_step", type=float, default=10,  help="Rotation step of AI2THOR simulation")
-parser.add_argument("--sleep_time", type=float, default=0.1,  help="Sleep time between two actions")
+parser.add_argument("--sleep_time", type=float, default=0.05,  help="Sleep time between two actions")
 parser.add_argument("--save_directory", type=str, default='./data',  help="Data saving directory")
 parser.add_argument("--log_level", type=int, default=5,  help="Level of showing log 1-5 where 5 is most detailed")
 
@@ -42,6 +42,8 @@ class Dumb_Navigetion():
 		self._coordinate_dict = self._Agent_action.Get_reachable_coordinate()
 		self._map_searched = [False] * len(self._coordinate_dict)
 		self._debug = debug
+		if self._debug:
+			self._map_searched = [True] * len(self._coordinate_dict)
 		self._build_map()
 
 	def Get_agent_position(self):
@@ -82,7 +84,7 @@ class Dumb_Navigetion():
 		nav_starting_point = self._Agent_action.Get_agent_position()
 		nav_starting_point = list(nav_starting_point.values())
 		for point in self._point_list:
-			if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, nav_starting_point)))) < 0.15 * self._grid_size:
+			if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, nav_starting_point)))) < 0.25 * self._grid_size:
 				nav_starting_point_index = self._point_list.index(point)
 				break
 		# nav_starting_point_index = self._point_list.index(nav_starting_point)
@@ -92,7 +94,7 @@ class Dumb_Navigetion():
 
 		goal_point_index = None
 		for point in self._point_list:
-			if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, goal_point)))) < 0.15 * self._grid_size:
+			if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, goal_point)))) < 0.25 * self._grid_size:
 				goal_point_index = self._point_list.index(point)
 				break
 		if goal_point_index is None or nav_starting_point_index is None:
@@ -101,8 +103,10 @@ class Dumb_Navigetion():
 
 		connected_point_index = self._map[goal_point_index]
 		nearest_reachable_index = None
+		goal_in_existing_map = False
 		if self._map_searched[goal_point_index]:
 			nearest_reachable_index = goal_point_index
+			goal_in_existing_map = True
 		else:
 			for index in connected_point_index:
 				if self._map_searched[index]:
@@ -110,6 +114,7 @@ class Dumb_Navigetion():
 					break
 			if nearest_reachable_index is None:
 				logging.error('Can not reach the point by existing map')
+				return
 
 		for index in range(len(self._map)):
 			for connected_index in range(len(self._map[index])):
@@ -119,7 +124,7 @@ class Dumb_Navigetion():
 
 		path = result.nodes
 
-		for mid_point_index in range(0, len(path)):
+		for mid_point_index in range(1, len(path)):
 			mid_point_pose = {'position': [], 'rotation': []}
 			mid_point_pose['position'] = copy.deepcopy(self._point_list[path[mid_point_index]])
 			mid_point_pose['rotation'] = [0, 0, 0]
@@ -128,8 +133,9 @@ class Dumb_Navigetion():
 		if self._debug:
 			print('not moving by path-----------')
 			print('self._point_list[goal_point_index]: ', self._point_list[goal_point_index])
-		self._Agent_action.Move_toward({'position': copy.deepcopy(self._point_list[goal_point_index]), 'rotation': [0, 0, 0]}, rotation_care=False)
-		self._map_searched[goal_point_index] = True
+		if not goal_in_existing_map:
+			self._Agent_action.Move_toward({'position': copy.deepcopy(self._point_list[goal_point_index]), 'rotation': [0, 0, 0]}, rotation_care=False)
+			self._map_searched[goal_point_index] = True
 		if self._debug:
 				time.sleep(1)
 				print('--------------------------------------------------------')
@@ -199,7 +205,7 @@ class Agent_action():
 		object_poses = copy.deepcopy(objects)
 		object_name_exact = []
 		nearest_name = None
-		distance = 100
+		distance = np.inf
 
 		goal_position = pose['position']
 		goal_rotation = pose['rotation']
@@ -315,70 +321,10 @@ if __name__ == '__main__':
 	Dumb_Navigetion = Dumb_Navigetion(args.scene_type, args.scene_num, args.grid_size,
 		args.rotation_step, args.sleep_time, args.save_directory, debug=True)
 	position = Dumb_Navigetion.Get_agent_position()
-	position['z'] += args.grid_size
+	ori_position = copy.deepcopy(position)
+	reach = Dumb_Navigetion._Agent_action.Get_reachable_coordinate()
+	print(reach)
+	position = reach[random.randint(int(len(reach) / 3), len(reach))]
 	Dumb_Navigetion.Dumb_navigate(position)
-	position['z'] += args.grid_size
-	Dumb_Navigetion.Dumb_navigate(position)
-	position['z'] += args.grid_size
-	Dumb_Navigetion.Dumb_navigate(position)
-	position['z'] -= args.grid_size * 4
-	Dumb_Navigetion.Dumb_navigate(position)
-	# Agent_action_test = Agent_action(args.scene_type, args.scene_num, args.grid_size,
-	# 	args.rotation_step, args.sleep_time, args.save_directory, debug=True)
-	# time.sleep(1)
-	# print(Agent_action_test.Get_agent_position())
-	# print('rotation:', Agent_action_test.Get_agent_rotation())
-	# Agent_action_test.Unit_move()
-	# print('move')
-	# time.sleep(1)
-	# print(Agent_action_test.Get_agent_position())
-	# print('rotation:', Agent_action_test.Get_agent_rotation())
-	# Agent_action_test.Unit_rotate(90)
-	# time.sleep(1)
-	# print(Agent_action_test.Get_agent_position())
-	# print('rotation:', Agent_action_test.Get_agent_rotation())
-	# Agent_action_test.Unit_move()
-	# print('move')
-	# time.sleep(1)
-	# print(Agent_action_test.Get_agent_position())
-	# print('rotation:', Agent_action_test.Get_agent_rotation())
-	# Agent_action_test.Unit_rotate(90)
-	# time.sleep(1)
-	# print(Agent_action_test.Get_agent_position())
-	# print('rotation:', Agent_action_test.Get_agent_rotation())
-	# Agent_action_test.Unit_move()
-	# print('move')
-	# time.sleep(1)
-	# print(Agent_action_test.Get_agent_position())
-	# print('rotation:', Agent_action_test.Get_agent_rotation())
-	# Agent_action_test.Unit_rotate(90)
-	# time.sleep(1)
-	# print(Agent_action_test.Get_agent_position())
-	# print('rotation:', Agent_action_test.Get_agent_rotation())
-	# Agent_action_test.Unit_move()
-	# print('move')
-	# time.sleep(1)
-	# print(Agent_action_test.Get_agent_position())
-	# print('rotation:', Agent_action_test.Get_agent_rotation())
-	# goal = {'position': Agent_action_test.Get_agent_position(), 'rotation': Agent_action_test.Get_agent_rotation()}
-	# print(goal)
-	# goal['position']['x'] += 0.25
-	# Agent_action_test.Move_toward(goal, rotation_care=True)
-	# Agent_action_test.Unit_rotate(45)
+
 	time.sleep(2)
-	# print(Agent_action_test.Get_object())
-	# controller = Controller(scene='FloorPlan28', agentControllerType='physics')
-	# event = controller.step('Pass')
-	# test = event.metadata['objects']
-	# floor_id = None
-	# for i in range(len(test)):
-	# 	print(i)
-	# 	if test[i]['objectType'] == 'CounterTop':
-	# 		floor_id = test[i]['objectId']
-	# 		# print('test[i][Receptacle]: ', test[i])
-	# 		print('floor_id: ', floor_id)
-	# 		event = controller.step('GetSpawnCoordinatesAboveReceptacle', objectId=floor_id, anywhere=True)
-	# 		test_position = event.metadata['actionReturn']
-	# 		print('test_position', test_position)
-	# 		break
-	
