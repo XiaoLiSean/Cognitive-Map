@@ -1,0 +1,6 @@
+pretrain_use: False
+num_epochs: 20
+num_classes: 10
+batch_size: 64
+learning_rate: 1e-8
+action_file_path: /home/user/src/Cognitive-Map/experiment/data

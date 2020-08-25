@@ -46,6 +46,9 @@ class Dumb_Navigetion():
 			self._map_searched = [True] * len(self._coordinate_dict)
 		self._build_map()
 
+	def Open_close_label_text(self):
+		return self._Agent_action.Open_close_label_text()
+
 	def Get_agent_position(self):
 		return self._Agent_action.Get_agent_position()
 
@@ -155,18 +158,39 @@ class Agent_action():
 		self._event = self._controller.step('Pass')
 		self._start_time = time.time()
 		self._debug = debug
+		self._action_label_text_file = None
+		self._action_type = {'MOVE_FORWARD': 1, 'STAY_IDLE' :2, 'TURN_RIGHT' :3, 'TURN_LEFT': 4}
 
 	def Update_event(self):
 		self._event = self._controller.step('Pass')
 
-	def _Save_RGB(self):
+	def Open_close_label_text(self):
+		if self._action_label_text_file is None:
+			# if not os.path.exists(self._save_directory):
+			# 	os.makedirs(self._save_directory)
+			self._action_label_text_file = open(self._save_directory + '/action.txt', 'w')
+		else:
+			self._action_label_text_file.close()
+
+	def _Save_RGB_label(self, action):
 		self.Update_event()
+		RGB_file_name = str(time.time() - self._start_time)
 		frame = self._event.frame
 		img = Image.fromarray(frame, 'RGB')
-		if not os.path.exists(self._save_directory + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num)):
-			os.makedirs(self._save_directory + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num))
-		img.save(self._save_directory + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num) +
-				'/' + str(time.time() - self._start_time) + '.png')
+		if not os.path.exists(self._save_directory + '/images'):
+			os.makedirs(self._save_directory + '/images')
+		if not os.path.exists(self._save_directory + '/images' + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num)):
+			os.makedirs(self._save_directory + '/images' + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num))
+		img.save(self._save_directory + '/images' + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num) +
+				'/' + RGB_file_name + '.png')
+
+		if self._action_label_text_file is None:
+			logging.error('Action label file is not opened')
+			return
+		if action:
+			self._action_label_text_file.write('/images/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num) +
+				'/' + RGB_file_name + '.png' + ' ' + str(action) + '\n')
+
 
 	def Get_agent_position(self):
 		self.Update_event()
@@ -186,10 +210,11 @@ class Agent_action():
 
 	def Unit_move(self):
 		self._event = self._controller.step(action='MoveAhead')
+		return 'MOVE_FORWARD'
 
 	def Unit_rotate(self, degree):
 		if np.abs(degree) < 2:
-			return
+			return None
 		degree_corrected = degree
 		while degree_corrected > 180:
 			degree_corrected -= 360
@@ -197,8 +222,10 @@ class Agent_action():
 			degree_corrected += 360
 		if degree > 0:
 			self._event = self._controller.step(action='RotateRight', degrees=np.abs(degree_corrected))
+			return 'TURN_RIGHT'
 		else:
 			self._event = self._controller.step(action='RotateLeft', degrees=np.abs(degree_corrected))
+			return 'TURN_LEFT'
 
 	def Set_object_pose(self, object_name, original_position, pose):
 		objects = self.Get_object()
@@ -273,15 +300,18 @@ class Agent_action():
 		for _ in range(rotate_steps):
 			if self._debug:
 				time.sleep(self._sleep_time)
-			self.Unit_rotate(self._rotation_step * np.sign(rotation_error_corrected))
-			self._Save_RGB()
-		self.Unit_rotate((rotation_error_corrected - rotate_steps * self._rotation_step * np.sign(rotation_error_corrected)))
-		self._Save_RGB()
+			action = self.Unit_rotate(self._rotation_step * np.sign(rotation_error_corrected))
+			if action:
+				self._Save_RGB_label(self._action_type[action])
+		action = self.Unit_rotate((rotation_error_corrected - rotate_steps * self._rotation_step * np.sign(rotation_error_corrected)))
+		if action:
+			self._Save_RGB_label(self._action_type[action])
 
 		if self._debug:
 				time.sleep(self._sleep_time)
-		self.Unit_move()
-		self._Save_RGB()
+		action = self.Unit_move()
+		if action:
+			self._Save_RGB_label(self._action_type[action])
 
 		if not rotation_care:
 			return
@@ -309,10 +339,12 @@ class Agent_action():
 		for _ in range(rotate_steps):
 			if self._debug:
 				time.sleep(self._sleep_time)
-			self.Unit_rotate(self._rotation_step * np.sign(rotation_error_corrected))
-			self._Save_RGB()
-		self.Unit_rotate((rotation_error_corrected - rotate_steps * self._rotation_step * np.sign(rotation_error_corrected)))
-		self._Save_RGB()
+			action = self.Unit_rotate(self._rotation_step * np.sign(rotation_error_corrected))
+			if action:
+				self._Save_RGB_label(self._action_type[action])
+		action = self.Unit_rotate((rotation_error_corrected - rotate_steps * self._rotation_step * np.sign(rotation_error_corrected)))
+		if action:
+			self._Save_RGB_label(self._action_type[action])
 		
 		return
 
@@ -320,11 +352,12 @@ class Agent_action():
 if __name__ == '__main__':
 	Dumb_Navigetion = Dumb_Navigetion(args.scene_type, args.scene_num, args.grid_size,
 		args.rotation_step, args.sleep_time, args.save_directory, debug=True)
+	Dumb_Navigetion.Open_close_label_text()
 	position = Dumb_Navigetion.Get_agent_position()
 	ori_position = copy.deepcopy(position)
 	reach = Dumb_Navigetion._Agent_action.Get_reachable_coordinate()
-	print(reach)
+	# print(reach)
 	position = reach[random.randint(int(len(reach) / 3), len(reach))]
 	Dumb_Navigetion.Dumb_navigate(position)
-
+	Dumb_Navigetion.Open_close_label_text()
 	time.sleep(2)
