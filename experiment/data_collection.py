@@ -66,11 +66,11 @@ class Dumb_Navigetion():
 			self._point_list.append(list(point_adding.values()))
 			self._point_num += 1
 			self._map[self._point_num - 1] = []
-			
+
 			for point_added_index in range(self._point_num - 1):
 				point_added = self._point_list[point_added_index]
 				distance = np.linalg.norm(np.array(list(map(lambda x, y: x - y, point_added, self._point_list[self._point_num - 1]))))
-				
+
 				if distance < self._grid_size + 0.03 * self._grid_size:
 					# if self._debug:
 					# 	print('distance:', distance)
@@ -345,7 +345,7 @@ class Agent_action():
 		action = self.Unit_rotate((rotation_error_corrected - rotate_steps * self._rotation_step * np.sign(rotation_error_corrected)))
 		if action:
 			self._Save_RGB_label(self._action_type[action])
-		
+
 		return
 
 
@@ -356,7 +356,7 @@ if __name__ == '__main__':
 	position = Dumb_Navigetion.Get_agent_position()
 	ori_position = copy.deepcopy(position)
 	reach = Dumb_Navigetion._Agent_action.Get_reachable_coordinate()
-	# print(reach)
+	print(reach)
 	position = reach[random.randint(int(len(reach) / 3), len(reach))]
 	Dumb_Navigetion.Dumb_navigate(position)
 	Dumb_Navigetion.Open_close_label_text()

@@ -1,33 +1,18 @@
-# Scene graph Module for SSG and store object-level info for
+# Scene graph Module for SSG
 from scipy.sparse import lil_matrix, find
 from scipy.sparse import find as find_sparse_idx
+from os.path import dirname, abspath
+from termcolor import colored
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import xlrd
 import sys
 
-OBJ_TYPE_NUM = 125 # Maximum numbers of objectType in iTHOR Env.
-INFO_FILE_PATH = './AI2THOR_info' # objectType list of iTHOR Env.
-PROXIMITY_THRESHOLD = 3 # distance ratio threshold for proximity determination
-
-# Function for construct dictionary of d[objectType] = index
-# The index is listed in ai2thor.allenai.org/ithor/documentation/objects/actionable-properties/#table-of-object-actionable-properties
-def load_obj_idx_excel():
-    FILE_NAME = 'Object Type.xlsx'
-    wb = xlrd.open_workbook(INFO_FILE_PATH + '/' + FILE_NAME)
-    sh = wb.sheet_by_index(0)
-    obj_2_idx_dic = {}
-    idx_2_obj_list = []
-    for i in range(OBJ_TYPE_NUM):
-        obj_2_idx_dic[sh.cell(i,0).value] = i
-        idx_2_obj_list.append(sh.cell(i,0).value)
-    np.save(INFO_FILE_PATH + '/' + 'obj_2_idx_dic.npy', obj_2_idx_dic) # Save dictionary as .npy
-    np.save(INFO_FILE_PATH + '/' + 'idx_2_obj_list.npy', idx_2_obj_list) # Save list as .npy
-
-
+INFO_FILE_PATH = dirname(dirname(abspath(__file__))) + '/AI2THOR_info' # File path for info of iTHOR Env.
 obj_2_idx_dic = np.load(INFO_FILE_PATH + '/' + 'obj_2_idx_dic.npy', allow_pickle='TRUE').item()
 idx_2_obj_list = np.load(INFO_FILE_PATH + '/' + 'idx_2_obj_list.npy')
+OBJ_TYPE_NUM = len(idx_2_obj_list) # Maximum numbers of objectType in iTHOR Env.
+PROXIMITY_THRESHOLD = 3 # distance ratio threshold for proximity determination
 
 class Scene_Graph:
     def __init__(self):
@@ -55,7 +40,8 @@ class Scene_Graph:
         elif r_ij == 'disjoint':
             self._R_disjoint[obj_i, obj_j] = True
         else:
-            sys.stderr.write("Expect input r_ij = 'on', 'in', 'proximity' or 'disjoint' while get ", r_ij)
+            sys.stderr.write(colored('ERROR: ','red')
+                             + "Expect input r_ij = 'on', 'in', 'proximity' or 'disjoint' while get {}\n".format(r_ij))
             sys.exit(1)
 
     # Visualize Scene Graph
@@ -65,10 +51,10 @@ class Scene_Graph:
         edge_labels = {}
 
         # append edges and edge_labels for r_ij = 'on', 'in', 'proximity' & 'disjoint'
-        # eg: r_ij = 'on' implies obj_i on obj_j
+        # eg: r_ij = 'on' implies obj_i on obj_jpurple
         edge_data = [self._R_on, self._R_in, self._R_proximity, self._R_disjoint]
         edge_type = ['on', 'in', 'proximity', 'disjoint']
-        for k in range(len(edge_data)-1): # Exclude 'disjoint' for visualization
+        for k in range(len(edge_data)-1): # '-1' to Exclude 'disjoint' for visualization
             R = edge_data[k] # self._R_XXX
             i_list = find_sparse_idx(R)[0] # index for obj_i
             j_list = find_sparse_idx(R)[1] # index for obj_j
@@ -126,10 +112,3 @@ class Scene_Graph:
         # visualize Scene Graph
         if visualization_on:
             self.visualize_SG()
-
-
-if __name__ == '__main__':
-    # Reload the excel info into 'obj_2_idx_dic.npy' and 'idx_2_obj_list.npy'
-    print("Reloading AI2THOR objectType excel info into 'obj_2_idx_dic.npy' and 'idx_2_obj_list.npy'")
-    load_obj_idx_excel()
-    print('Done')
