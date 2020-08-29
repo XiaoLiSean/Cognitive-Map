@@ -1,10 +1,9 @@
 # Module for objectType info update
 from ai2thor.controller import Controller
-from os.path import dirname, abspath
 from termcolor import colored
+from params import INFO_FILE_PATH
 import numpy as np
 
-INFO_FILE_PATH = dirname(dirname(abspath(__file__))) + '/AI2THOR_info' # File path for info of iTHOR Env.
 
 # Function for construct dictionary of d[objectType] = index
 # and list for lst[index] = objectType
@@ -50,13 +49,10 @@ def update_object_type():
                 idx_2_obj_list.append(name)
                 objType_num = objType_num + 1
 
-    print(objType_num)
-    #for i in range(objType_num):
-    #    print(idx_2_obj_list[i], obj_2_idx_dic[idx_2_obj_list[i]])
 
     np.save(INFO_FILE_PATH + '/' + 'obj_2_idx_dic.npy', obj_2_idx_dic) # Save dictionary as .npy
     np.save(INFO_FILE_PATH + '/' + 'idx_2_obj_list.npy', idx_2_obj_list) # Save list as .npy
-
+    print(colored('INFO: ','blue') + "Successfully saved 'obj_2_idx_dic.npy' and 'idx_2_obj_list.npy'")
 
 
 

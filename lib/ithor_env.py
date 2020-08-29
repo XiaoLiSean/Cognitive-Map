@@ -2,6 +2,9 @@
 from ai2thor.controller import Controller
 from termcolor import colored
 from dijkstar import Graph, find_path
+# from lib.scene_graph_generation import *
+from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH
+import matplotlib.pyplot as plt
 import numpy as np
 import time, copy, sys
 
@@ -38,6 +41,7 @@ class Agent_Sim():
 
         self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
         self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size)
+        self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)  # Change simulation window size
         self._event = self._controller.step('Pass')
         self._start_time = time.time()
         self._action_type = {'MOVE_FORWARD': 1, 'STAY_IDLE' :2, 'TURN_RIGHT' :3, 'TURN_LEFT': 4}
@@ -82,7 +86,7 @@ class Agent_Sim():
             self._event = self._controller.step(action='RotateLeft', degrees=np.abs(degree_corrected))
             return 'TURN_LEFT'
 
-	# Assume goal is {'position': position, 'rotation': rotation} where position and rotation are dict or list
+    # Assume goal is {'position': position, 'rotation': rotation} where position and rotation are dict or list
     def move_towards(self, goal):
         self.update_event()
         agent_position = self.get_agent_position()
@@ -133,92 +137,110 @@ class Agent_Sim():
         action = self.unit_move()
 
 class Dumb_Navigetor():
-	def __init__(self, agent_sim):
-		self._map = {}
-		self._point_list = []
-		self._grid_size = agent_sim._grid_size
-		self._point_num = 0
-		self._agent_sim = agent_sim
-		self._starting_point = self._agent_sim.get_agent_position()
-		self._coordinate_dict = self._agent_sim.get_reachable_coordinate()
-		self._map_searched = [True] * len(self._coordinate_dict)
-		self._build_map()
+    def __init__(self, agent_sim):
+        self._map = {}
+        self._point_list = []
+        self._grid_size = agent_sim._grid_size
+        self._point_num = 0
+        self._agent_sim = agent_sim
+        self._starting_point = self._agent_sim.get_agent_position()
+        self._coordinate_dict = self._agent_sim.get_reachable_coordinate()
+        self._map_searched = [True] * len(self._coordinate_dict)
+        self._build_map()
 
-	def _build_map(self):
-		self._point_list.append(list(self._starting_point.values()))
-		self._map[self._point_num] = []
-		self._map_searched[self._point_num] = True
-		self._point_num += 1
-		for point_adding in self._coordinate_dict:
-			if self._starting_point == point_adding:
-				continue
-			self._point_list.append(list(point_adding.values()))
-			self._point_num += 1
-			self._map[self._point_num - 1] = []
+    def _build_map(self):
+        self._point_list.append(list(self._starting_point.values()))
+        self._map[self._point_num] = []
+        self._map_searched[self._point_num] = True
+        self._point_num += 1
+        for point_adding in self._coordinate_dict:
+            if self._starting_point == point_adding:
+                continue
+            self._point_list.append(list(point_adding.values()))
+            self._point_num += 1
+            self._map[self._point_num - 1] = []
 
-			for point_added_index in range(self._point_num - 1):
-				point_added = self._point_list[point_added_index]
-				distance = np.linalg.norm(np.array(list(map(lambda x, y: x - y, point_added, self._point_list[self._point_num - 1]))))
+            for point_added_index in range(self._point_num - 1):
+                point_added = self._point_list[point_added_index]
+                distance = np.linalg.norm(np.array(list(map(lambda x, y: x - y, point_added, self._point_list[self._point_num - 1]))))
 
-				if distance < self._grid_size + 0.03 * self._grid_size:
-					self._map[self._point_num - 1].append(point_added_index)
-					self._map[point_added_index].append(self._point_num - 1)
-		return
+                if distance < self._grid_size + 0.03 * self._grid_size:
+                    self._map[self._point_num - 1].append(point_added_index)
+                    self._map[point_added_index].append(self._point_num - 1)
+        return
 
-		# Assume goal_position is dict
-	def dumb_navigate(self, goal_position):
-		graph = Graph()
-		nav_starting_point = self._agent_sim.get_agent_position()
-		nav_starting_point = list(nav_starting_point.values())
-		for point in self._point_list:
-			if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, nav_starting_point)))) < 0.25 * self._grid_size:
-				nav_starting_point_index = self._point_list.index(point)
-				break
-		# nav_starting_point_index = self._point_list.index(nav_starting_point)
+    # Assume goal_position is dict
+    def dumb_navigate(self, goal_position, server=None, comfirmed=None):
+        # server and comfirm is not none --> this function is used as a server node
+        graph = Graph()
+        nav_starting_point = self._agent_sim.get_agent_position()
+        nav_starting_point = list(nav_starting_point.values())
+        for point in self._point_list:
+            if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, nav_starting_point)))) < 0.25 * self._grid_size:
+                nav_starting_point_index = self._point_list.index(point)
+                break
 
-		if isinstance(goal_position, dict):
-			goal_point = list(goal_position.values())
+        # nav_starting_point_index = self._point_list.index(nav_starting_point)
 
-		goal_point_index = None
-		for point in self._point_list:
-			if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, goal_point)))) < 0.25 * self._grid_size:
-				goal_point_index = self._point_list.index(point)
-				break
-		if goal_point_index is None or nav_starting_point_index is None:
-			sys.stderr.write(colored('ERROR: ','red') + 'No matching point in map' + '\n')
-			return
+        if isinstance(goal_position, dict):
+            goal_point = list(goal_position.values())
 
-		connected_point_index = self._map[goal_point_index]
-		nearest_reachable_index = None
-		goal_in_existing_map = False
-		if self._map_searched[goal_point_index]:
-			nearest_reachable_index = goal_point_index
-			goal_in_existing_map = True
-		else:
-			for index in connected_point_index:
-				if self._map_searched[index]:
-					nearest_reachable_index = index
-					break
-			if nearest_reachable_index is None:
-				sys.stderr.write(colored('ERROR: ','red') + 'Can not reach the point by existing map' + '\n')
-				return
+        goal_point_index = None
+        for point in self._point_list:
+            if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, goal_point)))) < 0.25 * self._grid_size:
+                goal_point_index = self._point_list.index(point)
+                break
+        if goal_point_index is None or nav_starting_point_index is None:
+            sys.stderr.write(colored('ERROR: ','red') + 'No matching point in map' + '\n')
+            return
 
-		for index in range(len(self._map)):
-			for connected_index in range(len(self._map[index])):
-				if self._map_searched[self._map[index][connected_index]]:
-					graph.add_edge(index, self._map[index][connected_index], 1)
-		result = find_path(graph, nav_starting_point_index, nearest_reachable_index)
+        connected_point_index = self._map[goal_point_index]
+        nearest_reachable_index = None
+        goal_in_existing_map = False
+        if self._map_searched[goal_point_index]:
+            nearest_reachable_index = goal_point_index
+            goal_in_existing_map = True
+        else:
+            for index in connected_point_index:
+                if self._map_searched[index]:
+                    nearest_reachable_index = index
+                    break
+            if nearest_reachable_index is None:
+                sys.stderr.write(colored('ERROR: ','red') + 'Can not reach the point by existing map' + '\n')
+                return
 
-		path = result.nodes
+        for index in range(len(self._map)):
+            for connected_index in range(len(self._map[index])):
+                if self._map_searched[self._map[index][connected_index]]:
+                    graph.add_edge(index, self._map[index][connected_index], 1)
 
-		for mid_point_index in range(1, len(path)):
-			mid_point_pose = {'position': [], 'rotation': []}
-			mid_point_pose['position'] = copy.deepcopy(self._point_list[path[mid_point_index]])
-			mid_point_pose['rotation'] = [0, 0, 0]
-			self._agent_sim.move_towards(mid_point_pose)
+        result = find_path(graph, nav_starting_point_index, nearest_reachable_index)
 
-		if not goal_in_existing_map:
-			self._agent_sim.move_towards({'position': copy.deepcopy(self._point_list[goal_point_index]), 'rotation': [0, 0, 0]})
-			self._map_searched[goal_point_index] = True
+        path = result.nodes
 
-		return
+        for mid_point_index in range(1, len(path)):
+            if server is not None:  # this navigator serve as a server node
+                objs = [obj for obj in self._agent_sim._event.metadata['objects'] if obj['visible']]
+                server.send(objs)
+                print(colored('Server: ','cyan') + 'Sent Data from navigator at mid_point_index {}'.format(mid_point_index))
+                while True:  # Waiting for client to confirm
+                    if comfirmed.value:
+                        break
+                comfirmed.value = 0  # Turn off the switch
+
+            # Action
+            mid_point_pose = {'position': [], 'rotation': []}
+            mid_point_pose['position'] = copy.deepcopy(self._point_list[path[mid_point_index]])
+            mid_point_pose['rotation'] = [0, 0, 0]
+            self._agent_sim.move_towards(mid_point_pose)
+
+        # Terminate the service by sending 'END'
+        if server is not None:
+            server.send('END')
+            print(colored('Server: ','cyan') + 'END')
+
+        if not goal_in_existing_map:
+            self._agent_sim.move_towards({'position': copy.deepcopy(self._point_list[goal_point_index]), 'rotation': [0, 0, 0]})
+            self._map_searched[goal_point_index] = True
+
+        return

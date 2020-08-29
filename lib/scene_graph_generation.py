@@ -1,24 +1,28 @@
 # Scene graph Module for SSG
 from scipy.sparse import lil_matrix, find
 from scipy.sparse import find as find_sparse_idx
-from os.path import dirname, abspath
 from termcolor import colored
+from lib.params import *
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import networkx as nx
 import numpy as np
-import sys
-
-INFO_FILE_PATH = dirname(dirname(abspath(__file__))) + '/AI2THOR_info' # File path for info of iTHOR Env.
-obj_2_idx_dic = np.load(INFO_FILE_PATH + '/' + 'obj_2_idx_dic.npy', allow_pickle='TRUE').item()
-idx_2_obj_list = np.load(INFO_FILE_PATH + '/' + 'idx_2_obj_list.npy')
-OBJ_TYPE_NUM = len(idx_2_obj_list) # Maximum numbers of objectType in iTHOR Env.
-PROXIMITY_THRESHOLD = 3 # distance ratio threshold for proximity determination
+import sys, time
 
 class Scene_Graph:
     def __init__(self):
         # All vector and sparse matrix initialized with 'False' boolean
-        self._obj_vec = lil_matrix((OBJ_TYPE_NUM, 1), dtype=np.bool) # binary object occurence vector where index follow 'obj_2_idx_dic.npy'
-        self._R_on = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool) # Relationship sparse matrix _R_on[i,j] = True , obj_i on obj_j
+        self._obj_vec = lil_matrix((OBJ_TYPE_NUM, 1), dtype=np.bool)    # binary object occurence vector where index follow 'obj_2_idx_dic.npy'
+        self._R_on = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)    # Relationship sparse matrix _R_on[i,j] = True , obj_i on obj_j
+        self._R_in = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
+        self._R_proximity = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
+        self._R_disjoint = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
+
+    # reset all values in SG instance
+    def reset(self):
+        # All vector and sparse matrix initialized with 'False' boolean
+        self._obj_vec = lil_matrix((OBJ_TYPE_NUM, 1), dtype=np.bool)    # binary object occurence vector where index follow 'obj_2_idx_dic.npy'
+        self._R_on = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)    # Relationship sparse matrix _R_on[i,j] = True , obj_i on obj_j
         self._R_in = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
         self._R_proximity = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
         self._R_disjoint = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
@@ -45,8 +49,9 @@ class Scene_Graph:
             sys.exit(1)
 
     # Visualize Scene Graph
-    def visualize_SG(self):
-        node_list = find_sparse_idx(self._obj_vec)[0] # objectType/Node index list
+    def visualize_SG(self, comfirmed=None):
+        # comfirm is not none --> this function is used as a client node
+        node_list = find_sparse_idx(self._obj_vec)[0]  # objectType/Node index list
         edges = []
         edge_labels = {}
 
@@ -66,16 +71,24 @@ class Scene_Graph:
         G = nx.DiGraph(directed=True)
         G.add_edges_from(edges)
         pos = nx.spring_layout(G)
-        plt.figure()
+        #fig = plt.figure()
         nx.draw(G, pos, edge_color='black', width=2, linewidths=1,
                 node_size=1500, node_color='skyblue', alpha=0.9,
                 labels={node:idx_2_obj_list[int(node)] for node in G.nodes()})
         nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='red')
-        plt.axis('off')
-        plt.show()
+        if comfirmed is None:
+            plt.show() # plt.show() is a blocking function...
+        else:
+            # to continuous changing SG, cannot use blocking function plt.show()
+            # plt.savefig("tmp.png")
+            # plt.imshow(mpimg.imread("tmp.png"))
+            plt.show()
+            print(colored('Client: ','green') + 'Receive Data from navigator')
+            comfirmed.value = 1
 
     # Input object data 'event.metadata['objects']'
-    def update_from_data(self, objs, visualization_on = False):
+    def update_from_data(self, objs, visualization_on = False, comfirmed=None):
+        # comfirm is not none --> this function is used as a client node
         # Loop through current observation and update SG
         for i in range(len(objs)-1):
             for j in range(i+1, len(objs)):
@@ -111,4 +124,4 @@ class Scene_Graph:
 
         # visualize Scene Graph
         if visualization_on:
-            self.visualize_SG()
+            self.visualize_SG(comfirmed)
