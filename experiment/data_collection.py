@@ -17,7 +17,10 @@ parser.add_argument("--grid_size", type=float, default=0.25,  help="Grid size of
 parser.add_argument("--rotation_step", type=float, default=10,  help="Rotation step of AI2THOR simulation")
 parser.add_argument("--sleep_time", type=float, default=0.05,  help="Sleep time between two actions")
 parser.add_argument("--save_directory", type=str, default='./data',  help="Data saving directory")
+parser.add_argument("--overwrite_data", type=bool, default=True, help="overwrite the existing data or not")
 parser.add_argument("--log_level", type=int, default=5,  help="Level of showing log 1-5 where 5 is most detailed")
+parser.add_argument("--debug", type=bool, default=True,  help="Output debug info if True")
+
 
 args = parser.parse_args()
 
@@ -32,18 +35,20 @@ logging.basicConfig(level=log_setting[args.log_level])
 
 
 class Dumb_Navigetion():
-	def __init__(self, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, debug=False):
+	def __init__(self, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, overwrite_data, debug=False):
 		self._map = {}
 		self._point_list = []
 		self._grid_size = grid_size
 		self._point_num = 0
-		self._Agent_action = Agent_action(scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, debug=debug)
+		self._sleep_time = sleep_time
+		self._Agent_action = Agent_action(scene_type, scene_num, grid_size, rotation_step, sleep_time,
+			save_directory, overwrite_data, debug=debug)
 		self._starting_point = self._Agent_action.Get_agent_position()
 		self._coordinate_dict = self._Agent_action.Get_reachable_coordinate()
 		self._map_searched = [False] * len(self._coordinate_dict)
 		self._debug = debug
-		if self._debug:
-			self._map_searched = [True] * len(self._coordinate_dict)
+		# if self._debug:
+		# 	self._map_searched = [True] * len(self._coordinate_dict)
 		self._build_map()
 
 	def Open_close_label_text(self):
@@ -81,8 +86,28 @@ class Dumb_Navigetion():
 					self._map[point_added_index].append(self._point_num - 1)
 		return
 
+	def Dumb_traverse_map(self):
+		searching_queue = []
+		# print(self._point_list)
+		# print(self._Agent_action.Get_agent_position())
+		while False in self._map_searched:
+			current_position_index = self._point_list.index(list(self._Agent_action.Get_agent_position().values()))
+			if current_position_index in searching_queue:
+				searching_queue.remove(current_position_index)
+			for connected_point_index in self._map[current_position_index]:
+				if connected_point_index not in searching_queue and not self._map_searched[connected_point_index]:
+					searching_queue.insert(0, connected_point_index)
+			if self._debug:
+				print(searching_queue)
+			if len(searching_queue) == 0:
+				break
+			if not self.Dumb_navigate(self._point_list[searching_queue[0]], searching_queue[0]):
+				logging.error('Fail traversing the map')
+				break
+		return
+
 		# Assume goal_position is dict
-	def Dumb_navigate(self, goal_position):
+	def Dumb_navigate(self, goal_position, goal_index=None):
 		graph = Graph()
 		nav_starting_point = self._Agent_action.Get_agent_position()
 		nav_starting_point = list(nav_starting_point.values())
@@ -90,19 +115,23 @@ class Dumb_Navigetion():
 			if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, nav_starting_point)))) < 0.25 * self._grid_size:
 				nav_starting_point_index = self._point_list.index(point)
 				break
+		
 		# nav_starting_point_index = self._point_list.index(nav_starting_point)
 
 		if isinstance(goal_position, dict):
 			goal_point = list(goal_position.values())
 
 		goal_point_index = None
-		for point in self._point_list:
-			if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, goal_point)))) < 0.25 * self._grid_size:
-				goal_point_index = self._point_list.index(point)
-				break
+		if goal_index is None:
+			for point in self._point_list:
+				if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, goal_point)))) < 0.25 * self._grid_size:
+					goal_point_index = self._point_list.index(point)
+					break
+		else:
+			goal_point_index = goal_index
 		if goal_point_index is None or nav_starting_point_index is None:
 			logging.error('No matching point in map')
-			return
+			return False
 
 		connected_point_index = self._map[goal_point_index]
 		nearest_reachable_index = None
@@ -117,7 +146,7 @@ class Dumb_Navigetion():
 					break
 			if nearest_reachable_index is None:
 				logging.error('Can not reach the point by existing map')
-				return
+				return False
 
 		for index in range(len(self._map)):
 			for connected_index in range(len(self._map[index])):
@@ -131,22 +160,24 @@ class Dumb_Navigetion():
 			mid_point_pose = {'position': [], 'rotation': []}
 			mid_point_pose['position'] = copy.deepcopy(self._point_list[path[mid_point_index]])
 			mid_point_pose['rotation'] = [0, 0, 0]
-			self._Agent_action.Move_toward(mid_point_pose, rotation_care=False)
+			if not self._Agent_action.Move_toward(mid_point_pose, rotation_care=False):
+				return False
 
 		if self._debug:
 			print('not moving by path-----------')
 			print('self._point_list[goal_point_index]: ', self._point_list[goal_point_index])
 		if not goal_in_existing_map:
-			self._Agent_action.Move_toward({'position': copy.deepcopy(self._point_list[goal_point_index]), 'rotation': [0, 0, 0]}, rotation_care=False)
+			if not self._Agent_action.Move_toward({'position': copy.deepcopy(self._point_list[goal_point_index]), 'rotation': [0, 0, 0]}, rotation_care=False):
+				return False
 			self._map_searched[goal_point_index] = True
 		if self._debug:
-				time.sleep(1)
+				time.sleep(self._sleep_time)
 				print('--------------------------------------------------------')
-		return
+		return True
 
 
 class Agent_action():
-	def __init__(self, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, debug=False):
+	def __init__(self, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, overwrite_data, debug=False):
 		self._scene_type = scene_type
 		self._scene_num = scene_num
 		self._grid_size = grid_size
@@ -155,20 +186,25 @@ class Agent_action():
 		self._scene_name = 'FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num)
 		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size)
 		self._save_directory = save_directory
+		self._overwrite_data = overwrite_data
 		self._event = self._controller.step('Pass')
 		self._start_time = time.time()
 		self._debug = debug
 		self._action_label_text_file = None
-		self._action_type = {'MOVE_FORWARD': 1, 'STAY_IDLE' :2, 'TURN_RIGHT' :3, 'TURN_LEFT': 4}
+		self._action_type = {'MOVE_FORWARD': 1, 'STAY_IDLE': 2, 'TURN_RIGHT': 3, 'TURN_LEFT': 4}
 
 	def Update_event(self):
 		self._event = self._controller.step('Pass')
 
 	def Open_close_label_text(self):
 		if self._action_label_text_file is None:
-			# if not os.path.exists(self._save_directory):
-			# 	os.makedirs(self._save_directory)
-			self._action_label_text_file = open(self._save_directory + '/action.txt', 'w')
+			if not os.path.exists(self._save_directory):
+				os.makedirs(self._save_directory)
+			if  self._overwrite_data:
+				self._action_label_text_file = open(self._save_directory + '/action.txt', 'w')
+			else:
+				self._action_label_text_file = open(self._save_directory + '/action.txt', 'a')
+				self._action_label_text_file.seek(0, 2)
 		else:
 			self._action_label_text_file.close()
 
@@ -290,10 +326,10 @@ class Agent_action():
 
 		if np.linalg.norm(np.array(position_error)) > self._grid_size * 1.10:
 			logging.error('Moving step {} greater than grid size {}'.format(position_error, self._grid_size))
-			return
+			return False
 		elif np.linalg.norm(np.array(position_error)) < self._grid_size * 0.10:
 			logging.info('Moving distance {} too small'.format(position_error))
-			return
+			return False
 
 		rotate_steps = int(np.abs(rotation_error_corrected / self._rotation_step))
 
@@ -314,7 +350,7 @@ class Agent_action():
 			self._Save_RGB_label(self._action_type[action])
 
 		if not rotation_care:
-			return
+			return True
 
 		self.Update_event()
 		agent_rotation = self.Get_agent_rotation()
@@ -346,18 +382,23 @@ class Agent_action():
 		if action:
 			self._Save_RGB_label(self._action_type[action])
 
-		return
+		return True
 
 
 if __name__ == '__main__':
 	Dumb_Navigetion = Dumb_Navigetion(args.scene_type, args.scene_num, args.grid_size,
-		args.rotation_step, args.sleep_time, args.save_directory, debug=True)
+		args.rotation_step, args.sleep_time, args.save_directory, overwrite_data=args.overwrite_data, debug=True)
 	Dumb_Navigetion.Open_close_label_text()
+	Dumb_Navigetion.Dumb_traverse_map()
 	position = Dumb_Navigetion.Get_agent_position()
+	print(position)
 	ori_position = copy.deepcopy(position)
 	reach = Dumb_Navigetion._Agent_action.Get_reachable_coordinate()
-	print(reach)
-	position = reach[random.randint(int(len(reach) / 3), len(reach))]
-	Dumb_Navigetion.Dumb_navigate(position)
+	print(reach[0:4])
+	position_goal = reach[random.randint(int(len(reach) / 3), len(reach))]
+	Dumb_Navigetion.Dumb_navigate(position_goal)
 	Dumb_Navigetion.Open_close_label_text()
+	position = Dumb_Navigetion.Get_agent_position()
+	print(position)
+	print(position == position_goal)
 	time.sleep(2)

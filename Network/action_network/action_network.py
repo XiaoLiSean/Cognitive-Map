@@ -91,6 +91,7 @@ class Action_dataset(torch.utils.data.Dataset):
 		# return len(self._data)
 		return len(self._index_pair_label)
 
+
 if __name__ == '__main__':
 	model = resnet18(pretrained=False, num_classes=params['num_classes'])
 	criterion = nn.CrossEntropyLoss()

@@ -1,5 +1,7 @@
 lib/__pycache__
 example.py
 tmp.png
+experiment/data/images/
+*.png
 .idea/
 .git/

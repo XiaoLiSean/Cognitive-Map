@@ -1,0 +1,14 @@
+#!/bin/bash
+file_name="data_collection.py"
+if [ -e $file_name ];then
+	for scene_type in $(seq 1 4); do
+		for scene_num in $(seq 1 10); do
+			if [ $scene_type -eq 1 -a $scene_num -eq 1];then
+				python $file_name --scene_type $scene_type --scene_num $scene_num --overwrite_data True
+			else
+				python $file_name --scene_type $scene_type --scene_num $scene_num --overwrite_data False
+			fi
+		done
+	done
+fi
+
