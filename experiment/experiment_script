@@ -1,14 +1,76 @@
 #!/bin/bash
+# argument 1: scene_type_num from 1-4, take this number of scene type randomly from 4 types
+# argument 2: scene num from 1-30, take this number of scene of each type randomly from 30 scenes
+# argument 3: run each scene type and specific scene this time 
+num_scene_type=$1
+num_scene_num=$2
+num_trial=$3
+
+function rand(){
+    min=$1
+    max=$(($2-$min+1))
+    num=$(date +%s%N)
+    return $(($num%$max+$min))
+}
+
+result_get_rand_list=()
+function get_rand_list(){
+	max=$1
+	num_list=$2
+	list=()
+	rand 1 $max
+	list[0]=$?
+	while [ ${#list[*]} -ne $num_list ]
+	do
+		rand 1 $max
+		result=$?
+		add=1
+		for i in ${list[@]}
+		do
+			if [ $i -eq $result ];then
+				add=0
+			fi
+		done
+		if [ $add -eq 1 ];then
+			list[${#list[*]}]=$result
+		fi
+	done
+	result_get_rand_list=()
+	i=0
+	for scene_type in ${list[@]}; do
+		result_get_rand_list[i]=$scene_type
+		i=$(($i+1))
+	done
+}
+
+get_rand_list 4 $num_scene_type
+scene_type_list=()
+i=0
+for scene_type in ${result_get_rand_list[@]}; do
+	scene_type_list[i]=$scene_type
+	i=$(($i+1))
+done 
+
+get_rand_list 10 $num_scene_num
+scene_num_list=()
+i=0
+for scene_type in ${result_get_rand_list[@]}; do
+	scene_num_list[i]=$scene_type
+	i=$(($i+1))
+done 
+
 file_name="data_collection.py"
 if [ -e $file_name ];then
-	for scene_type in $(seq 1 4); do
-		for scene_num in $(seq 1 10); do
-			if [ $scene_type -eq 1 -a $scene_num -eq 1];then
-				python $file_name --scene_type $scene_type --scene_num $scene_num --overwrite_data True
-			else
-				python $file_name --scene_type $scene_type --scene_num $scene_num --overwrite_data False
-			fi
+	for scene_type in ${scene_type_list[@]}; do
+		for scene_num in ${scene_num_list[@]}; do
+			echo scene_type $scene_type scene_num ${scene_num}
+			for n in $(seq 1 $num_trial);do
+				if [ $scene_type -eq ${scene_type_list[0]} -a $scene_num -eq ${scene_num_list[0]} ];then
+					python $file_name --scene_type $scene_type --scene_num $scene_num --overwrite_data True
+				else
+					python $file_name --scene_type $scene_type --scene_num $scene_num --overwrite_data False
+				fi
+			done
 		done
 	done
 fi
-
