@@ -3,13 +3,13 @@ from ai2thor.controller import Controller
 from termcolor import colored
 from dijkstar import Graph, find_path
 # from lib.scene_graph_generation import *
-from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH
+from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH, VISBILITY_DISTANCE
 import matplotlib.pyplot as plt
 import numpy as np
 import time, copy, sys
 
 class Agent_Sim():
-    def __init__(self, scene_type, scene_num, grid_size=0.25, rotation_step=10, sleep_time=0.05):
+    def __init__(self, scene_type, scene_num, grid_size=0.25, rotation_step=10, sleep_time=0.05, ToggleMapView=False):
         self._scene_type = scene_type
         self._scene_num = scene_num
         self._grid_size = grid_size
@@ -40,8 +40,12 @@ class Agent_Sim():
 
 
         self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
-        self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size)
+        self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE)
         self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)  # Change simulation window size
+
+        if ToggleMapView:   # Top view of the map to see the objets layout. issue: no SG can be enerated
+            self._controller.step({"action": "ToggleMapView"})
+
         self._event = self._controller.step('Pass')
         self._start_time = time.time()
         self._action_type = {'MOVE_FORWARD': 1, 'STAY_IDLE' :2, 'TURN_RIGHT' :3, 'TURN_LEFT': 4}
@@ -171,6 +175,7 @@ class Dumb_Navigetor():
 
     # Assume goal_position is dict
     def dumb_navigate(self, goal_position, server=None, comfirmed=None):
+        print(colored('Dumb navigate to: {}','cyan').format(goal_position))
         # server and comfirm is not none --> this function is used as a server node
         graph = Graph()
         nav_starting_point = self._agent_sim.get_agent_position()

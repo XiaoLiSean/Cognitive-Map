@@ -1,7 +1,7 @@
 # Module for objectType info update
 from ai2thor.controller import Controller
 from termcolor import colored
-from params import INFO_FILE_PATH
+from params import INFO_FILE_PATH, BAN_TYPE_LIST
 import numpy as np
 
 
@@ -44,6 +44,8 @@ def update_object_type():
         event = controller.step(action='Pass')
         for obj in event.metadata['objects']:
             name = obj['objectType']
+            if name in BAN_TYPE_LIST:     # Ignore non-informative objectType e.g. 'Floor'
+                continue
             if name not in obj_2_idx_dic:
                 obj_2_idx_dic.update({name : objType_num})
                 idx_2_obj_list.append(name)
