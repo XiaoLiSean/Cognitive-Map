@@ -32,7 +32,7 @@ class Action_dataset(torch.utils.data.Dataset):
 		self._label_list = []
 		# self._data = []
 		self._index_pair_label = self.Go_through_text()
-		print('self._index_pair_label: ', self._index_pair_label)
+		# print('self._index_pair_label: ', self._index_pair_label)
 		# for line in action_groundtruth:
 		# 	line = line.rstrip()
 		# 	words = line.split()
@@ -61,7 +61,7 @@ class Action_dataset(torch.utils.data.Dataset):
 				label_current = label
 				repeat_index_dict[i] = [1, label_current]
 				pre_dict_index = i
-		print(repeat_index_dict)
+		# print(repeat_index_dict)
 		keys_shuffled = copy.deepcopy(list(repeat_index_dict.keys()))
 		random.shuffle(keys_shuffled)
 		for key in keys_shuffled:
@@ -79,9 +79,10 @@ class Action_dataset(torch.utils.data.Dataset):
 		current_img_path = self._img_path_list[index_pair_label[0]]
 		future_img_path = self._img_path_list[index_pair_label[1]]
 		label = index_pair_label[2]
-		current_img = (np.array(Image.open(self._action_groundtruth_path + current_img_path).convert('RGB'))).transpose([1, 2, 0])
-		future_img = (np.array(Image.open(self._action_groundtruth_path + future_img_path).convert('RGB'))).transpose([1, 2, 0])
-		data = np.concatenate((current_img, future_img), axis=2)
+		current_img = (np.array(Image.open(self._action_groundtruth_path + current_img_path).convert('RGB'))).transpose([0, 1, 2])
+		# print('current_img: ', current_img.shape)
+		future_img = (np.array(Image.open(self._action_groundtruth_path + future_img_path).convert('RGB'))).transpose([0, 1, 2])
+		data = np.concatenate((current_img, future_img), axis=1)
 		if not self._transform is None:
 			data = self._transform(data)
 

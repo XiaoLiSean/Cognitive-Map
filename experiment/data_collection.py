@@ -17,17 +17,17 @@ parser.add_argument("--grid_size", type=float, default=0.25,  help="Grid size of
 parser.add_argument("--rotation_step", type=float, default=10,  help="Rotation step of AI2THOR simulation")
 parser.add_argument("--sleep_time", type=float, default=0.05,  help="Sleep time between two actions")
 parser.add_argument("--save_directory", type=str, default='./data',  help="Data saving directory")
-parser.add_argument("--overwrite_data", type=bool, default=True, help="overwrite the existing data or not")
+parser.add_argument("--overwrite_data", type=bool, default=False, help="overwrite the existing data or not")
 parser.add_argument("--log_level", type=int, default=5,  help="Level of showing log 1-5 where 5 is most detailed")
-parser.add_argument("--debug", type=bool, default=True,  help="Output debug info if True")
+parser.add_argument("--debug", type=bool, default=False,  help="Output debug info if True")
 
 
 args = parser.parse_args()
-
+print(args)
 
 if args.scene_num == 0:
 	args.scene_num = random.randint(1, 30)
-scene_setting = {1: '', 2: '2', 3: '3', 4: '4'}
+scene_setting = {1: 0, 2: 200, 3: 300, 4: 400}
 
 log_setting = {1: logging.CRITICAL, 2: logging.ERROR, 3: logging.WARNING, 4: logging.INFO, 5: logging.DEBUG}
 
@@ -183,7 +183,7 @@ class Agent_action():
 		self._grid_size = grid_size
 		self._rotation_step = rotation_step
 		self._sleep_time = sleep_time
-		self._scene_name = 'FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num)
+		self._scene_name = 'FloorPlan' + str(scene_setting[self._scene_type] + self._scene_num)
 		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size)
 		self._save_directory = save_directory
 		self._overwrite_data = overwrite_data
@@ -191,7 +191,7 @@ class Agent_action():
 		self._start_time = time.time()
 		self._debug = debug
 		self._action_label_text_file = None
-		self._action_type = {'MOVE_FORWARD': 1, 'STAY_IDLE': 2, 'TURN_RIGHT': 3, 'TURN_LEFT': 4}
+		self._action_type = {'MOVE_FORWARD': 1, 'TURN_RIGHT': 2, 'TURN_LEFT': 3, 'STAY_IDLE': 4}
 
 	def Update_event(self):
 		self._event = self._controller.step('Pass')
@@ -215,16 +215,16 @@ class Agent_action():
 		img = Image.fromarray(frame, 'RGB')
 		if not os.path.exists(self._save_directory + '/images'):
 			os.makedirs(self._save_directory + '/images')
-		if not os.path.exists(self._save_directory + '/images' + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num)):
-			os.makedirs(self._save_directory + '/images' + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num))
-		img.save(self._save_directory + '/images' + '/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num) +
+		if not os.path.exists(self._save_directory + '/images' + '/FloorPlan' + str(scene_setting[self._scene_type] + self._scene_num)):
+			os.makedirs(self._save_directory + '/images' + '/FloorPlan' + str(scene_setting[self._scene_type] + self._scene_num))
+		img.save(self._save_directory + '/images' + '/FloorPlan' + str(scene_setting[self._scene_type] + self._scene_num) +
 				'/' + RGB_file_name + '.png')
 
 		if self._action_label_text_file is None:
 			logging.error('Action label file is not opened')
 			return
 		if action:
-			self._action_label_text_file.write('/images/FloorPlan' + scene_setting[self._scene_type] + str(self._scene_num) +
+			self._action_label_text_file.write('/images/FloorPlan' + str(scene_setting[self._scene_type] + self._scene_num) +
 				'/' + RGB_file_name + '.png' + ' ' + str(action) + '\n')
 
 
@@ -336,6 +336,7 @@ class Agent_action():
 		for _ in range(rotate_steps):
 			if self._debug:
 				time.sleep(self._sleep_time)
+				print('sleep')
 			action = self.Unit_rotate(self._rotation_step * np.sign(rotation_error_corrected))
 			if action:
 				self._Save_RGB_label(self._action_type[action])
@@ -345,6 +346,7 @@ class Agent_action():
 
 		if self._debug:
 				time.sleep(self._sleep_time)
+				print('sleep')
 		action = self.Unit_move()
 		if action:
 			self._Save_RGB_label(self._action_type[action])
@@ -375,6 +377,7 @@ class Agent_action():
 		for _ in range(rotate_steps):
 			if self._debug:
 				time.sleep(self._sleep_time)
+				print('sleep')
 			action = self.Unit_rotate(self._rotation_step * np.sign(rotation_error_corrected))
 			if action:
 				self._Save_RGB_label(self._action_type[action])
@@ -386,8 +389,13 @@ class Agent_action():
 
 
 if __name__ == '__main__':
+	print(args.debug)
 	Dumb_Navigetion = Dumb_Navigetion(args.scene_type, args.scene_num, args.grid_size,
-		args.rotation_step, args.sleep_time, args.save_directory, overwrite_data=args.overwrite_data, debug=True)
+		args.rotation_step, args.sleep_time, args.save_directory, overwrite_data=args.overwrite_data, debug=args.debug)
+	print(Dumb_Navigetion._debug)
+	# position = Dumb_Navigetion.Get_agent_position()
+	# print(position)
+	# exit()
 	Dumb_Navigetion.Open_close_label_text()
 	Dumb_Navigetion.Dumb_traverse_map()
 	position = Dumb_Navigetion.Get_agent_position()

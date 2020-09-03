@@ -68,7 +68,7 @@ if [ -e $file_name ];then
 				if [ $scene_type -eq ${scene_type_list[0]} -a $scene_num -eq ${scene_num_list[0]} ];then
 					python $file_name --scene_type $scene_type --scene_num $scene_num --overwrite_data True
 				else
-					python $file_name --scene_type $scene_type --scene_num $scene_num --overwrite_data False
+					python $file_name --scene_type $scene_type --scene_num $scene_num
 				fi
 			done
 		done
