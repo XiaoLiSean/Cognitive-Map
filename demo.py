@@ -9,8 +9,8 @@ def server_nav(server, comfirmed):
     navigator = Dumb_Navigetor(robot)
     reachable_poses = navigator._agent_sim.get_reachable_coordinate()
     goal = reachable_poses[random.randint(int(len(reachable_poses) / 3), len(reachable_poses))]
-    # goal = {'x': 1.25, 'y': 0.900999546, 'z': 0.25}     # Test case for SG debugging
-    goal = {'x': 0.5, 'y': 0.900999546, 'z': -1.75}     # Test case for SG debugging
+    goal = {'x': 1.25, 'y': 0.900999546, 'z': 0.25}     # Test case for SG debugging
+    # goal = {'x': 0.5, 'y': 0.900999546, 'z': -1.75}     # Test case for SG debugging
     # enter subprocess
     navigator.dumb_navigate(goal, server=server, comfirmed=comfirmed)
 
