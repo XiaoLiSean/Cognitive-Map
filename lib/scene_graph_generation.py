@@ -93,6 +93,8 @@ class Scene_Graph:
         nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='red')
         if comfirmed is None:
             plt.show() # plt.show() is a blocking function...
+            
+        # this SG function serve as a server node
         else:
             # to continuous changing SG, cannot use blocking function plt.show()
             # plt.savefig('tmp'+str(random.randint(1,100))+'.png')
@@ -170,7 +172,7 @@ class Scene_Graph:
                     # Exam the 'proximity' Relationship
                         distance_ij = np.linalg.norm(np.array([center_ij[0]['x'], center_ij[0]['y'], center_ij[0]['z']]) -
                                                      np.array([center_ij[1]['x'], center_ij[1]['y'], center_ij[1]['z']]))
-                        # Note: z is the forward axis, z is the horizon axis and y is the upward axis
+                        # Note: z is the forward axis, x is the horizon axis and y is the upward axis
                         is_proximity = (distance_ij < (PROXIMITY_THRESHOLD * np.linalg.norm([size_ij[smaller_obj]['x'],
                                                                                              size_ij[smaller_obj]['y'],
                                                                                              size_ij[smaller_obj]['z']])))

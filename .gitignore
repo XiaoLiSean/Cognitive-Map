@@ -1,5 +1,6 @@
 lib/__pycache__
-example.py
+example_mp.py
+draw_wedge.py
 tmp.png
 experiment/data/images/
 *.png

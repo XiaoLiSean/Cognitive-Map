@@ -3,7 +3,7 @@ from ai2thor.controller import Controller
 from termcolor import colored
 from dijkstar import Graph, find_path
 # from lib.scene_graph_generation import *
-from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH, VISBILITY_DISTANCE
+from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH, VISBILITY_DISTANCE, FIELD_OF_VIEW
 import matplotlib.pyplot as plt
 import numpy as np
 import time, copy, sys
@@ -40,7 +40,7 @@ class Agent_Sim():
 
 
         self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
-        self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE)
+        self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW)
         self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)  # Change simulation window size
 
         if ToggleMapView:   # Top view of the map to see the objets layout. issue: no SG can be enerated
@@ -224,8 +224,10 @@ class Dumb_Navigetor():
         path = result.nodes
 
         for mid_point_index in range(1, len(path)):
-            if server is not None:  # this navigator serve as a server node
+            # This navigator serve as a server node if server is not None
+            if server is not None:
                 objs = [obj for obj in self._agent_sim._event.metadata['objects'] if obj['visible']]
+                print(self._agent_sim._event.metadata['agent'])
                 server.send(objs)
                 print(colored('Server: ','cyan') + 'Sent Data from navigator at mid_point_index {}'.format(mid_point_index))
                 while True:  # Waiting for client to confirm
