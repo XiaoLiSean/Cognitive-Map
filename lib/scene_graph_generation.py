@@ -9,6 +9,7 @@ import networkx as nx
 import numpy as np
 import sys, time
 
+
 class Scene_Graph:
     def __init__(self):
         # All vector and sparse matrix initialized with 'False' boolean
@@ -35,14 +36,28 @@ class Scene_Graph:
         self._obj_vec[obj_j, 0] = True
         if r_ij == 'on':
             self._R_on[obj_i, obj_j] = True
+            self._R_on[obj_j, obj_i] = False     # The Relationship arrow in SG should be directional
+            # priority filter in case two object with same objectType have distinct R with another obj:
+            # 'on' > 'in' > 'proximity' > 'disjoint'
+            # This is also used to rguarantee unique i-j Relationship
+            self._R_in[obj_i, obj_j] = False
+            self._R_proximity[obj_i, obj_j] = False
+            self._R_disjoint[obj_i, obj_j] = False
         elif r_ij == 'in':
             self._R_in[obj_i, obj_j] = True
+            self._R_in[obj_j, obj_i] = False     # The Relationship arrow in SG should be directional
+            self._R_proximity[obj_i, obj_j] = False # priority filter
+            self._R_disjoint[obj_i, obj_j] = False # priority filter
+
         # 'proximity' and 'disjoint' belong to mutual Relationship
         # r_ij point from small to larger obj: chair proximity to table
         elif r_ij == 'proximity':
             self._R_proximity[obj_i, obj_j] = True
+            self._R_proximity[obj_j, obj_i] = False     # The Relationship arrow in SG should be directional
+            self._R_disjoint[obj_i, obj_j] = False # priority filter
         elif r_ij == 'disjoint':
             self._R_disjoint[obj_i, obj_j] = True
+            self._R_disjoint[obj_j, obj_i] = False     # The Relationship arrow in SG should be directional
         else:
             sys.stderr.write(colored('ERROR: ','red')
                              + "Expect input r_ij = 'on', 'in', 'proximity' or 'disjoint' while get {}\n".format(r_ij))
@@ -78,21 +93,42 @@ class Scene_Graph:
         nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='red')
         if comfirmed is None:
             plt.show() # plt.show() is a blocking function...
+            
+        # this SG function serve as a server node
         else:
             # to continuous changing SG, cannot use blocking function plt.show()
-            # plt.savefig("tmp.png")
+            # plt.savefig('tmp'+str(random.randint(1,100))+'.png')
             # plt.imshow(mpimg.imread("tmp.png"))
+            # plt.show(block=False)
             plt.show()
             print(colored('Client: ','green') + 'Receive Data from navigator')
             comfirmed.value = 1
 
     # Input object data 'event.metadata['objects']'
-    def update_from_data(self, objs, visualization_on = False, comfirmed=None):
+    def update_from_data(self, objs, visualization_on=False, comfirmed=None):
         # comfirm is not none --> this function is used as a client node
         # Loop through current observation and update SG
         for i in range(len(objs)-1):
+            if objs[i]['objectType'] in BAN_TYPE_LIST:  # Ignore non-informative objectType e.g. 'Floor'
+                continue
             for j in range(i+1, len(objs)):
-                # First exam the Receptacle Relationship 'on'
+
+                # 1. Ignore non-informative objectType e.g. 'Floor'
+                # 2. Rule out the exceptions of two objects belonging to same Type
+                # 3. priority filter in case two object with same objectType have distinct R with another obj:
+                #   'on' > 'in' > 'proximity' > 'disjoint'
+                if objs[j]['objectType'] in BAN_TYPE_LIST or objs[i]['objectType'] == objs[j]['objectType']:
+                    continue
+                R_on_stored = (self._R_on[obj_2_idx_dic[objs[i]['objectType']],obj_2_idx_dic[objs[j]['objectType']]]
+                               or self._R_on[obj_2_idx_dic[objs[j]['objectType']],obj_2_idx_dic[objs[i]['objectType']]])
+                R_in_stored = (self._R_in[obj_2_idx_dic[objs[i]['objectType']],obj_2_idx_dic[objs[j]['objectType']]]
+                               or self._R_in[obj_2_idx_dic[objs[j]['objectType']],obj_2_idx_dic[objs[i]['objectType']]])
+                R_proximity_stored = (self._R_proximity[obj_2_idx_dic[objs[i]['objectType']],obj_2_idx_dic[objs[j]['objectType']]]
+                                      or self._R_proximity[obj_2_idx_dic[objs[j]['objectType']],obj_2_idx_dic[objs[i]['objectType']]])
+                if R_on_stored:
+                    continue
+
+                # First exam the Receptacle Relationship 'on', high priority defined by the simulation system attributes setting
                 if objs[i]['parentReceptacles'] is not None and objs[i]['parentReceptacles'][0] == objs[j]['objectId']:
                     self.update_SG(obj_2_idx_dic[objs[i]['objectType']],
                                    obj_2_idx_dic[objs[j]['objectType']], 'on')
@@ -100,7 +136,7 @@ class Scene_Graph:
                     self.update_SG(obj_2_idx_dic[objs[j]['objectType']],
                                    obj_2_idx_dic[objs[i]['objectType']], 'on')
                 else:
-                # Exam the 'proximity' Relationship
+                    # Precalculations for later Relationship identification
                     idx_ij = [i, j]
                     center_ij = [objs[i]['axisAlignedBoundingBox']['center'],
                                  objs[j]['axisAlignedBoundingBox']['center']]
@@ -112,15 +148,40 @@ class Scene_Graph:
                     # from_i_to_j = False: j 'proximity'/'disjoint' to i
                     from_i_to_j = (size_ij[0]['x']*size_ij[0]['y']*size_ij[0]['z'] <
                                    size_ij[1]['x']*size_ij[1]['y']*size_ij[1]['z'])
-                    distance_ij = np.linalg.norm(np.array([center_ij[0]['x'], center_ij[0]['y'], center_ij[0]['z']]) -
-                                                 np.array([center_ij[1]['x'], center_ij[1]['y'], center_ij[1]['z']]))
-                    is_proximity = (distance_ij < PROXIMITY_THRESHOLD*max([size_ij[int(not from_i_to_j)]['x'], size_ij[int(not from_i_to_j)]['y']]))
-                    if is_proximity:
-                        self.update_SG(obj_2_idx_dic[objs[idx_ij[int(not from_i_to_j)]]['objectType']],
-                                       obj_2_idx_dic[objs[idx_ij[int(from_i_to_j)]]['objectType']], 'proximity')
+
+                    # from_i_to_j = True: smaller_obj = 0, it's object i smaller and been tested against j which is reference in dimension
+                    # from_i_to_j = False: smaller_obj = 1, it's object j smaller and been tested against i which is reference in dimension
+                    smaller_obj = int(not from_i_to_j)
+                    larger_obj = int(from_i_to_j)
+                    # Exam on Relationship 'in'
+                    is_in = True
+                    ref_center = np.array([center_ij[larger_obj]['x'], center_ij[larger_obj]['y'], center_ij[larger_obj]['z']])
+                    ref_size = np.array([size_ij[larger_obj]['x'], size_ij[larger_obj]['y'], size_ij[larger_obj]['z']])
+                    # smaller object is in larger object if and only if all corner points of smaller one is in axisAlignedBoundingBox of larger one
+                    for point in objs[idx_ij[smaller_obj]]['axisAlignedBoundingBox']['cornerPoints']:
+                        point = np.array(point)
+                        diff = np.abs(point - ref_center) - ref_size / 2.0
+                        if np.max(diff) > 0:
+                            is_in = False
+                            break
+
+                    if is_in and not R_on_stored:   # priority filter
+                        self.update_SG(obj_2_idx_dic[objs[idx_ij[smaller_obj]]['objectType']],
+                                       obj_2_idx_dic[objs[idx_ij[larger_obj]]['objectType']], 'in')
                     else:
-                        self.update_SG(obj_2_idx_dic[objs[idx_ij[int(not from_i_to_j)]]['objectType']],
-                                       obj_2_idx_dic[objs[idx_ij[int(from_i_to_j)]]['objectType']], 'disjoint')
+                    # Exam the 'proximity' Relationship
+                        distance_ij = np.linalg.norm(np.array([center_ij[0]['x'], center_ij[0]['y'], center_ij[0]['z']]) -
+                                                     np.array([center_ij[1]['x'], center_ij[1]['y'], center_ij[1]['z']]))
+                        # Note: z is the forward axis, x is the horizon axis and y is the upward axis
+                        is_proximity = (distance_ij < (PROXIMITY_THRESHOLD * np.linalg.norm([size_ij[smaller_obj]['x'],
+                                                                                             size_ij[smaller_obj]['y'],
+                                                                                             size_ij[smaller_obj]['z']])))
+                        if is_proximity and not R_in_stored:   # priority filter
+                            self.update_SG(obj_2_idx_dic[objs[idx_ij[smaller_obj]]['objectType']],
+                                           obj_2_idx_dic[objs[idx_ij[larger_obj]]['objectType']], 'proximity')
+                        elif not R_proximity_stored:  # priority filter
+                            self.update_SG(obj_2_idx_dic[objs[idx_ij[smaller_obj]]['objectType']],
+                                           obj_2_idx_dic[objs[idx_ij[larger_obj]]['objectType']], 'disjoint')
 
         # visualize Scene Graph
         if visualization_on:

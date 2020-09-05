@@ -1,7 +1,7 @@
 # Module for objectType info update
 from ai2thor.controller import Controller
 from termcolor import colored
-from params import INFO_FILE_PATH
+from params import INFO_FILE_PATH, BAN_TYPE_LIST
 import numpy as np
 
 
@@ -44,15 +44,27 @@ def update_object_type():
         event = controller.step(action='Pass')
         for obj in event.metadata['objects']:
             name = obj['objectType']
+            if name in BAN_TYPE_LIST:     # Ignore non-informative objectType e.g. 'Floor'
+                continue
             if name not in obj_2_idx_dic:
                 obj_2_idx_dic.update({name : objType_num})
                 idx_2_obj_list.append(name)
                 objType_num = objType_num + 1
 
-
-    np.save(INFO_FILE_PATH + '/' + 'obj_2_idx_dic.npy', obj_2_idx_dic) # Save dictionary as .npy
-    np.save(INFO_FILE_PATH + '/' + 'idx_2_obj_list.npy', idx_2_obj_list) # Save list as .npy
-    print(colored('INFO: ','blue') + "Successfully saved 'obj_2_idx_dic.npy' and 'idx_2_obj_list.npy'")
+def update_object():
+    iTHOR, RoboTHOR = update_floor_plan()
+    obj_list = []   # by 'name' attributes
+    controller = Controller()
+    for floor_plan in (iTHOR + RoboTHOR):
+        controller.reset(floor_plan)
+        event = controller.step(action='Pass')
+        for obj in event.metadata['objects']:
+            name = obj['name']
+            if obj['objectType'] in BAN_TYPE_LIST:     # Ignore non-informative objectType e.g. 'Floor'
+                continue
+            if name not in obj_list:
+                obj_list.append(name)
+    print(len(obj_list))
 
 
 
@@ -62,4 +74,5 @@ if __name__ == '__main__':
     print(colored('WARNING: ','magenta') + 'The objectType in the Excel file is obsolete')
     print(colored('INFO: ','blue') + "Reloading AI2THOR objectType info into 'obj_2_idx_dic.npy' and 'idx_2_obj_list.npy'")
     update_object_type()
+    #update_object()    # 6336 object instances in total
     print(colored('INFO: ','blue') + 'Done')
