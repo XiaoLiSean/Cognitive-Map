@@ -1,6 +1,9 @@
 lib/__pycache__
+Network/common/__pycache__
+3rdparty/
 example_mp.py
 draw_wedge.py
+test_lib.py
 tmp.png
 experiment/data/images/
 *.png

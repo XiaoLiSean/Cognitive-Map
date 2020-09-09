@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Wedge
 from matplotlib.collections import PatchCollection
 from numpy import matlib as mb
-from params import VISBILITY_DISTANCE, FIELD_OF_VIEW, SIMILARITY_GRID_ORDER
+from lib.params import VISBILITY_DISTANCE, FIELD_OF_VIEW, SIMILARITY_GRID_ORDER
 
 # color map and setting for plot
 COLOR_REGULAR = 'lightgrey'
@@ -53,7 +53,7 @@ def view_similarity(pose1, pose2, visualization_on=False):
         wedge2 = Wedge((pose2['x'], pose2['z']), VISBILITY_DISTANCE,
                        90-pose2['theta']-FIELD_OF_VIEW/2.0, 90-pose2['theta']+FIELD_OF_VIEW/2.0)
         patches = [wedge1, wedge2]
-        p = PatchCollection(patches, alpha=0.1)
+        p = PatchCollection(patches, alpha=0.2)
         p.set_array(np.array([0.0, 0.5]))
         ax.add_collection(p)
     # main algorithm to estimate the similarity score
@@ -77,11 +77,3 @@ def view_similarity(pose1, pose2, visualization_on=False):
         plt.show()
     # similarity calculation
     return num_in_intercept / num_in_FoV1
-
-
-if __name__ == '__main__':
-    # Test case
-    pose1 = {'x': -1.0, 'theta': 270.0, 'z': 1.0}
-    pose2 = {'x': -1.0, 'theta': 180.0, 'z': 0.75}
-    pose3 = {'x': -1.0, 'theta': 180.0, 'z': 0.5}
-    print(view_similarity(pose2, pose3, visualization_on=True))

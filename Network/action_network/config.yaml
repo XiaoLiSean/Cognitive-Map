@@ -4,4 +4,4 @@ num_classes: 10
 batch_size: 64
 learning_rate: 1e-8
 max_distance: 5
-action_file_path: /home/user/src/Cognitive-Map/experiment/data
+action_file_path: /home/progress/Cognitive-Map/experiment/data
