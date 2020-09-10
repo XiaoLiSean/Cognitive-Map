@@ -5,7 +5,7 @@ import multiprocessing, random
 
 def server_nav(server, comfirmed):
     # prepare date for navigator process
-    robot = Agent_Sim('Kitchen', 2, ToggleMapView=False)
+    robot = Agent_Sim('Kitchen', 30, ToggleMapView=False)
     navigator = Dumb_Navigetor(robot)
     reachable_poses = navigator._agent_sim.get_reachable_coordinate()
     goal = reachable_poses[random.randint(int(len(reachable_poses) / 3), len(reachable_poses))]

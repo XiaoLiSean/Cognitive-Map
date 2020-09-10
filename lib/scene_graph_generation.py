@@ -1,6 +1,7 @@
 # Scene graph Module for SSG
 from scipy.sparse import lil_matrix, find
 from scipy.sparse import find as find_sparse_idx
+from mpl_toolkits.mplot3d import Axes3D
 from termcolor import colored
 from lib.params import *
 import matplotlib.pyplot as plt
@@ -93,7 +94,7 @@ class Scene_Graph:
         nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='red')
         if comfirmed is None:
             plt.show() # plt.show() is a blocking function...
-            
+
         # this SG function serve as a server node
         else:
             # to continuous changing SG, cannot use blocking function plt.show()
@@ -103,6 +104,129 @@ class Scene_Graph:
             plt.show()
             print(colored('Client: ','green') + 'Receive Data from navigator')
             comfirmed.value = 1
+
+    # Function to generate points for plot_surface a cuboid
+    def cuboid_data(self, pos, size):
+        # code taken from
+        # https://stackoverflow.com/a/35978146/4124317
+        # suppose axis direction: x: to left; y: to inside; z: to upper
+        # get the length, width, and height
+        o = [pos['x'], pos['z'], -pos['y']] # This is reorgnized to suit AI2THOR coordinates
+        l = size['x']
+        w = size['z']
+        h = size['y']
+
+        x = [[o[0], o[0] + l, o[0] + l, o[0], o[0]],
+             [o[0], o[0] + l, o[0] + l, o[0], o[0]],
+             [o[0], o[0] + l, o[0] + l, o[0], o[0]],
+             [o[0], o[0] + l, o[0] + l, o[0], o[0]]] - 0.5*l
+        y = [[o[1], o[1], o[1] + w, o[1] + w, o[1]],
+             [o[1], o[1], o[1] + w, o[1] + w, o[1]],
+             [o[1], o[1], o[1], o[1], o[1]],
+             [o[1] + w, o[1] + w, o[1] + w, o[1] + w, o[1] + w]] - 0.5*w
+        z = [[o[2], o[2], o[2], o[2], o[2]],
+             [o[2] + h, o[2] + h, o[2] + h, o[2] + h, o[2] + h],
+             [o[2], o[2], o[2] + h, o[2] + h, o[2]],
+             [o[2], o[2], o[2] + h, o[2] + h, o[2]]] - 0.5*h
+
+        return np.array(x), np.array(y), np.array(z)
+
+    def plot_cube_at(self, pos, size, ax=None):
+        # Plotting a cube element at position pos
+        if ax !=None:
+            X, Y, Z = self.cuboid_data(pos, size)
+            ax.plot_surface(X, Y, Z, rstride=1, cstride=1,alpha=0.5, linewidth=0,color='limegreen')
+
+    # This function is used to draw bounding boxs from objects
+    def draw_bb_from_objs(self, objs):
+        fig = plt.figure()
+        ax = fig.gca(projection='3d', aspect='auto')
+        for obj in objs:
+            pos = obj['axisAlignedBoundingBox']['center']
+            size = obj['axisAlignedBoundingBox']['size']
+            self.plot_cube_at(pos, size, ax=ax)
+
+        plt.show()
+
+    # This function is used to judge if two objects: cabinets or drawers can form a group
+    def in_group(self, drawer_group, new_drawer):
+        in_group = False
+        for grouped_drawer in drawer_group:
+            grouped = grouped_drawer['axisAlignedBoundingBox']
+            # Test if those two are close enough
+            new = new_drawer['axisAlignedBoundingBox']
+            distance = np.linalg.norm(np.array([new['center']['x'], new['center']['y'], new['center']['z']])
+                                      -np.array([grouped['center']['x'], grouped['center']['y'], grouped['center']['z']]))
+            new_r = np.linalg.norm(np.array([0.5*new['size']['x'], 0.5*new['size']['y'], 0.5*new['size']['z']]))
+            grouped_r = np.linalg.norm(np.array([0.5*grouped['size']['x'], 0.5*grouped['size']['y'], 0.5*grouped['size']['z']]))
+            if distance < (new_r+grouped_r)*CLUSTERING_RADIUS_RATIO:
+                in_group = True
+
+        return in_group
+
+    # This function is used to preprocess the object data before update the SG
+    # To group up the objectType 'Drawer' and 'Cabinet' based on their structure and position
+    def group_up(self, objs, visualization_on=False):
+        drawers = [] # used to temporarily store all drawers
+
+        # Feed in all drawers and cabinets into lists
+        for obj in objs:
+            if obj['objectType'] == 'Drawer':
+                drawers.append(obj)
+        # Case There is no drawer
+        if len(drawers) == 0:
+            print(colored('Group info: ','blue')+'No drawer')
+            return objs
+        # used to output results of group
+        output = '{} Drawer '.format(len(drawers))
+        # This is preliminary process of drawer groups
+        # drawer_groups = [drawer_group_1, drawer_group_2] = [[drawer_1, drawer_2],[drawer_3, drawer_4]]
+        # initialize drawer_groups
+        drawer_groups = []
+        drawer_groups.append([drawers.pop(0)])
+
+        # iteration through all drawers
+        # Algorithm to radiatively get in group members for the last added group
+        while True:
+            least_one_grouped = False
+            # [:] is used to assign new list, not adding [:] is essentially a pointer
+            tmp_drawers = drawers[:]
+            for new_drawer in tmp_drawers:
+                in_group = False
+                # [:] is used to assign new list, not adding [:] is essentially a pointer
+                tmp_drawer_group = drawer_groups[-1][:]
+                # Test if those two are close enoug
+                if self.in_group(tmp_drawer_group, new_drawer):
+                    drawer_groups[-1].append(new_drawer)
+                    drawers.remove(new_drawer)
+                    least_one_grouped = True
+                if len(drawers) == 0:
+                    break
+            if not least_one_grouped and len(drawers) != 0:
+                drawer_groups.append([drawers.pop(0)])
+            if len(drawers) == 0:
+                break
+
+        # Prepare output to show group info
+        output += 'formed {} groups:'.format(len(drawer_groups))
+        for drawer_group in drawer_groups:
+            output += ' [{}] '.format(len(drawer_group))
+        print(colored('Group info: ','blue')+output)
+        # Used to store drawer and cabinet groups
+        # i.e. drawer_groups = [drawer_group_1, drawer_group_2]
+        #      drawer_group_1 = {'objectType': 'Drawer',
+        #                        'members': [drawer_1, drawer_2],
+        #                        'axisAlignedBoundingBox': {'cornerPoints': [[-1.24880266, 1.56558228, -0.902912259],
+        #                                                                    [-1.24880266, 1.56558228, -1.086083],
+        #                                                                    [-1.24880266, 1.23842049, -0.902912259],
+        #                                                                    [-1.24880266, 1.23842049, -1.086083],
+        #                                                                    [-1.390816, 1.56558228, -0.902912259],
+        #                                                                    [-1.390816, 1.56558228, -1.086083],
+        #                                                                    [-1.390816, 1.23842049, -0.902912259],
+        #                                                                    [-1.390816, 1.23842049, -1.086083]],
+        #                                                   'center': {'x': -1.31980932, 'y': 1.40200138, 'z': -0.994497657},
+        #                                                   'size': {'x': 0.142013311, 'y': 0.3271618, 'z': 0.1831708} }
+        return
 
     # Input object data 'event.metadata['objects']'
     def update_from_data(self, objs, visualization_on=False, comfirmed=None):
@@ -170,8 +294,8 @@ class Scene_Graph:
                                        obj_2_idx_dic[objs[idx_ij[larger_obj]]['objectType']], 'in')
                     else:
                     # Exam the 'proximity' Relationship
-                        distance_ij = np.linalg.norm(np.array([center_ij[0]['x'], center_ij[0]['y'], center_ij[0]['z']]) -
-                                                     np.array([center_ij[1]['x'], center_ij[1]['y'], center_ij[1]['z']]))
+                        distance_ij = np.linalg.norm(np.array([center_ij[0]['x'], center_ij[0]['y'], center_ij[0]['z']])
+                                                     - np.array([center_ij[1]['x'], center_ij[1]['y'], center_ij[1]['z']]))
                         # Note: z is the forward axis, x is the horizon axis and y is the upward axis
                         is_proximity = (distance_ij < (PROXIMITY_THRESHOLD * np.linalg.norm([size_ij[smaller_obj]['x'],
                                                                                              size_ij[smaller_obj]['y'],

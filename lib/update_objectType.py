@@ -120,6 +120,7 @@ def get_type_parent(name='Shelf'):
 # --------------------------------------------------------------------------
 # Side Notes: FloorPlan206 have 15 'Shelf' ... shelf belongs to TVStand, ShelvingUnit
 #             FloorPlan9 have 28 'Cabinet'
+#             FloorPlan30 have 27 'Drawer'
 #             FloorPlan_Train12_5 have 8 'SideTable'
 REC_MAX_DIC = {'Drawer': 27, 'CounterTop': 4, 'Cabinet': 28, 'Microwave': 1, 'Shelf': 15, 'Toaster': 1, 'Pan': 1, 'GarbageCan': 1, 'Pot': 2,
  'Fridge': 1, 'CoffeeMachine': 1, 'Bowl': 1, 'SinkBasin': 2, 'Mug': 1, 'Stool': 2, 'Chair': 8, 'Sink': 2, 'SideTable': 8,
