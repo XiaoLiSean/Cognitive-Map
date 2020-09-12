@@ -1,6 +1,8 @@
 lib/__pycache__
 Network/common/__pycache__
 3rdparty/
+words.txt
+objs.txt
 example_mp.py
 draw_wedge.py
 test_lib.py
