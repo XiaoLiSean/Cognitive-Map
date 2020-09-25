@@ -5,6 +5,7 @@
 num_scene_type=$1
 num_scene_num=$2
 num_trial=$3
+test_data=$4
 
 function rand(){
     min=$1
@@ -43,21 +44,31 @@ function get_rand_list(){
 	done
 }
 
-get_rand_list 4 $num_scene_type
+get_rand_list 7 $num_scene_type
 scene_type_list=()
 i=0
 for scene_type in ${result_get_rand_list[@]}; do
 	scene_type_list[i]=$scene_type
 	i=$(($i+1))
-done 
+done
+scene_type_list[0]=4
+scene_type_list[1]=10
+scene_type_list[2]=9
+scene_type_list[3]=7
+scene_type_list[4]=12
+scene_type_list[5]=11
+scene_type_list[6]=5
+echo ${scene_type_list[@]}
 
-get_rand_list 10 $num_scene_num
+get_rand_list 5 $num_scene_num
 scene_num_list=()
 i=0
 for scene_type in ${result_get_rand_list[@]}; do
 	scene_num_list[i]=$scene_type
 	i=$(($i+1))
 done 
+
+# scene_num_list=(4 24 30)
 
 file_name="data_collection.py"
 if [ -e $file_name ];then
@@ -66,11 +77,21 @@ if [ -e $file_name ];then
 			echo scene_type $scene_type scene_num ${scene_num}
 			for n in $(seq 1 $num_trial);do
 				if [ $scene_type -eq ${scene_type_list[0]} -a $scene_num -eq ${scene_num_list[0]} ];then
-					python $file_name --scene_type $scene_type --scene_num $scene_num --overwrite_data True
+					if [ $test_data == true ];then
+						python $file_name --scene_type $scene_type --scene_num $scene_num --overwrite_data False --test_data True --AI2THOR True
+					else
+						python $file_name --scene_type $scene_type --scene_num $scene_num --overwrite_data False --AI2THOR True
+					fi
 				else
-					python $file_name --scene_type $scene_type --scene_num $scene_num
+					if [ $test_data == true ];then
+						python $file_name --scene_type $scene_type --scene_num $scene_num --test_data True --AI2THOR True
+					else
+						python $file_name --scene_type $scene_type --scene_num $scene_num --AI2THOR True
+					fi
 				fi
 			done
 		done
 	done
 fi
+echo ${scene_num_list[@]}
+# 

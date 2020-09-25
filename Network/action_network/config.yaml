@@ -1,7 +1,8 @@
 pretrain_use: False
-num_epochs: 20
-num_classes: 10
-batch_size: 64
-learning_rate: 1e-8
+num_epochs: 100
+num_classes: 3
+batch_size: 32
+learning_rate: 1e-12
 max_distance: 5
 action_file_path: /home/user/src/Cognitive-Map/experiment/data
+test_action_file_path: /home/user/src/Cognitive-Map/experiment/data/test_dataset
