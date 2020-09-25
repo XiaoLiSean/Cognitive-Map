@@ -5,12 +5,13 @@ import multiprocessing, random
 
 def server_nav(server, comfirmed):
     # prepare date for navigator process
-    robot = Agent_Sim('Kitchen', 1, ToggleMapView=True)
+    robot = Agent_Sim('Kitchen', 30, ToggleMapView=False)
     navigator = Dumb_Navigetor(robot)
     reachable_poses = navigator._agent_sim.get_reachable_coordinate()
     goal = reachable_poses[random.randint(int(len(reachable_poses) / 3), len(reachable_poses))]
+    goal = {'x': -0.25, 'y': 0.927788734, 'z': 1.0}
     # goal = {'x': 1.25, 'y': 0.900999546, 'z': 0.25}     # Test case for SG debugging
-    goal = {'x': 0.5, 'y': 0.900999546, 'z': -1.75}     # Test case for SG debugging
+    # goal = {'x': 0.5, 'y': 0.900999546, 'z': -1.75}     # Test case for SG debugging
     # enter subprocess
     navigator.dumb_navigate(goal, server=server, comfirmed=comfirmed)
 
