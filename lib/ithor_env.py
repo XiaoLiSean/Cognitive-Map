@@ -8,7 +8,7 @@ import numpy as np
 import time, copy, sys
 
 class Agent_Sim():
-    def __init__(self, scene_type, scene_num, grid_size=0.25, rotation_step=10, sleep_time=0.05, ToggleMapView=False):
+    def __init__(self, scene_type='Kitchen', scene_num=1, scene_name=None, grid_size=0.25, rotation_step=10, sleep_time=0.05, ToggleMapView=False):
         self._scene_type = scene_type
         self._scene_num = scene_num
         self._grid_size = grid_size
@@ -37,8 +37,11 @@ class Agent_Sim():
                              + "Expect scene_type 'Kitchen', 'Living room', 'Bedroom' or 'Bathroom' while get '{}'\n".format(scene_type))
             sys.exit(1)
 
+        if scene_name is None:
+            self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
+        else:
+            self._scene_name = scene_name
 
-        self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
         self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW)
         self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)  # Change simulation window size
 
@@ -175,9 +178,11 @@ class Dumb_Navigetor():
     # Assume goal_position is dict
     def dumb_navigate(self, goal_position, server=None, comfirmed=None):
         print(colored('Dumb navigate to: {}','cyan').format(goal_position))
+        #self._controller.step(action='TeleportFull', x=0.999, y=1.01, z=-0.3541, rotation=dict(x=0.0, y=90.0, z=0.0), horizon=30.0)
         # server and comfirm is not none --> this function is used as a server node
         graph = Graph()
         nav_starting_point = self._agent_sim.get_agent_position()
+        print(nav_starting_point)
         nav_starting_point = list(nav_starting_point.values())
         for point in self._point_list:
             if np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, nav_starting_point)))) < 0.25 * self._grid_size:

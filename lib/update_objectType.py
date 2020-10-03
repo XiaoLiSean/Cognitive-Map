@@ -184,8 +184,6 @@ def refine_object_info():
     np.save(INFO_FILE_PATH + '/' + 'obj_2_idx_dic.npy', obj_dic) # Save dictionary as .npy
     np.save(INFO_FILE_PATH + '/' + 'idx_2_obj_list.npy', obj_list) # Save list as .npy
 
-
-
 # --------------------------------------------------------------------------
 # This function is used to check objectType info against official info
 # in ai2thor.allenai.org/ithor/documentation/objects/actionable-properties/#table-of-object-actionable-properties
@@ -208,3 +206,62 @@ def update_object():
             if name not in obj_list:
                 obj_list.append(name)
     print(len(obj_list))
+
+# --------------------------------------------------------------------------
+# Function used to get moveable but not pickupable objects
+def furniture_object():
+    iTHOR, RoboTHOR = update_floor_plan()
+    max_mass = 0
+    min_mass = 10
+    obj_list = []   # by 'name' attributes
+    controller = Controller()
+    for floor_plan in (iTHOR + RoboTHOR):
+        controller.reset(floor_plan)
+        event = controller.step(action='Pass')
+        for obj in event.metadata['objects']:
+            name = obj['objectType']
+            if obj['mass'] > max_mass:
+                max_mass = obj['mass']
+            if obj['mass'] < min_mass:
+                min_mass = obj['mass']
+            if name not in obj_list and not obj['pickupable'] and obj['moveable']:
+                obj_list.append(name)
+    print(obj_list, max_mass, min_mass)
+
+# max_mass = 103.999992 min_mass = 0.0
+# HIGH_DYNAMICS = ['HousePlant', 'GarbageCan', 'Stool', 'Chair', 'GarbageBag',
+#                  'FloorLamp', 'DeskLamp', 'ArmChair', 'Toaster', 'SideTable',
+#                  'LaundryHamper', 'Desktop', 'VacuumCleaner', 'RoomDecor',
+#                  'Ottoman', 'DogBed']
+# LOW_DYNAMICS = ['Microwave', 'CoffeeMachine', 'ShelvingUnit', 'DiningTable',
+#                 'CoffeeTable', 'TVStand', 'Sofa', 'Safe', 'Television',
+#                 'Desk', 'Dresser', 'Bed']
+
+# --------------------------------------------------------------------------
+# Function used to get infomation about objects and their possible receptacles
+# This is further used to analyze possible dynamcis
+def parentReceptacles_of_obj():
+    controller = Controller()
+    parentReceptacles_of_objs = {}
+    random_num = 100
+    floorplans = np.concatenate((ITHOR_FLOOR_PLANS, ROBOTHOR_FLOOR_PLANS), axis=0)
+    for floor_plan in floorplans:
+        controller.reset(floor_plan)
+        # Randomize the objects layout for random_num times
+        for i in range(random_num):
+            event = controller.step(action='InitialRandomSpawn', randomSeed=i,
+                                    forceVisible=False, numPlacementAttempts=5,
+                                    placeStationary=True)
+            # Collect possible parentReceptacles' objectType for obj
+            for obj in event.metadata['objects']:
+                objType = obj['objectType']
+                if objType not in parentReceptacles_of_objs:
+                    parentReceptacles_of_objs.update({objType:[]})
+                if obj['parentReceptacles'] is not None:
+                    receptacleId = obj['parentReceptacles'][0]
+                    receptacleType = receptacleId.split('|')[0]
+                    if receptacleType not in parentReceptacles_of_objs[objType]:
+                        parentReceptacles_of_objs[obj['objectType']].append(receptacleType)
+
+    print(parentReceptacles_of_objs)
+    np.save(INFO_FILE_PATH + '/' + 'parentReceptacles_of_objs.npy', parentReceptacles_of_objs) # Save dictionary as .npy
