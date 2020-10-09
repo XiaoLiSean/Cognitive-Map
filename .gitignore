@@ -7,3 +7,4 @@ experiment/data/images/
 *.png
 .idea/
 .git/
+*.pkl
