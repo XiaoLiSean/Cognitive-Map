@@ -94,9 +94,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 
             # Iterate over data.
             for inputs, labels in dataloaders[phase]:
-                inputs = inputs.to(device)
-                labels = labels.to(device)
-
+                #inputs = inputs.to(device)
+                #labels = labels.to(device)
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
@@ -106,7 +105,6 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                     outputs = model(inputs)
                     _, preds = torch.max(outputs, 1)
                     loss = criterion(outputs, labels)
-
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
@@ -175,7 +173,7 @@ print(model_ft.fc.in_features, model_ft.fc.out_features)
 # Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
 model_ft.fc = nn.Linear(num_ftrs, 2)
 
-model_ft = model_ft.to(device)
+#model_ft = model_ft.to(device)
 
 criterion = nn.CrossEntropyLoss()
 

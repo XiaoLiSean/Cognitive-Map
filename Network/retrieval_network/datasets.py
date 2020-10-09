@@ -13,6 +13,7 @@ sys.path.append(root_folder)
 
 from lib.similarity import *
 
+# ------------------------------------------------------------------------------
 # Get pose dict from file name
 def  get_pose_from_name(name):
     info = name.split('_')
@@ -54,8 +55,7 @@ def update_triplet_info(DATA_DIR, PN_THRESHOLD):
         np.save(DATA_DIR + '/' + label + '/' + 'anchor_to_positives.npy', anchor_to_positives) # Save dict as .npy
         np.save(DATA_DIR + '/' + label + '/' 'name_list.npy', images) # Save list as .npy
 
-
-
+# ------------------------------------------------------------------------------
 class TripletImagesDataset(torch.utils.data.Dataset):
     """
     Train: For each sample (anchor) randomly chooses a positive and negative samples
@@ -74,7 +74,7 @@ class TripletImagesDataset(torch.utils.data.Dataset):
 
     def get_triplets(self, NEGATIVE_RAND_NUM):
         triplets_img = []
-        triplets_pose = []
+        triplets_name = []
         if self.is_train:
             path = self.data_dir + '/' + 'train'
         else:
@@ -83,13 +83,9 @@ class TripletImagesDataset(torch.utils.data.Dataset):
         anchor_to_positives = np.load(path + '/' + 'anchor_to_positives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-positives
         name_list = np.load(path + '/' + 'name_list.npy')
         for anchor in anchor_to_positives:
-            # anchor_img = np.array(Image.open(path + '/' + anchor).convert('RGB').resize((self.image_size, self.image_size)))
             anchor_img = self.transforms(Image.open(path + '/' + anchor))
-            anchor_pose = get_pose_from_name(anchor)
             for positive in anchor_to_positives[anchor]:
-                # positive_img = np.array(Image.open(path + '/' + positive).convert('RGB').resize((self.image_size, self.image_size)))
                 positive_img = self.transforms(Image.open(path + '/' + positive))
-                positive_pose = get_pose_from_name(positive)
                 for i in range(NEGATIVE_RAND_NUM):
                     while True:
                         idx = np.random.randint(0, len(name_list))
@@ -98,14 +94,12 @@ class TripletImagesDataset(torch.utils.data.Dataset):
                         else:
                             negative = name_list[idx]
                             break
-                    # negative_img = np.array(Image.open(path + '/' + negative).convert('RGB').resize((self.image_size, self.image_size)))
                     negative_img = self.transforms(Image.open(path + '/' + negative))
-                    negative_pose = get_pose_from_name(negative)
                     # Append triplet data tuple
                     triplets_img.append((deepcopy(anchor_img), deepcopy(positive_img), deepcopy(negative_img)))
-                    triplets_pose.append((deepcopy(anchor_pose), deepcopy(positive_pose), deepcopy(negative_pose)))
+                    triplets_name.append([anchor, positive, negative])
 
-        return triplets_img, triplets_pose
+        return triplets_img, triplets_name
 
     def __getitem__(self, index):
         return self.triplets_img[index], self.triplets_pose[index]
