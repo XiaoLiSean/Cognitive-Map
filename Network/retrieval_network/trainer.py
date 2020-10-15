@@ -68,7 +68,6 @@ def training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(*inputs)
                     loss, correct_num = loss_fcn(*outputs, img_names)
-
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
@@ -95,7 +94,7 @@ def training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
     # --------------------------------------------------------------------------
     time_elapsed = time.time() - start_time
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
-    print('Best val loss: {:4f}'.format(best_acc))
+    print('Best val accuracy: {:4f}'.format(best_acc))
 
     # load best model weights
     model.load_state_dict(best_model_wts)

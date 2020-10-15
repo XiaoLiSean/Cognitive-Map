@@ -30,7 +30,8 @@ class TripletLoss(torch.nn.Module):
                 negative_pose = get_pose_from_name(img_names[2][idx])
                 alphas[idx] = view_similarity(anchor_pose, positive_pose) - view_similarity(anchor_pose, negative_pose) # margin
 
+        # Using ReLU instead of max since max is not differentiable
         losses = F.relu(COS(anchors, negatives)[0] - COS(anchors, positives)[0] + alphas)
-        corrects = (losses <= 0)
+        corrects = (COS(anchors, negatives)[0] < COS(anchors, positives)[0])
 
         return losses.mean() if batch_average_loss else losses.sum(), torch.sum(corrects.int())
