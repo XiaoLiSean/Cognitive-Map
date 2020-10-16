@@ -19,8 +19,8 @@ NUM_WORKERS = 4 # dataloader workers
 IMAGE_ENCODING_VEC_LENGTH = 2048 # encoding vector length of the image
 
 # Traning parameters/setting
-BATCH_SIZE = 10 # larger than one
-NUM_EPOCHS = 2
+BATCH_SIZE = 12 # larger than one
+NUM_EPOCHS = 20
 
 # Training hyper-parameter
 LEARNING_RATE = 0.001

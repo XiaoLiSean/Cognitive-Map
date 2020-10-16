@@ -22,7 +22,7 @@ n_clusters = 3
 class Node_generator():
 	def __init__(self, node_radius=1.5):
 		self._grid_size = 0.25
-		self._controller = Controller(scene='FloorPlan_Train3_3', gridSize=self._grid_size, fieldOfView=120, visibilityDistance=node_radius, agentMode='bot')
+		self._controller = Controller(scene='FloorPlan1', gridSize=self._grid_size, fieldOfView=120, visibilityDistance=node_radius, agentMode='bot')
 		self._event = self._controller.step(action='Pass')
 
 		self._general_orientation = self._event.metadata['agent']['rotation']
@@ -68,8 +68,8 @@ class Node_generator():
 		self._assign_obj_cluster()
 		self._get_node_vs_obj()
 		self.Build_node_map()
-		
-		
+
+
 	def _get_node_vs_obj(self):
 		pts_object_cover = {}
 

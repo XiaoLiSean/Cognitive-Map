@@ -9,7 +9,6 @@ from losses import *
 from trainer import *
 from os.path import dirname, abspath
 
-
 # Uncomment to load triplet infomation which is used to collect ground truth
 # Uncomment when you have new incoming dataset/data
 # update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_IMAGES, TRIPLET_MAX_NUM_PER_ANCHOR)
@@ -23,7 +22,7 @@ dataset_sizes.update({'train': len(train_dataset)})
 # --------------------------Loading validation dataset--------------------------
 print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading validation dataset...')
 val_dataset = TripletImagesDataset(DATA_DIR, IMAGE_SIZE, is_train=False)
-val_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 dataset_sizes.update({'val': len(val_dataset)})
 
 # ------------------------------Initialize model--------------------------------

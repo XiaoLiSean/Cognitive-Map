@@ -95,7 +95,7 @@ class TripletImagesDataset(torch.utils.data.Dataset):
         self.transforms = transforms.Compose([transforms.Resize(self.image_size),
                                               transforms.ToTensor(),
                                               transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-        self.triplets_img, self.triplets_pose = self.get_triplets()
+        self.triplets_img, self.triplets_name = self.get_triplets()
 
     def get_triplets(self):
         triplets_img = []
@@ -111,20 +111,23 @@ class TripletImagesDataset(torch.utils.data.Dataset):
             anchor_to_negatives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-negatives
             name_list = np.load(path + '/' + FloorPlan + '/' + 'name_list.npy')
             for anchor in anchor_to_positives:
-                anchor_img = self.transforms(Image.open(path + '/' + FloorPlan + '/' + anchor))
+                anchor_img = path + '/' + FloorPlan + '/' + anchor
                 positives = anchor_to_positives[anchor]
                 negatives = anchor_to_negatives[anchor]
                 for i in range(min([len(positives), len(negatives)])):
-                    positive_img = self.transforms(Image.open(path + '/' + FloorPlan + '/' + positives[i]))
-                    negative_img = self.transforms(Image.open(path + '/' + FloorPlan + '/' + negatives[i]))
+                    positive_img = path + '/' + FloorPlan + '/' + positives[i]
+                    negative_img = path + '/' + FloorPlan + '/' + negatives[i]
+                    # append path to desired image triplets
                     triplets_img.append((deepcopy(anchor_img), deepcopy(positive_img), deepcopy(negative_img)))
                     triplets_name.append([anchor, positives[i], negatives[i]])
-            break
 
         return triplets_img, triplets_name
 
     def __getitem__(self, index):
-        return self.triplets_img[index], self.triplets_pose[index]
+        # Path to triplet images
+        paths = self.triplets_img[index]
+        triplet = (self.transforms(Image.open(paths[0])), self.transforms(Image.open(paths[1])), self.transforms(Image.open(paths[2])))
+        return triplet, self.triplets_name[index]
 
     def __len__(self):
         return len(self.triplets_img)
