@@ -44,15 +44,17 @@ def training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
             # ------------------------------------------------------------------
             # loading bar
             bar = Bar('Processing', max=math.ceil(dataset_sizes[phase]/BATCH_SIZE))
-            for batch_idx, (inputs, img_names) in enumerate(data_loaders[phase]):
+            for batch_idx, (inputs, alphas) in enumerate(data_loaders[phase]):
                 # zero the parameter gradients
                 optimizer.zero_grad()
+                inputs = tuple(input.to(device) for input in inputs) # to GPU
+                alphas = tuple(alpha.to(device) for alpha in alphas) # to GPU
 
                 # Forward propagation
                 # Track history if only in trainer
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(*inputs)
-                    loss, correct_num = loss_fcn(*outputs, img_names, batch_average_loss=True)
+                    loss, correct_num = loss_fcn(*outputs, alphas, device, batch_average_loss=True)
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
@@ -77,6 +79,8 @@ def training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
+                FILE = 'checkpoints' + '/' + 'image_model_acc_' + str(best_acc) + '_epoch_' + str(epoch) + '.pkl'
+                torch.save(model.state_dict(), )
             # ------------------------------------------------------------------
     # --------------------------------------------------------------------------
     time_elapsed = time.time() - start_time

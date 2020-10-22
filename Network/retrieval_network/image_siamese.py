@@ -12,6 +12,7 @@ from os.path import dirname, abspath
 # Uncomment to load triplet infomation which is used to collect ground truth
 # Uncomment when you have new incoming dataset/data
 # update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_IMAGES, TRIPLET_MAX_NUM_PER_ANCHOR)
+
 dataset_sizes = {}
 # ---------------------------Loading training dataset---------------------------
 print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading training dataset...')
@@ -29,6 +30,8 @@ dataset_sizes.update({'val': len(val_dataset)})
 print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
 model = TripletNetImage()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print("Model training on: ", device)
+print("Cuda is_available: ", torch.cuda.is_available())
 model.to(device)
 
 # Uncomment to see the summary of the model structure

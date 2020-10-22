@@ -105,23 +105,44 @@ class Agent_Sim():
 			ax.grid(True)
 			plt.show()
 
-	def coordnates_patroling(self, saving_data=False, file_path=None, rand_pts_fration=None):
-		points = self.get_reachable_coordinate()
+	def get_near_grids(self, node, step=2):
+		nodes = []
+		for i in range(-step, step+1):
+			dx = i * self._grid_size
+			for j in range(-step, step+1):
+				dz = j * self._grid_size
+				x = node['x'] + dx
+				y = node['y']
+				z = node['z'] + dz
+				nodes.append({'x':x, 'y':y, 'z':z})
+		return nodes
+
+	def coordnates_patroling(self, saving_data=False, file_path=None, grid_steps=2):
+		map = self.get_reachable_coordinate()
 		rotations = [dict(x=0.0, y=0.0, z=0.0),
 					 dict(x=0.0, y=90.0, z=0.0),
 					 dict(x=0.0, y=180.0, z=0.0),
 					 dict(x=0.0, y=270.0, z=0.0)]
 
-		# random get fractional points
+		# random get fractional points as node
+		rand_pts_fration = 1 / (2*grid_steps + 1)**2
+		print(rand_pts_fration, len(map))
 		if rand_pts_fration != None:
-			random.shuffle(points)
-			points = points[0:int(rand_pts_fration*len(points))]
+			random.shuffle(map)
+			points = copy.deepcopy(map[0:int(rand_pts_fration*len(map))])
+
+		# get points near the node
+		for node in points:
+			grids = self.get_near_grids(node, step=grid_steps)
+			for grid in grids:
+				if grid not in points and grid in map:
+					points.append(grid)
 
 		# define file path
 		file_path = file_path + '/' + self._scene_name
 		if not os.path.isdir(file_path):
 			os.mkdir(file_path)
-			
+
 		# store image
 		for p in points:
 			for r in rotations:

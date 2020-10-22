@@ -2,6 +2,7 @@ lib/__pycache__
 Network/common/__pycache__
 Network/retrieval_network/hymenoptera_data
 Network/retrieval_network/image_data
+Network/retrieval_network/image_data_v1
 Network/retrieval_network/image_data_test
 Network/retrieval_network/image_model_best_fit.pkl
 3rdparty/

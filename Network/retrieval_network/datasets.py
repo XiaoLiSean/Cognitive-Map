@@ -56,10 +56,10 @@ def update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_IMAGES, 
                     pose_i = get_pose_from_name(images[i])
                     similarity = view_similarity(pose_anchor, pose_i, visualization_on=False)
                     # Append positive and negative images
-                    if similarity > PN_THRESHOLD['p'] and len(anchor_to_positives[anchor]) < TRIPLET_MAX_NUM_PER_ANCHOR:
-                        anchor_to_positives[anchor].append(images[i])
+                    if similarity >= PN_THRESHOLD['p'] and len(anchor_to_positives[anchor]) < TRIPLET_MAX_NUM_PER_ANCHOR:
+                        anchor_to_positives[anchor].append((images[i], similarity))
                     elif similarity < PN_THRESHOLD['n'] and len(anchor_to_negatives[anchor]) < TRIPLET_MAX_NUM_PER_ANCHOR:
-                        anchor_to_negatives[anchor].append(images[i])
+                        anchor_to_negatives[anchor].append((images[i], similarity))
                     # break loop for current anchor if TRIPLET_MAX_NUM_PER_ANCHOR is reached
                     new_added_triplets = min([len(anchor_to_positives[anchor]), len(anchor_to_negatives[anchor])])
                     if new_added_triplets >= TRIPLET_MAX_NUM_PER_ANCHOR:
@@ -95,11 +95,11 @@ class TripletImagesDataset(torch.utils.data.Dataset):
         self.transforms = transforms.Compose([transforms.Resize(self.image_size),
                                               transforms.ToTensor(),
                                               transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-        self.triplets_img, self.triplets_name = self.get_triplets()
+        self.triplets_img, self.triplets_alphas = self.get_triplets()
 
     def get_triplets(self):
         triplets_img = []
-        triplets_name = []
+        triplets_alphas = []
         if self.is_train:
             path = self.data_dir + '/' + 'train'
         else:
@@ -109,25 +109,24 @@ class TripletImagesDataset(torch.utils.data.Dataset):
         for FloorPlan in os.listdir(path):
             anchor_to_positives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_positives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-positives
             anchor_to_negatives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-negatives
-            name_list = np.load(path + '/' + FloorPlan + '/' + 'name_list.npy')
             for anchor in anchor_to_positives:
                 anchor_img = path + '/' + FloorPlan + '/' + anchor
                 positives = anchor_to_positives[anchor]
                 negatives = anchor_to_negatives[anchor]
                 for i in range(min([len(positives), len(negatives)])):
-                    positive_img = path + '/' + FloorPlan + '/' + positives[i]
-                    negative_img = path + '/' + FloorPlan + '/' + negatives[i]
+                    positive_img = path + '/' + FloorPlan + '/' + positives[i][0]
+                    negative_img = path + '/' + FloorPlan + '/' + negatives[i][0]
                     # append path to desired image triplets
                     triplets_img.append((deepcopy(anchor_img), deepcopy(positive_img), deepcopy(negative_img)))
-                    triplets_name.append([anchor, positives[i], negatives[i]])
+                    triplets_alphas.append((deepcopy(positives[i][1]), deepcopy(negatives[i][1])))
 
-        return triplets_img, triplets_name
+        return triplets_img, triplets_alphas
 
     def __getitem__(self, index):
         # Path to triplet images
         paths = self.triplets_img[index]
         triplet = (self.transforms(Image.open(paths[0])), self.transforms(Image.open(paths[1])), self.transforms(Image.open(paths[2])))
-        return triplet, self.triplets_name[index]
+        return triplet, self.triplets_alphas[index]
 
     def __len__(self):
         return len(self.triplets_img)

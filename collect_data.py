@@ -9,7 +9,7 @@ val_fraction = 0.15
 test_fraction = 0.15
 total_scene_num = 30
 node_radius = 1.5
-rand_pts_fration = 0.5 # Get frational reachable points
+grid_steps = 2
 robot = Agent_Sim(scene_type='Kitchen', scene_num=1, node_radius=node_radius)
 
 for scene_type in scene_types:
@@ -22,4 +22,4 @@ for scene_type in scene_types:
             FILE_PATH='./Network/retrieval_network/image_data/test'
 
         robot.reset_scene(scene_type=scene_type, scene_num=scene_num)
-        robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, rand_pts_fration=rand_pts_fration)
+        robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, grid_steps=grid_steps)
