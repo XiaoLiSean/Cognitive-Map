@@ -71,7 +71,7 @@ def training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
                 lr_scheduler.step() # update LEARNING_RATE
 
             # Epoch loss calculation
-            epoch_loss = running_loss * BATCH_SIZE / dataset_sizes[phase]
+            epoch_loss = running_loss * BATCH_SIZE / dataset_sizes[phase] # Loss averaged on per data points
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
             print('----'*6)
             print('{} Loss: \t {:.4f} \t Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))

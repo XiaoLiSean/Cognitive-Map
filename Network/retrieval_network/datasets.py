@@ -7,6 +7,7 @@ from os.path import dirname, abspath
 from termcolor import colored
 from copy import deepcopy
 
+
 # import from root/lib
 root_folder = dirname(dirname(dirname(abspath(__file__))))
 sys.path.append(root_folder)
@@ -31,35 +32,35 @@ def update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_IMAGES, 
 
     for label in labels:
         for FloorPlan in os.listdir(DATA_DIR + '/' + label):
-            images = []
+            data_points = []
             total_triplet_num = 0
             for filename in os.listdir(DATA_DIR + '/' + label + '/' + FloorPlan):
                 if filename.endswith(".png"):
-                    images.append(filename)
+                    data_points.append(filename[0:-4])
 
             print(colored('Process A-P list: ','blue') + DATA_DIR + '/' + label + '/' + FloorPlan + '/')
-            random.shuffle(images)
-            total_triplet_max_num = len(images)*TRIPLET_MAX_FRACTION_TO_IMAGES
+            random.shuffle(data_points)
+            total_triplet_max_num = len(data_points)*TRIPLET_MAX_FRACTION_TO_IMAGES
 
-            # dictionary map from one anchor to its positive images in same FloorPlan
+            # dictionary map from one anchor to its positive data_points in same FloorPlan
             anchor_to_positives = {}
             anchor_to_negatives = {}
 
-            for idx, anchor in enumerate(images):
+            for idx, anchor in enumerate(data_points):
                 anchor_to_positives.update({anchor: []})
                 anchor_to_negatives.update({anchor: []})
 
                 pose_anchor = get_pose_from_name(anchor)
                 # for one anchor image add positive pairs which are after the anchor in the list
-                for i in range(idx+1, len(images)):
+                for i in range(idx+1, len(data_points)):
                     # Find positive pairs
-                    pose_i = get_pose_from_name(images[i])
+                    pose_i = get_pose_from_name(data_points[i])
                     similarity = view_similarity(pose_anchor, pose_i, visualization_on=False)
-                    # Append positive and negative images
+                    # Append positive and negative data_points
                     if similarity >= PN_THRESHOLD['p'] and len(anchor_to_positives[anchor]) < TRIPLET_MAX_NUM_PER_ANCHOR:
-                        anchor_to_positives[anchor].append((images[i], similarity))
+                        anchor_to_positives[anchor].append((data_points[i], similarity))
                     elif similarity < PN_THRESHOLD['n'] and len(anchor_to_negatives[anchor]) < TRIPLET_MAX_NUM_PER_ANCHOR:
-                        anchor_to_negatives[anchor].append((images[i], similarity))
+                        anchor_to_negatives[anchor].append((data_points[i], similarity))
                     # break loop for current anchor if TRIPLET_MAX_NUM_PER_ANCHOR is reached
                     new_added_triplets = min([len(anchor_to_positives[anchor]), len(anchor_to_negatives[anchor])])
                     if new_added_triplets >= TRIPLET_MAX_NUM_PER_ANCHOR:
@@ -76,7 +77,7 @@ def update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_IMAGES, 
 
             np.save(DATA_DIR + '/' + label + '/' + FloorPlan + '/' + 'anchor_to_positives.npy', anchor_to_positives) # Save dict as .npy
             np.save(DATA_DIR + '/' + label + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', anchor_to_negatives) # Save dict as .npy
-            np.save(DATA_DIR + '/' + label + '/' + FloorPlan + '/' + 'name_list.npy', images) # Save list as .npy
+            np.save(DATA_DIR + '/' + label + '/' + FloorPlan + '/' + 'name_list.npy', data_points) # Save list as .npy
             print(colored('Done A-P list: ','blue') + str(total_triplet_num) + 'pairs')
 
 
@@ -123,7 +124,7 @@ class TripletImagesDataset(torch.utils.data.Dataset):
         return triplets_img, triplets_alphas
 
     def __getitem__(self, index):
-        # Path to triplet images
+        # Path to triplet data_points
         paths = self.triplets_img[index]
         triplet = (self.transforms(Image.open(paths[0])), self.transforms(Image.open(paths[1])), self.transforms(Image.open(paths[2])))
         return triplet, self.triplets_alphas[index]
