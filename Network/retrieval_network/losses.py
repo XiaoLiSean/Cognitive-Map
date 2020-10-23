@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from termcolor import colored
 from params import *
 from datasets import get_pose_from_name
 import sys
@@ -20,17 +21,16 @@ class TripletLoss(torch.nn.Module):
         self.constant_margin = constant_margin
         self.margin = margin
 
-    def forward(self, anchors, positives, negatives, img_names, batch_average_loss=True):
-        # Set margins alpha
-        alphas = self.margin*torch.ones(BATCH_SIZE)
-        if not self.constant_margin:
-            for idx in range(BATCH_SIZE):
-                anchor_pose = get_pose_from_name(img_names[0][idx])
-                positive_pose = get_pose_from_name(img_names[1][idx])
-                negative_pose = get_pose_from_name(img_names[2][idx])
-                alphas[idx] = view_similarity(anchor_pose, positive_pose) - view_similarity(anchor_pose, negative_pose) # margin
+    def forward(self, anchors, positives, negatives, alphas, device, batch_average_loss=True):
 
-        losses = F.relu(COS(anchors, negatives)[0] - COS(anchors, positives)[0] + alphas)
-        corrects = (losses <= 0)
+        if self.constant_margin:
+            alphas = self.margin*torch.ones(BATCH_SIZE)
+            alphas.to(device)
+            # Using ReLU instead of max since max is not differentiable
+            losses = F.relu(COS(anchors, negatives) - COS(anchors, positives) + alphas)
+        else:
+            # Using ReLU instead of max since max is not differentiable
+            losses = F.relu(COS(anchors, negatives) - COS(anchors, positives) + alphas[0] - alphas[1])
+        corrects = (COS(anchors, negatives) < COS(anchors, positives))
 
         return losses.mean() if batch_average_loss else losses.sum(), torch.sum(corrects.int())

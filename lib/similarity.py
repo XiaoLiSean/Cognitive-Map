@@ -39,6 +39,12 @@ def in_FoV(pose, dot):
 # Note: In AI2THOR, z is the forward axis, x is the horizon axis and y is the verticle axis
 # pose is a dictionary of {x: ... meter, z: ... meter, theta: ... degree}
 def view_similarity(pose1, pose2, visualization_on=False):
+    # special case/ hard coding filter
+    angle_diff = abs(pose1['theta']-pose2['theta'])
+    distance = ((pose1['x']-pose2['x'])**2 + (pose1['z']-pose2['z'])**2)**0.5
+    if angle_diff > 360 / (SUB_NODES_NUM * 2) or distance >= VISBILITY_DISTANCE:
+        return 0
+
     grid_size = VISBILITY_DISTANCE * 2 / 10**SIMILARITY_GRID_ORDER # distance between two dots
     X = np.arange(-VISBILITY_DISTANCE, VISBILITY_DISTANCE + grid_size, grid_size)
     dots_num_sqrt = len(X)

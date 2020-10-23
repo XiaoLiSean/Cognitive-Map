@@ -6,7 +6,7 @@ class SiameseNetImage(torch.nn.Module):
     def __init__(self):
         super(SiameseNetImage, self).__init__()
         model = models.resnet50(pretrained=True)
-        # Strip final fc layer: self.embedding output 512d
+        # Strip final fc layer: self.embedding output 2048d
         self.embedding = torch.nn.Sequential(*(list(model.children())[:-1]))
 
     def forward(self, img1, img2):
