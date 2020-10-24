@@ -26,7 +26,7 @@ def  get_pose_from_name(name):
 # ------------------------------------------------------------------------------
 # This function is used to update triplets npy list in train and val folder
 # filename = [FloorPlanX_x_z_theta_i_.png]
-def update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_IMAGES, TRIPLET_MAX_NUM_PER_ANCHOR):
+def update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_POINTS, TRIPLET_MAX_NUM_PER_ANCHOR):
 
     labels = ['train', 'val', 'test']
 
@@ -40,7 +40,7 @@ def update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_IMAGES, 
 
             print(colored('Process A-P list: ','blue') + DATA_DIR + '/' + label + '/' + FloorPlan + '/')
             random.shuffle(data_points)
-            total_triplet_max_num = len(data_points)*TRIPLET_MAX_FRACTION_TO_IMAGES
+            total_triplet_max_num = len(data_points)*TRIPLET_MAX_FRACTION_TO_POINTS
 
             # dictionary map from one anchor to its positive data_points in same FloorPlan
             anchor_to_positives = {}
@@ -78,7 +78,7 @@ def update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_IMAGES, 
             np.save(DATA_DIR + '/' + label + '/' + FloorPlan + '/' + 'anchor_to_positives.npy', anchor_to_positives) # Save dict as .npy
             np.save(DATA_DIR + '/' + label + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', anchor_to_negatives) # Save dict as .npy
             np.save(DATA_DIR + '/' + label + '/' + FloorPlan + '/' + 'name_list.npy', data_points) # Save list as .npy
-            print(colored('Done A-P list: ','blue') + str(total_triplet_num) + 'pairs')
+            print(colored('Done A-P list: ','blue') + str(total_triplet_num) + 'pairs, ' + str(len(anchor_to_positives)) + 'anchors')
 
 
 # ------------------------------------------------------------------------------

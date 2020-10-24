@@ -56,8 +56,8 @@ def training_pipeline(Dataset, Network, LossFcn, Training):
 if __name__ == '__main__':
     # Uncomment to load triplet infomation which is used to collect ground truth
     # Uncomment when you have new incoming dataset/data
-    # update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_IMAGES, TRIPLET_MAX_NUM_PER_ANCHOR)
-
+    update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_POINTS, TRIPLET_MAX_NUM_PER_ANCHOR)
+    exit(0)
     # Train corresponding networks
     Dataset = TripletImagesDataset
     Network = TripletNetImage

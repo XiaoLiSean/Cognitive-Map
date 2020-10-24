@@ -1,5 +1,6 @@
 lib/__pycache__
 Network/common/__pycache__
+Network/retrieval_network/__pycache__
 Network/retrieval_network/hymenoptera_data
 Network/retrieval_network/image_data
 Network/retrieval_network/datasets
