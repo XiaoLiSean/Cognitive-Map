@@ -1,8 +1,8 @@
 import torch
 import torch.nn.functional as F
 from termcolor import colored
-from params import *
-from datasets import get_pose_from_name
+from Network.retrieval_network.params import *
+from Network.retrieval_network.datasets import get_pose_from_name
 import sys
 from os.path import dirname, abspath
 root_folder = dirname(dirname(dirname(abspath(__file__))))

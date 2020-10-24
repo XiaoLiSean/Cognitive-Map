@@ -5,11 +5,11 @@ import copy, math
 import numpy as np
 from termcolor import colored
 from progress.bar import Bar
-from datasets import get_pose_from_name
-from params import *
+from Network.retrieval_network.datasets import get_pose_from_name
+from Network.retrieval_network.params import *
 
 # ------------------------------------------------------------------------------
-def training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS):
+def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS):
     """
     Loaders, model, loss function and metrics should work together for a given task,
     i.e. The model should be able to process data output of loaders,

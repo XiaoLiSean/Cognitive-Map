@@ -11,8 +11,8 @@ from copy import deepcopy
 # import from root/lib
 root_folder = dirname(dirname(dirname(abspath(__file__))))
 sys.path.append(root_folder)
-
-from lib.similarity import *
+from lib.params import OBJ_TYPE_NUM
+from lib.similarity import view_similarity
 
 # ------------------------------------------------------------------------------
 # Get pose dict from file name
@@ -111,12 +111,63 @@ class TripletImagesDataset(torch.utils.data.Dataset):
             anchor_to_positives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_positives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-positives
             anchor_to_negatives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-negatives
             for anchor in anchor_to_positives:
-                anchor_img = path + '/' + FloorPlan + '/' + anchor
+                anchor_img = path + '/' + FloorPlan + '/' + anchor + '.png'
                 positives = anchor_to_positives[anchor]
                 negatives = anchor_to_negatives[anchor]
                 for i in range(min([len(positives), len(negatives)])):
-                    positive_img = path + '/' + FloorPlan + '/' + positives[i][0]
-                    negative_img = path + '/' + FloorPlan + '/' + negatives[i][0]
+                    positive_img = path + '/' + FloorPlan + '/' + positives[i][0] + '.png'
+                    negative_img = path + '/' + FloorPlan + '/' + negatives[i][0] + '.png'
+                    # append path to desired image triplets
+                    triplets_img.append((deepcopy(anchor_img), deepcopy(positive_img), deepcopy(negative_img)))
+                    triplets_alphas.append((deepcopy(positives[i][1]), deepcopy(negatives[i][1])))
+
+        return triplets_img, triplets_alphas
+
+    def __getitem__(self, index):
+        # Path to triplet data_points
+        paths = self.triplets_img[index]
+        triplet = (self.transforms(Image.open(paths[0])), self.transforms(Image.open(paths[1])), self.transforms(Image.open(paths[2])))
+        return triplet, self.triplets_alphas[index]
+
+    def __len__(self):
+        return len(self.triplets_img)
+
+# ------------------------------------------------------------------------------
+class TripletSGsDataset(torch.utils.data.Dataset):
+    """
+    Train: For each sample (anchor) randomly chooses a positive and negative samples
+    Test: Creates fixed triplets for testing
+    """
+
+    def __init__(self, DATA_DIR, matrix_size=OBJ_TYPE_NUM, is_train=True):
+        super(TripletImagesDataset, self).__init__()
+        self.data_dir = DATA_DIR
+        self.matrix_size = matrix_size
+        self.is_train = is_train
+        self.transforms = transforms.Compose([transforms.Resize(self.image_size),
+                                              transforms.ToTensor(),
+                                              transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+        self.triplets_SG, self.triplets_alphas = self.get_triplets()
+
+    def get_triplets(self):
+        triplets_img = []
+        triplets_alphas = []
+        if self.is_train:
+            path = self.data_dir + '/' + 'train'
+        else:
+            path = self.data_dir + '/' + 'val'
+
+        # Iterate through floorplans
+        for FloorPlan in os.listdir(path):
+            anchor_to_positives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_positives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-positives
+            anchor_to_negatives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-negatives
+            for anchor in anchor_to_positives:
+                anchor_img = path + '/' + FloorPlan + '/' + anchor + '.png'
+                positives = anchor_to_positives[anchor]
+                negatives = anchor_to_negatives[anchor]
+                for i in range(min([len(positives), len(negatives)])):
+                    positive_img = path + '/' + FloorPlan + '/' + positives[i][0] + '.png'
+                    negative_img = path + '/' + FloorPlan + '/' + negatives[i][0] + '.png'
                     # append path to desired image triplets
                     triplets_img.append((deepcopy(anchor_img), deepcopy(positive_img), deepcopy(negative_img)))
                     triplets_alphas.append((deepcopy(positives[i][1]), deepcopy(negatives[i][1])))

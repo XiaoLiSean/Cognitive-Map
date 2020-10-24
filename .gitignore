@@ -12,6 +12,8 @@ mis/
 *.gif
 test_lib.py
 test_spawn.py
+navi_demo.py
+demo.py
 experiment/data/images/
 *.png
 *.jpg
