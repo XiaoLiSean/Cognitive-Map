@@ -1,4 +1,5 @@
 lib/__pycache__
+Network/__pycache__
 Network/common/__pycache__
 Network/retrieval_network/__pycache__
 Network/retrieval_network/hymenoptera_data

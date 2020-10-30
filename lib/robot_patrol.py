@@ -2,7 +2,9 @@
 from ai2thor.controller import Controller
 from termcolor import colored
 from PIL import Image
-from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH, VISBILITY_DISTANCE, FIELD_OF_VIEW
+from math import floor, ceil
+from matplotlib.patches import Circle, Rectangle
+from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH, VISBILITY_DISTANCE, FIELD_OF_VIEW, NODES
 from lib.scene_graph_generation import *
 from lib.object_dynamics import *
 import matplotlib.pyplot as plt
@@ -50,6 +52,7 @@ class Agent_Sim():
 
 		if ToggleMapView:   # Top view of the map to see the objets layout. issue: no SG can be enerated
 			self._controller.step({"action": "ToggleMapView"})
+			self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)  # Change simulation window size
 
 		self._event = self._controller.step('Pass')
 
@@ -71,7 +74,7 @@ class Agent_Sim():
 		self._event = self._controller.step(action='GetReachablePositions')
 		return self._event.metadata['actionReturn']
 
-	def reset_scene(self, scene_type, scene_num):
+	def reset_scene(self, scene_type, scene_num, ToggleMapView=False):
 		if scene_type == 'Kitchen':
 			add_on = 0
 		elif scene_type == 'Living room':
@@ -88,8 +91,101 @@ class Agent_Sim():
 		self._scene_num = scene_num
 		self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
 		self._controller.reset(self._scene_name)
+
+		if ToggleMapView:   # Top view of the map to see the objets layout. issue: no SG can be enerated
+			self._controller.step({"action": "ToggleMapView"})
+			self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)  # Change simulation window size
+
 		self.update_event()
 
+	# --------------------------------------------------------------------------
+	'''
+	Following functions is used to visualize map of a certain scene for
+	manually topological map construction
+	'''
+	# --------------------------------------------------------------------------
+	def get_scene_bbox(self):
+		data = self._event.metadata['sceneBounds']
+		center_x = data['center']['x']
+		center_z = data['center']['z']
+		size_x = data['size']['x']
+		size_z = data['size']['z']
+
+		bbox_x = [center_x-size_x*0.5, center_x+size_x*0.5, center_x+size_x*0.5, center_x-size_x*0.5, center_x-size_x*0.5]
+		bbox_z = [center_z+size_z*0.5, center_z+size_z*0.5, center_z-size_z*0.5, center_z-size_z*0.5, center_z+size_z*0.5]
+
+		return (bbox_x, bbox_z)
+
+	def add_nodes(self, ax):
+		nodes_x = []
+		nodes_y = []
+		points = NODES[self._scene_name]
+		for p in points:
+			circ = Circle(xy = (p[0], p[1]), radius=self._node_radius, alpha=0.3)
+			ax.add_patch(circ)
+			nodes_x.append(p[0])
+			nodes_y.append(p[1])
+
+		return (nodes_x, nodes_y)
+
+	def show_map(self, show_nodes=False):
+		self.update_event()
+		# Plot reachable points
+		points = self.get_reachable_coordinate()
+		X = [p['x'] for p in points]
+		Z = [p['z'] for p in points]
+
+		fig, ax = plt.subplots()
+
+		plt.plot(X, Z, 'o', color='lightskyblue',
+		         markersize=5, linewidth=4,
+		         markerfacecolor='white',
+		         markeredgecolor='lightskyblue',
+		         markeredgewidth=2)
+
+		# Plot rectangle bounding the entire scene
+		scene_bbox = self.get_scene_bbox()
+		plt.plot(scene_bbox[0], scene_bbox[1], '-', color='orangered', linewidth=4)
+
+		# Plot objects 2D boxs
+		for obj in self._event.metadata['objects']:
+			size = obj['axisAlignedBoundingBox']['size']
+			center = obj['axisAlignedBoundingBox']['center']
+			rect = Rectangle(xy = (center['x'] - size['x']*0.5, center['z'] - size['z']*0.5), width=size['x'], height=size['z'], fill=True, alpha=0.3, color='darkgray', hatch='//')
+			ax.add_patch(rect)
+
+		# Setup parameters
+		plt.xticks(np.arange(floor(min(scene_bbox[0])/self._grid_size), ceil(max(scene_bbox[0])/self._grid_size)+1, 1) * self._grid_size, rotation=90)
+		plt.yticks(np.arange(floor(min(scene_bbox[1])/self._grid_size), ceil(max(scene_bbox[1])/self._grid_size)+1, 1) * self._grid_size)
+		plt.xlabel("x coordnates, [m]")
+		plt.xlabel("z coordnates, [m]")
+		plt.title("{}: Node radius {} [m]".format(self._scene_name, str(self._node_radius)))
+		plt.xlim(min(scene_bbox[0])-self._grid_size, max(scene_bbox[0])+self._grid_size)
+		plt.ylim(min(scene_bbox[1])-self._grid_size, max(scene_bbox[1])+self._grid_size)
+		plt.gca().set_aspect('equal', adjustable='box')
+		plt.grid(True)
+
+		# Plot nodes
+		if show_nodes and self._scene_name in NODES:
+			nodes = self.add_nodes(ax)
+			plt.plot(nodes[0], nodes[1], 'o', color="None",
+			         markersize=5, linewidth=4,
+			         markerfacecolor='red',
+			         markeredgecolor="None",
+			         markeredgewidth=2)
+
+		# frame = self._event.frame
+		# img = Image.fromarray(frame, 'RGB')
+		# print(self._event.map_coord_to_thor_xz(1, 2))
+		plt.show()
+
+
+	# --------------------------------------------------------------------------
+	'''
+	Following functions is used to collect data with and without dynamcis
+	for localization/retrieval network
+	'''
+	# --------------------------------------------------------------------------
 	def save_current_fram(self, FILE_PATH, file_name):
 		self.update_event()
 		# Save image data

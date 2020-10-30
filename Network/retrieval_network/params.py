@@ -13,8 +13,9 @@ COS = torch.nn.CosineSimilarity(dim=1, eps=1e-10)
 # ------------------------------------------------------------------------------
 IMAGE_SIZE = 224 # Input image size into siamese image branch
 DATA_DIR = './Network/retrieval_network/datasets' # Training and validation data directory
+CHECKPOINTS_PREFIX = './Network/retrieval_network/checkpoints/image_siamese_dynamics'
 PN_THRESHOLD = {'p': 0.6, 'n': 0.5} # triplet, anchor to positive and negative threshold
-TRIPLET_MAX_FRACTION_TO_POINTS = 0.10
+TRIPLET_MAX_FRACTION_TO_IMAGES = 0.10
 TRIPLET_MAX_NUM_PER_ANCHOR = 40
 NEGATIVE_RAND_NUM = 1 # randomly chooses NEGTIVE_RAND_NUM of negative for each anchor-positive pair
 NUM_WORKERS = 4 # dataloader workers
