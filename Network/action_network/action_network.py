@@ -49,25 +49,35 @@ class Action_dataset(torch.utils.data.Dataset):
 		end_image_index = None
 		action_index = None
 		shuffle_index_pair_label = []
-
+		action_num = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
 		for i, line in enumerate(action_groundtruth):
 			line = line.rstrip()
 			words = line.split()
 			label = int(words[1])
+			add = True
 			self._img_path_list.append(words[0])
 			self._label_list.append(label)
+
 
 			if starting_image_index is None:
 				starting_image_index = i
 				action_index = label
+
+			if action_index in [1, 2]:
+				add = random.choice([True, True, False])
+
 			if label < 0:
 				end_image_index = i
 				if end_image_index == starting_image_index:
 					starting_image_index = None
 					continue
-				shuffle_index_pair_label.append([starting_image_index, end_image_index, action_index])
+				if add:
+					shuffle_index_pair_label.append([starting_image_index, end_image_index, action_index])
+					action_num[action_index] += 1
+
+				
 				starting_image_index = None
-			
+		print(action_num)
 		# print(shuffle_index_pair_label)
 		return shuffle_index_pair_label
 
@@ -114,7 +124,7 @@ class Action_dataset(torch.utils.data.Dataset):
 				shuffle_index_pair_label.append([starting_key, starting_key + rand_frame_distance, repeat_index_dict[key][1]])
 				starting_key = starting_key + rand_frame_distance
 				frame_left = frame_left - rand_frame_distance
-		print('')
+		# print('---------------------------')
 		# print(shuffle_index_pair_label)
 		return shuffle_index_pair_label
 
@@ -141,7 +151,7 @@ class Action_dataset(torch.utils.data.Dataset):
 
 
 class Action_network():
-	def __init__(self, num_classes=3, weight_file_path=action_network_path + 'weight/params_SPTM_like_large.pkl'):
+	def __init__(self, num_classes=6, weight_file_path=action_network_path + 'weight/params_SPTM_like_back_left_right_large_rot_90_new_long_more_more_left_special.pkl'):
 		self._model = resnet18(pretrained=False, num_classes=num_classes)
 		if torch.cuda.is_available():
 			self._model.cuda()
@@ -177,9 +187,14 @@ class Action_network():
 
 
 if __name__ == '__main__':
-	
-	model = resnet18(pretrained=False, num_classes=params['num_classes'])
-	model.load_state_dict(torch.load('weight/params_SPTM_like_large.pkl'))
+	model = resnet18(pretrained=True)
+	# model = resnet18(pretrained=False, num_classes=params['num_classes'])
+	num_ftrs = model.fc.in_features
+	model.fc = nn.Linear(num_ftrs, params['num_classes'])
+
+	model.load_state_dict(torch.load('weight/params_SPTM_like_back_left_right_large_rot_90_new_long_more_more.pkl'))
+	# exit()
+	# model.load_state_dict(torch.load('weight/params_SPTM_like_back_left_right_large.pkl'))
 	# model.load_state_dict(torch.load('params.pkl'))
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.Adam(model.parameters())
@@ -189,61 +204,54 @@ if __name__ == '__main__':
 		model.cuda()
 		pass
 
-	# train_data = Action_dataset(transform=transforms.ToTensor(), action_groundtruth_path=params['action_file_path'])
-	test_data = Action_dataset(transform=transforms.ToTensor(), action_groundtruth_path=params['test_action_file_path'])
-	# train_loader = DataLoader(dataset=train_data, batch_size=params['batch_size'], shuffle=True)
-	test_loader = DataLoader(dataset=test_data, batch_size=int(params['batch_size'] / 2), shuffle=False)
+	train_data = Action_dataset(transform=transforms.ToTensor(), action_groundtruth_path=params['action_file_path'])
+	# test_data = Action_dataset(transform=transforms.ToTensor(), action_groundtruth_path=params['test_action_file_path'])
+	train_loader = DataLoader(dataset=train_data, batch_size=params['batch_size'], shuffle=True)
+	# test_loader = DataLoader(dataset=test_data, batch_size=int(params['batch_size'] / 2), shuffle=False)
 	# dataiter = iter(train_loader)
-	# print(len(train_data))
-	print(len(test_data))
-	# exit()
-	# test_action = Action_network()
-	# correct = 0
-	# for i in range(1000):
-	# 	data, label = train_data[i]
-	# 	# print(data.size())
-	# 	if test_action.predict_fuse(data).item() == label:
-	# 		correct += 1
-	# 	# print('predict: ', test_action.predict_fuse(data).item())
-	# 	# print(label)
-	# print(correct)
+	print(len(train_data))
+	# print(len(test_data))
 	# exit()
 
-	# for epoch in range(params['num_epochs']):
-	#     since = time.time()
-	#     running_loss = 0
-	#     running_acc = 0
-	#     model.train()
-	#     for i, data in enumerate(train_loader, 1):
-	#         img, label = data
-	#         if torch.cuda.is_available():
-	#             img = img.cuda()
-	#             label = label.cuda()
-	#         out = model(img.float())
-	#         loss = criterion(out, label)
-	#         running_loss += loss.item()
-	#         _, pred = torch.max(out, 1)
-	#         running_acc += (pred==label).float().mean()
-	#         # print('(pred==label).float().mean(): ', (pred==label).float().mean())
-	#         # print('pred: ', pred)
-	#         # print('label: ', label)
-	#         optimizer.zero_grad()
-	#         loss.backward()
-	#         optimizer.step()
-	#     running_acc /= i
-	#     running_loss /= i
-	#     print('time: ', time.time() - since)
-	#     print('epoch: ', epoch)
-	#     print('running_acc: ', running_acc.item())
-	#     print('running_loss: ', running_loss)
-	#     # torch.save(model.state_dict(), 'params.pkl')
-	#     if running_acc.item() > 0.98:
-	#     	break
-	# torch.save(model.state_dict(), 'params.pkl')
-	# model.load_state_dict(torch.load('params_SPTM_like.pkl'))
+	for epoch in range(params['num_epochs']):
+	    since = time.time()
+	    running_loss = 0
+	    running_acc = 0
+	    model.train()
+	    for i, data in enumerate(train_loader, 1):
+	        img, label = data
+	        if torch.cuda.is_available():
+	            img = img.cuda()
+	            label = label.cuda()
+	        out = model(img.float())
+	        loss = criterion(out, label)
+	        running_loss += loss.item()
+	        _, pred = torch.max(out, 1)
+	        running_acc += (pred==label).float().mean()
+	        # print('(pred==label).float().mean(): ', (pred==label).float().mean())
+	        # print('pred: ', pred)
+	        # print('label: ', label)
+	        optimizer.zero_grad()
+	        loss.backward()
+	        optimizer.step()
+	    running_acc /= i
+	    running_loss /= i
+	    print('time: ', time.time() - since)
+	    print('epoch: ', epoch)
+	    print('running_acc: ', running_acc.item())
+	    print('running_loss: ', running_loss)
+	    torch.save(model.state_dict(), 'params.pkl')
+	    if running_acc.item() > 0.98:
+	    	break
+	torch.save(model.state_dict(), 'params.pkl')
+	exit()
+	# model.load_state_dict(torch.load('params_SPTM_like_backward_large.pkl'))
 	model.eval()
 	eval_loss = 0
 	eval_acc = 0
+
+	# exit()
+
 	for i, data in enumerate(test_loader):
 		img, label = data
 		img = img.cuda()

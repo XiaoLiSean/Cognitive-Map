@@ -17,3 +17,7 @@ experiment/data/images/
 .idea/
 .git/
 *.pkl
+*.csv
+experiment/data/
+experiment/data_long/
+*.txt
