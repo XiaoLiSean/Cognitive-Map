@@ -5,15 +5,15 @@ from PIL import Image
 from math import floor, ceil
 from matplotlib.patches import Circle, Rectangle
 from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH, VISBILITY_DISTANCE, FIELD_OF_VIEW, NODES
-from lib.scene_graph_generation import *
-from lib.object_dynamics import *
+from lib.scene_graph_generation import Scene_Graph
+from lib.object_dynamics import shuffle_scene_layout
 import matplotlib.pyplot as plt
 import numpy as np
 import time, copy, sys, random, os
 
 # Class for agent and nodes in simulation env
 class Agent_Sim():
-	def __init__(self, scene_type='Kitchen', scene_num=1, grid_size=0.25, node_radius=1.5, default_resol=True, ToggleMapView=False, applyActionNoise=False):
+	def __init__(self, scene_type='Kitchen', scene_num=1, grid_size=0.25, node_radius=VISBILITY_DISTANCE, default_resol=True, ToggleMapView=False, applyActionNoise=False):
 		self._scene_type = scene_type
 		self._scene_num = scene_num
 		self._grid_size = grid_size
@@ -154,7 +154,7 @@ class Agent_Sim():
 			rect = Rectangle(xy = (center['x'] - size['x']*0.5, center['z'] - size['z']*0.5), width=size['x'], height=size['z'], fill=True, alpha=0.3, color='darkgray', hatch='//')
 			ax.add_patch(rect)
 
-		# Setup parameters
+		# Setup plot parameters
 		plt.xticks(np.arange(floor(min(scene_bbox[0])/self._grid_size), ceil(max(scene_bbox[0])/self._grid_size)+1, 1) * self._grid_size, rotation=90)
 		plt.yticks(np.arange(floor(min(scene_bbox[1])/self._grid_size), ceil(max(scene_bbox[1])/self._grid_size)+1, 1) * self._grid_size)
 		plt.xlabel("x coordnates, [m]")
@@ -186,11 +186,14 @@ class Agent_Sim():
 	for localization/retrieval network
 	'''
 	# --------------------------------------------------------------------------
-	def save_current_fram(self, FILE_PATH, file_name):
+	def get_current_fram(self):
 		self.update_event()
-		# Save image data
 		frame = self._event.frame
 		img = Image.fromarray(frame, 'RGB')
+		return img
+
+	def save_current_fram(self, FILE_PATH, file_name):
+		img = self.get_current_fram()
 		img.save(FILE_PATH + '/' + file_name + '.png')
 		# Save SG data
 		SG_data = self._SG.get_SG_as_dict()
@@ -224,14 +227,15 @@ class Agent_Sim():
 				nodes.append({'x':x, 'y':y, 'z':z})
 		return nodes
 
-	def coordnates_patroling(self, saving_data=False, file_path=None, dynamics_rounds=1, grid_steps=2):
+	def coordnates_patroling(self, saving_data=False, file_path=None, dynamics_rounds=1, grid_steps=2, is_test=False):
 		rotations = [dict(x=0.0, y=0.0, z=0.0),
 					 dict(x=0.0, y=90.0, z=0.0),
 					 dict(x=0.0, y=180.0, z=0.0),
 					 dict(x=0.0, y=270.0, z=0.0)]
 
-		# random get fractional points as node
-		rand_pts_fration = (1 / (2*grid_steps + 1)**2)
+		if is_test and self._scene_name not in NODES:
+			print('No nodes data available for {}'.format(self._scene_name ))
+			return
 
 		# define file path
 		file_path = file_path + '/' + self._scene_name
@@ -243,6 +247,10 @@ class Agent_Sim():
 			print('Skip: ', self._scene_name)
 			return
 
+		# random get fractional points as node in train and validation scene
+		rand_pts_fration = (1 / (2*grid_steps + 1)**2)
+
+
 		for round in range(dynamics_rounds):
 			# change obj layout for the 2-end rounds
 			if round != 0:
@@ -250,21 +258,34 @@ class Agent_Sim():
 				shuffle_scene_layout(self._controller)
 				self.update_event()
 
-			map = self.get_reachable_coordinate()
-			if rand_pts_fration != None:
-				random.shuffle(map)
-				points = copy.deepcopy(map[0:int(rand_pts_fration*len(map))])
+			# random get fractional points as node in train and validation scene
+			if not is_test:
+				map = self.get_reachable_coordinate()
+				if rand_pts_fration != None:
+					random.shuffle(map)
+					points = copy.deepcopy(map[0:int(rand_pts_fration*len(map))])
 
-			# get points near the node
-			nodes_tmp = copy.deepcopy(points)
-			for node in nodes_tmp:
-				grids = self.get_near_grids(node, step=grid_steps)
-				for grid in grids:
-					if grid not in points and grid in map:
-						points.append(grid)
+				# get points near the node
+				nodes_tmp = copy.deepcopy(points)
+				for node in nodes_tmp:
+					grids = self.get_near_grids(node, step=grid_steps)
+					for grid in grids:
+						if grid not in points and grid in map:
+							points.append(grid)
 
-			print('{}: {} round, {} data points per round with {} nodes'.format(self._scene_name, dynamics_rounds, len(points)*len(rotations), int(rand_pts_fration*len(map))))
-			# store image
+				nodes_num = int(rand_pts_fration*len(map))
+
+			# get nodes in test scene
+			else:
+				points = []
+				universal_y = self.get_agent_position()['y']
+				for node in NODES[self._scene_name]:
+					points.append({'x': node[0], 'y': universal_y, 'z': node[1]})
+				nodes_num = len(NODES[self._scene_name])
+
+
+			print('{}: {}/{} round, {} data points per round with {} nodes'.format(self._scene_name, round, dynamics_rounds, len(points)*len(rotations), nodes_num))
+			# store image and SG
 			for p in points:
 				for r in rotations:
 					self._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=r)

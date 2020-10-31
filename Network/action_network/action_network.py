@@ -67,7 +67,7 @@ class Action_dataset(torch.utils.data.Dataset):
 					continue
 				shuffle_index_pair_label.append([starting_image_index, end_image_index, action_index])
 				starting_image_index = None
-			
+
 		# print(shuffle_index_pair_label)
 		return shuffle_index_pair_label
 
@@ -177,7 +177,7 @@ class Action_network():
 
 
 if __name__ == '__main__':
-	
+
 	model = resnet18(pretrained=False, num_classes=params['num_classes'])
 	model.load_state_dict(torch.load('weight/params_SPTM_like_large.pkl'))
 	# model.load_state_dict(torch.load('params.pkl'))

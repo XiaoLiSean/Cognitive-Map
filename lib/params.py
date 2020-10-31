@@ -6,6 +6,8 @@ import numpy as np
 SIM_WINDOW_HEIGHT = 700
 SIM_WINDOW_WIDTH = 900
 BAN_TYPE_LIST = ['Floor']   # Ignore non-informative objectType e.g. 'Floor
+SCENE_TYPES = ['Kitchen', 'Living room', 'Bedroom', 'Bathroom']
+SCENE_NUM_PER_TYPE = 30
 # ------------------------------------------------------------------------------
 INFO_FILE_PATH = dirname(dirname(abspath(__file__))) + '/AI2THOR_info' # File path for info of iTHOR Env.
 obj_2_idx_dic = np.load(INFO_FILE_PATH + '/' + 'obj_2_idx_dic.npy', allow_pickle='TRUE').item()
