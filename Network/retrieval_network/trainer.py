@@ -5,11 +5,11 @@ import copy, math
 import numpy as np
 from termcolor import colored
 from progress.bar import Bar
-from datasets import get_pose_from_name
-from params import *
+from Network.retrieval_network.datasets import get_pose_from_name
+from Network.retrieval_network.params import *
 
 # ------------------------------------------------------------------------------
-def training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS):
+def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=None):
     """
     Loaders, model, loss function and metrics should work together for a given task,
     i.e. The model should be able to process data output of loaders,
@@ -79,8 +79,9 @@ def training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
-                FILE = 'checkpoints' + '/' + 'image_model_acc_' + str(best_acc) + '_epoch_' + str(epoch) + '.pkl'
-                torch.save(model.state_dict(), )
+                if checkpoints_prefix != None:
+                    FILE = checkpoints_prefix + '_acc_' + str(best_acc.item()) + '_epoch_' + str(epoch) + '.pkl'
+                    torch.save(model.state_dict(), FILE)
             # ------------------------------------------------------------------
     # --------------------------------------------------------------------------
     time_elapsed = time.time() - start_time

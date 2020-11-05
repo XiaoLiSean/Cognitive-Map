@@ -108,7 +108,7 @@ def get_cornerPoints(center, size):
 #-------------------------------------------------------------------------------
 # This function is used to preprocess the object data before update the SG
 # To group up the objectType 'Drawer' and 'Cabinet' based on their structure and position
-def group_up(objs, visualization_on=False):
+def group_up(objs, visualization_on=False, verbose=False):
     # iterate over all possible receptacles which needs to be grouped up
     for name in GROUP_UP_LIST:
         receptacles = [] # used to temporarily store all receptacles
@@ -121,7 +121,8 @@ def group_up(objs, visualization_on=False):
 
         # Case There is no receptacle
         if len(receptacles) == 0:
-            print(colored('Group info: ','blue')+'No '+name)
+            if verbose:
+                print(colored('Group info: ','blue')+'No '+name)
             continue
 
         # Visualize all the receptacles in same name
@@ -161,7 +162,8 @@ def group_up(objs, visualization_on=False):
         output += 'formed {} groups:'.format(len(receptacle_groups))
         for receptacle_group in receptacle_groups:
             output += ' [{}] '.format(len(receptacle_group))
-        print(colored('Group info: ','blue')+output)
+        if verbose:
+            print(colored('Group info: ','blue')+output)
 
         # Re-define the objs structure:
         # i.e. receptacle_groups = [receptacle_group_1, receptacle_group_2]
@@ -284,10 +286,6 @@ class Scene_Graph:
 
         # this SG function serve as a server node
         else:
-            # to continuous changing SG, cannot use blocking function plt.show()
-            # plt.savefig('tmp'+str(random.randint(1,100))+'.png')
-            # plt.imshow(mpimg.imread("tmp.png"))
-            # plt.show(block=False)
             plt.show()
             print(colored('Client: ','green') + 'Receive Data from navigator')
             comfirmed.value = 1
@@ -326,7 +324,13 @@ class Scene_Graph:
         ref_center = np.array([center_ij[larger_obj]['x'], center_ij[larger_obj]['y'], center_ij[larger_obj]['z']])
         ref_size = np.array([size_ij[larger_obj]['x'], size_ij[larger_obj]['y'], size_ij[larger_obj]['z']])
         # smaller object is in larger object if and only if all corner points of smaller one is in axisAlignedBoundingBox of larger one
-        for point in objs[idx_ij[smaller_obj]]['axisAlignedBoundingBox']['cornerPoints']:
+
+        cornerPoints_small = objs[idx_ij[smaller_obj]]['axisAlignedBoundingBox']['cornerPoints']
+        # in case one of the bbox is None
+        if cornerPoints_small == None:
+            cornerPoints_small = objs[idx_ij[smaller_obj]]['objectOrientedBoundingBox']['cornerPoints']
+
+        for point in cornerPoints_small:
             point = np.array(point)
             diff = np.abs(point - ref_center) - ref_size / 2.0
             if np.max(diff) > 0:
@@ -360,14 +364,14 @@ class Scene_Graph:
         # comfirm is not none --> this function is used as a client node
         # Loop through current observation and update SG
         for i in range(len(objs)-1):
-            if objs[i]['objectType'] in BAN_TYPE_LIST:  # Ignore non-informative objectType e.g. 'Floor'
+            if objs[i]['objectType'] in BAN_TYPE_LIST or objs[i]['objectType'] not in idx_2_obj_list:  # Ignore non-informative objectType e.g. 'Floor' and abnormal obj
                 continue
             for j in range(i+1, len(objs)):
                 # 1. Ignore non-informative objectType e.g. 'Floor'
                 # 2. Rule out the exceptions of two objects belonging to same Type
                 # 3. priority filter in case two object with same objectType have distinct R with another obj:
                 #   'on' > 'in' > 'proximity' > 'disjoint'
-                if objs[j]['objectType'] in BAN_TYPE_LIST:
+                if objs[j]['objectType'] in BAN_TYPE_LIST or objs[j]['objectType'] not in idx_2_obj_list:
                     continue
                 if (objs[i]['objectType'] not in REC_MAX_DIC and objs[j]['objectType'] not in REC_MAX_DIC
                     and objs[i]['objectType'] == objs[j]['objectType']):
@@ -416,3 +420,8 @@ class Scene_Graph:
         # visualize Scene Graph
         if visualization_on:
             self.visualize_SG(comfirmed)
+    #---------------------------------------------------------------------------
+    # get current scene graph as data
+    def get_SG_as_dict(self):
+        data = deepcopy({'in':self._R_in, 'on': self._R_on, 'proximity': self._R_proximity, 'disjoint': self._R_disjoint})
+        return data

@@ -19,6 +19,7 @@ import time, copy, random
 
 
 if __name__ == '__main__':
+    
     # controller = Controller(scene='FloorPlan1', gridSize=0.25)
     # controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)
     # controller.step('Pass')

@@ -43,7 +43,7 @@ def get_possible_parentReceptacles(furniture, objs, floor_ID):
 # ------------------------------------------------------------------------------
 # This function is used to shuffle objects in scenes
 # Input the controller handle and output the event data
-def shuffle_scene_layout(controller, num_attempts=40):
+def shuffle_scene_layout(controller, num_attempts=40, verbose=False):
 
     event = controller.step("Pass")
     # Disable small objects
@@ -85,7 +85,8 @@ def shuffle_scene_layout(controller, num_attempts=40):
             event = controller.step(action='PlaceObjectAtPoint', objectId=obj['objectId'], position=position)
             if event.metadata['lastActionSuccess']:
                 floor_poses.remove(position)
-                print(colored('Config Info: ','blue')+'Placed '+obj['objectId']+' on floor')
+                if verbose:
+                    print(colored('Config Info: ','blue')+'Placed '+obj['objectId']+' on floor')
                 break
 
     # --------------------------------------------------------------------------
@@ -107,6 +108,11 @@ def shuffle_scene_layout(controller, num_attempts=40):
         event = controller.step('GetSpawnCoordinatesAboveReceptacle',
                                 objectId=furnitures_prev[obj_sorted['name']]['parentReceptacles'][0], anywhere=True)
         spawn_poses = event.metadata['actionReturn']
+        if spawn_poses == None or len(spawn_poses) == 0:
+            print(furnitures_prev[obj_sorted['name']]['parentReceptacles'], ' has no spawn position for obj:')
+            print(furnitures_prev[obj_sorted['name']])
+            continue
+
         random.shuffle(spawn_poses) # Randomize the positions order
         # High dynamics object move randomly on its parentReceptacles
         if obj['objectType'] in HIGH_DYNAMICS:
@@ -139,7 +145,8 @@ def shuffle_scene_layout(controller, num_attempts=40):
                 event = controller.step(action='PlaceObjectAtPoint', objectId=obj['objectId'], position=position, rotation=rotation)
                 if event.metadata['lastActionSuccess']:
                     successfully_placed[obj_sorted['name']] = True
-                    print(colored('Config Info: ','blue')+'Change Pos of '+obj['objectId'])
+                    if verbose:
+                        print(colored('Config Info: ','blue')+'Change Pos of '+obj['objectId'])
                     break
 
         # At the end: if the object which is previous on their pRs and did not placed to new pose
@@ -156,7 +163,7 @@ def shuffle_scene_layout(controller, num_attempts=40):
                                       for obj in event.metadata['objects'] if not obj['pickupable'] and obj['moveable']])
     furnitures_sorted.sort(key=get_volumn, reverse=True) # Sort object by its volume from large to small
 
-    for obj_sorted in furnitures_sorted:    # Disable small objects
+    for obj_sorted in furnitures_sorted:
         obj = furnitures[obj_sorted['name']] # Get object information using 'name' key out of furnitures dict
         if not successfully_placed[obj_sorted['name']]:
             # Place the object to initialized place and position
@@ -179,7 +186,8 @@ def shuffle_scene_layout(controller, num_attempts=40):
                         event = controller.step(action='PlaceObjectAtPoint', objectId=obj['objectId'], position=position)
                         if event.metadata['lastActionSuccess']:
                             successfully_placed[obj_sorted['name']] = True
-                            print(colored('Config Info: ','blue')+'Change Pos of '+obj['objectId'])
+                            if verbose:
+                                print(colored('Config Info: ','blue')+'Change Pos of '+obj['objectId'])
                             break
                     if successfully_placed[obj_sorted['name']]:
                         break

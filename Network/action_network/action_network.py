@@ -77,7 +77,6 @@ class Action_dataset(torch.utils.data.Dataset):
 
 				
 				starting_image_index = None
-		print(action_num)
 		# print(shuffle_index_pair_label)
 		return shuffle_index_pair_label
 
@@ -151,8 +150,9 @@ class Action_dataset(torch.utils.data.Dataset):
 
 
 class Action_network():
-	def __init__(self, num_classes=6, weight_file_path=action_network_path + 'weight/params_SPTM_like_back_left_right_large_rot_90_new_long_more_more_left_special.pkl'):
+	def __init__(self, num_classes=6, weight_file_path=action_network_path + 'weight/params_SPTM_like_back_left_right_large_rot_90_new_long_more_more_left_more_special.pkl'):
 		self._model = resnet18(pretrained=False, num_classes=num_classes)
+		print('torch.cuda.is_available(): ', torch.cuda.is_available())
 		if torch.cuda.is_available():
 			self._model.cuda()
 		self._model.load_state_dict(torch.load(weight_file_path))
@@ -192,9 +192,10 @@ if __name__ == '__main__':
 	num_ftrs = model.fc.in_features
 	model.fc = nn.Linear(num_ftrs, params['num_classes'])
 
-	model.load_state_dict(torch.load('weight/params_SPTM_like_back_left_right_large_rot_90_new_long_more_more.pkl'))
+	model.load_state_dict(torch.load('weight/params_SPTM_like_back_left_right_large_rot_90_new_long_more_more_left_special.pkl'))
 	# exit()
 	# model.load_state_dict(torch.load('weight/params_SPTM_like_back_left_right_large.pkl'))
+
 	# model.load_state_dict(torch.load('params.pkl'))
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.Adam(model.parameters())

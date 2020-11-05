@@ -9,73 +9,73 @@ if __name__ == '__main__':
 	# 		print(i, j, np.sqrt((0.25 * i) ** 2 + (0.25 * j) ** 2))
 	# exit()
 
-	distance_data = {}
-	coordinate_differences = []
-	coor_diff_corres_cases = []
-	heat_map_num = np.zeros((17, 17))
+	# distance_data = {}
+	# coordinate_differences = []
+	# coor_diff_corres_cases = []
+	# heat_map_num = np.zeros((17, 17))
 
-	with open('distance.csv', 'r') as result:
-	# with open('normal.csv', 'r') as result:
-		reader = csv.reader(result)
-		action_num = 0
-		for row in reader:
-			distance = float(row[0])
-			if distance >= 2.25:
-				continue
-			action_num += 1
+	# with open('distance.csv', 'r') as result:
+	# # with open('normal.csv', 'r') as result:
+	# 	reader = csv.reader(result)
+	# 	action_num = 0
+	# 	for row in reader:
+	# 		distance = float(row[0])
+	# 		if distance >= 2.25:
+	# 			continue
+	# 		action_num += 1
 
-			orientation = float(row[1])
-	    	# success = int(row[2])
-			coordinate_difference = [distance * np.cos(orientation * np.pi / 180), distance * np.sin(orientation * np.pi / 180)]
-			coordinate_difference[0] = int(np.round(coordinate_difference[0] / 0.25))
-			coordinate_difference[1] = int(np.round(coordinate_difference[1] / 0.25))
+	# 		orientation = float(row[1])
+	#     	# success = int(row[2])
+	# 		coordinate_difference = [distance * np.cos(orientation * np.pi / 180), distance * np.sin(orientation * np.pi / 180)]
+	# 		coordinate_difference[0] = int(np.round(coordinate_difference[0] / 0.25))
+	# 		coordinate_difference[1] = int(np.round(coordinate_difference[1] / 0.25))
 
-			coor_diff_index = None
-			just_add = False
-			if not coordinate_difference in coordinate_differences:
-				coordinate_differences.append(coordinate_difference)
-				coor_diff_corres_cases.append(1)
-				just_add = True
-				coor_diff_index = coordinate_differences.index(coordinate_difference)
-			else:
-				coor_diff_index = coordinate_differences.index(coordinate_difference)
-				coor_diff_corres_cases[coor_diff_index] += 1
+	# 		coor_diff_index = None
+	# 		just_add = False
+	# 		if not coordinate_difference in coordinate_differences:
+	# 			coordinate_differences.append(coordinate_difference)
+	# 			coor_diff_corres_cases.append(1)
+	# 			just_add = True
+	# 			coor_diff_index = coordinate_differences.index(coordinate_difference)
+	# 		else:
+	# 			coor_diff_index = coordinate_differences.index(coordinate_difference)
+	# 			coor_diff_corres_cases[coor_diff_index] += 1
 
 
-			if not distance in list(distance_data.keys()):
-				distance_data[distance] = 1
-			else:
-				distance_data[distance] += 1
+	# 		if not distance in list(distance_data.keys()):
+	# 			distance_data[distance] = 1
+	# 		else:
+	# 			distance_data[distance] += 1
 
-	for index, coordinate_difference in enumerate(coordinate_differences):
-		heat_map_prob_index = [coordinate_difference[0], coordinate_difference[1]]
-		if np.abs(heat_map_prob_index[0]) > 8 or np.abs(heat_map_prob_index[1]) > 8:
-			continue
-		heat_map_prob_index[0] = -heat_map_prob_index[0]
-		heat_map_prob_index[1] = -heat_map_prob_index[1]
-		# if not heat_map_prob_index[0] == 1:
-		# 	continue
+	# for index, coordinate_difference in enumerate(coordinate_differences):
+	# 	heat_map_prob_index = [coordinate_difference[0], coordinate_difference[1]]
+	# 	if np.abs(heat_map_prob_index[0]) > 8 or np.abs(heat_map_prob_index[1]) > 8:
+	# 		continue
+	# 	heat_map_prob_index[0] = -heat_map_prob_index[0]
+	# 	heat_map_prob_index[1] = -heat_map_prob_index[1]
+	# 	# if not heat_map_prob_index[0] == 1:
+	# 	# 	continue
 
-		heat_map_prob_index[0] += 8
-		heat_map_prob_index[1] += 8
+	# 	heat_map_prob_index[0] += 8
+	# 	heat_map_prob_index[1] += 8
 
-		# heat_map_prob[heat_map_prob_index[0], heat_map_prob_index[1]] = round(coor_diff_corres_success_cases[index] / coor_diff_corres_cases[index], 3)
-		heat_map_num[heat_map_prob_index[0], heat_map_prob_index[1]] = coor_diff_corres_cases[index]
-		# num_test += coor_diff_corres_cases[index]
+	# 	# heat_map_prob[heat_map_prob_index[0], heat_map_prob_index[1]] = round(coor_diff_corres_success_cases[index] / coor_diff_corres_cases[index], 3)
+	# 	heat_map_num[heat_map_prob_index[0], heat_map_prob_index[1]] = coor_diff_corres_cases[index]
+	# 	# num_test += coor_diff_corres_cases[index]
 
-	fig, ax = plt.subplots()
-	im = ax.imshow(heat_map_num)
-	print('action_num: ', action_num)
+	# fig, ax = plt.subplots()
+	# im = ax.imshow(heat_map_num)
+	# print('action_num: ', action_num)
 
-	for i in range(17):
-	    for j in range(17):
-	        text = ax.text(j, i, str(int(heat_map_num[i, j])),
-	                       ha="center", va="center", color="w")
+	# for i in range(17):
+	#     for j in range(17):
+	#         text = ax.text(j, i, str(int(heat_map_num[i, j])),
+	#                        ha="center", va="center", color="w")
 
-	fig.tight_layout()
-	plt.show()
+	# fig.tight_layout()
+	# plt.show()
 
-	exit()
+	# exit()
 
 
 	# with open('distance_special_small.csv', 'r') as result:

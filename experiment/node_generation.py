@@ -23,7 +23,7 @@ n_clusters = 3
 
 
 class Node_generator():
-	def __init__(self, controller=None, node_radius=1, fieldOfView=120):
+	def __init__(self, controller=None, node_radius=2.0, fieldOfView=120):
 		self._grid_size = 0.25
 		self._fieldOfView = fieldOfView
 		if controller is None:
@@ -67,7 +67,7 @@ class Node_generator():
 		self._tree = None
 		self._tree_obj = None
 		self._boundary_tree = None
-		
+
 
 		self._cluster_center = None
 		self._cluster_center_point = []
@@ -102,7 +102,7 @@ class Node_generator():
 		self._get_object()
 		self._build_obj_tree()
 		self._get_node_vs_obj()
-		
+
 		self.Build_node_map()
 		# self._node_index_list = [0, 1, 4, 5, 7, 8, 9, 10, 11, 17, 21, 23, 32, 44, 47, 48, 52, 56, 58, 59, 81, 83, 90]
 		
@@ -242,7 +242,7 @@ class Node_generator():
 	# 			visible_boundary_index = []
 	# 			# lines_
 	# 			for boundary_index in potential_visible_boundary_index:
-					
+
 	# 				delta_position = list(map(lambda x, y: x - y, self._map_boundary[boundary_index],
 	# 					self._reachable_position[node_pair[node_index]]))
 	# 				dx, dy = delta_position
@@ -252,7 +252,7 @@ class Node_generator():
 	# 				for i in range(steps):
 	# 					searching_point = list(map(lambda x, y: x + y, self._reachable_position[node_pair[node_index]], [dx * i / steps, dy * i / steps]))
 	# 					ineighbor_indexes = self._boundary_tree.query_ball_point(searching_point, r=0.5 * self._grid_size)
-						
+
 	# 					# if self._map_boundary[boundary_index] == [-2.25, 7.0] or boundary_index ==83:
 	# 						# print('searching_point: ', searching_point)
 	# 					if len(ineighbor_indexes) > 0:
@@ -394,8 +394,8 @@ class Node_generator():
 		self._boundary_tree = spatial.KDTree(list(zip(self._map_boundary_x, self._map_boundary_y)))
 		self._map_boundary = copy.deepcopy(self._smaller_grid_map_boundary)
 		print(len(self._map_boundary))
-		
-		
+
+
 		# print(self._boundary_tree.query_ball_point(self._map_boundary[0], r=0.8 * self._grid_size))
 
 	def Get_navigatable_node_pair(self):
@@ -525,7 +525,7 @@ class Node_generator():
 	def Plot_map(self):
 		map_boundary_x = []
 		map_boundary_y = []
-		
+
 		for point in self._smaller_grid_map_boundary:
 			map_boundary_x.append(point[0])
 			map_boundary_y.append(point[1])
@@ -538,15 +538,15 @@ class Node_generator():
 		plt.scatter(self._reachable_x, self._reachable_y, color='#1f77b4')
 		plt.scatter(self._obj_x, self._obj_y, color='#ff7f0e')
 
-		
+
 		for i in range(len(self._node_index_list)):
 			# if i == 3:
 			cir1 = Circle(xy = (self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1]), radius=self._node_radius, alpha=0.3)
 			plt.scatter(self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1], color='#00FFFF')
 			ax.add_patch(cir1)
 		print('len(self._node_index_list): ', len(self._node_index_list))
-		
-		
+
+
 
 		# for i in range(len(self._neighbor_nodes)):
 		# 	x = []
@@ -578,7 +578,7 @@ class Node_generator():
 		# plt.scatter(self._group_x[1], self._group_y[1], color='#A52A2A')
 		# plt.scatter(self._group_x[2], self._group_y[2], color='#DEB887')
 		# plt.scatter(self._group_x[3], self._group_y[3], color='#00FFFF')
-		
+
 		plt.axis('equal')
 		plt.show()
 		return

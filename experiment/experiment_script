@@ -51,7 +51,7 @@ for scene_type in ${result_get_rand_list[@]}; do
 	scene_type_list[i]=$scene_type
 	i=$(($i+1))
 done
-# scene_type_list=(8)
+# scene_type_list=(1)
 scene_type_list=(1 2 3)
 # scene_type_list=(1 2 3 4 5 6 7 8 9 10 11 12)
 

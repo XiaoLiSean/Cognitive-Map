@@ -1,7 +1,10 @@
 lib/__pycache__
+Network/__pycache__
 Network/common/__pycache__
+Network/retrieval_network/__pycache__
 Network/retrieval_network/hymenoptera_data
 Network/retrieval_network/image_data
+Network/retrieval_network/datasets
 Network/retrieval_network/image_data_v1
 Network/retrieval_network/image_data_test
 Network/retrieval_network/image_model_best_fit.pkl
@@ -11,6 +14,8 @@ mis/
 *.gif
 test_lib.py
 test_spawn.py
+navi_demo.py
+demo.py
 experiment/data/images/
 *.png
 *.jpg
