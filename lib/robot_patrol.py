@@ -4,7 +4,7 @@ from termcolor import colored
 from PIL import Image
 from math import floor, ceil
 from matplotlib.patches import Circle, Rectangle
-from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH, VISBILITY_DISTANCE, FIELD_OF_VIEW, NODES
+from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH, VISBILITY_DISTANCE, FIELD_OF_VIEW, NODES, ADJACENT_NODES_SHIFT_GRID, DOOR_NODE
 from lib.scene_graph_generation import Scene_Graph
 from lib.object_dynamics import shuffle_scene_layout
 import matplotlib.pyplot as plt
@@ -74,7 +74,7 @@ class Agent_Sim():
 		self._event = self._controller.step(action='GetReachablePositions')
 		return self._event.metadata['actionReturn']
 
-	def reset_scene(self, scene_type, scene_num, ToggleMapView=False):
+	def reset_scene(self, scene_type, scene_num, ToggleMapView=False, Show_doorway=False):
 		if scene_type == 'Kitchen':
 			add_on = 0
 		elif scene_type == 'Living room':
@@ -91,6 +91,13 @@ class Agent_Sim():
 		self._scene_num = scene_num
 		self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
 		self._controller.reset(self._scene_name)
+
+		if Show_doorway and self._scene_name in DOOR_NODE:
+			node_idx = DOOR_NODE[self._scene_name][0]
+			node = NODES[self._scene_name][node_idx]
+			subnode = DOOR_NODE[self._scene_name][1]
+			self._controller.step(action='TeleportFull', x=node[0], y=self.get_agent_position()['y'], z=node[1], rotation=dict(x=0.0, y=subnode, z=0.0))
+			time.sleep(5)
 
 		if ToggleMapView:   # Top view of the map to see the objets layout. issue: no SG can be enerated
 			self._controller.step({"action": "ToggleMapView"})
@@ -120,15 +127,52 @@ class Agent_Sim():
 		nodes_x = []
 		nodes_y = []
 		points = NODES[self._scene_name]
-		for p in points:
+		for idx, p in enumerate(points):
 			circ = Circle(xy = (p[0], p[1]), radius=self._node_radius, alpha=0.3)
 			ax.add_patch(circ)
 			nodes_x.append(p[0])
 			nodes_y.append(p[1])
+			ax.text(p[0], p[1], str(idx))
 
 		return (nodes_x, nodes_y)
 
-	def show_map(self, show_nodes=False):
+	def add_edges(self, nodes, ax=None):
+		edges = []
+		# Iterature through nodes to generate edges
+		for i in range(len(nodes)-1):
+			node_i = nodes[i]
+			for j in range(i+1, len(nodes)):
+				node_j = nodes[j]
+				diff = np.abs(np.array(node_i) - np.array(node_j))
+				is_edge = False
+
+				if diff[0] < self._node_radius:
+					if diff[1] <= ADJACENT_NODES_SHIFT_GRID * self._grid_size:
+						cost = (diff[0] + diff[1]) / self._grid_size
+						edges.append((node_i, node_j, int(cost)))
+						is_edge = True
+
+				if diff[1] < self._node_radius:
+					if diff[0] <= ADJACENT_NODES_SHIFT_GRID * self._grid_size:
+						cost = (diff[0] + diff[1]) / self._grid_size
+						edges.append((node_i, node_j, int(cost)))
+						is_edge = True
+
+				if is_edge and ax != None:
+					ax.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0)
+					ax.text((node_i[0]+node_j[0]) / 2.0, (node_i[1]+node_j[1]) / 2.0, int(cost), size=8,
+					        ha="center", va="center",
+					        bbox=dict(boxstyle="round",
+					                  ec=(1., 0.5, 0.5),
+					                  fc=(1., 0.8, 0.8),
+					                  )
+					        )
+
+
+		return edges
+
+
+	def show_map(self, show_nodes=False, show_edges=False):
 		self.update_event()
 		# Plot reachable points
 		points = self.get_reachable_coordinate()
@@ -173,10 +217,9 @@ class Agent_Sim():
 			         markerfacecolor='red',
 			         markeredgecolor="None",
 			         markeredgewidth=2)
+			if show_edges:
+				self.add_edges(NODES[self._scene_name], ax=ax)
 
-		# frame = self._event.frame
-		# img = Image.fromarray(frame, 'RGB')
-		# print(self._event.map_coord_to_thor_xz(1, 2))
 		plt.show()
 
 
