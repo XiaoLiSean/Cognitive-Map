@@ -68,5 +68,14 @@ This part is used to document node list (manual construction)
 # ------------------------------------------------------------------------------
 # TOPOLOGICAL MAP NODES [X,Z]
 # ------------------------------------------------------------------------------
+# node A and node B have same z coordnates and x coordnates is shifted by ADJACENT_NODES_SHIFT_GRID grids ---> consider to be adjacent to each other
+# This is set based on yidong's navigation heatmap
+ADJACENT_NODES_SHIFT_GRID = 2
 NODES = {'FloorPlan26': [[-2.00, 4.00], [-1.00, 4.00], [-2.00, 3.00], [-1.25, 3.00],
-                         [-2.00, 2.00], [-1.25, 2.00], [-2.00, 1.00], [-1.00, 1.00]]}
+                         [-2.00, 2.00], [-1.25, 2.00], [-2.00, 1.00], [-1.00, 1.00]]
+        }
+
+# The door is visible in node_i subnode_j: thus DOOR[scene_name] = (node_i, subnode_j)
+# Note Subnode is in degree [00, 90.0, 180.0, 270.0]
+DOOR_NODE = {'FloorPlan26': (7, 90.0)
+            }
