@@ -69,16 +69,19 @@ class Dumb_Navigetion():
 		self._build_map()
 		self._action_network = Action_network()
 		self._rotate_degree_for_train = 90
-		self._SPTM_like_method_try = 2500
-		self._Navigation_test_num = 200
-		self._Navigation_max_try = 17
+		self._SPTM_like_method_try = 900
+		self._Navigation_test_num = 5
+		self._Navigation_max_try = 18
 		self._rand_step_num = 8
 		self._total_action_num = 6
 		self._neighbor_nodes_dis = None
 		self._neighbor_nodes_facing = None
+		self._neighbor_nodes_facing_degree = None
+		self._neighbor_nodes_coor_difference = None
 		self._success_list = None
 
 		self._train_data_distance = []
+		self._train_data_orientation = []
 
 	def Wrap_to_degree(self, degree):
 		degree_wrap = copy.deepcopy(degree)
@@ -217,6 +220,7 @@ class Dumb_Navigetion():
 
 	def Random_SPTM_like_method(self):
 		for i in range(self._SPTM_like_method_try):
+			coor_move = [0, 0]
 			orientation_init = [i for i in range(12)]
 			orientation_init.extend([0, 3, 6, 9])
 			# pre_rand_rot_num = random.randint(0, 12)
@@ -240,16 +244,23 @@ class Dumb_Navigetion():
 			opposite_action = {0: 3, 3: 0, 4: 5, 5: 4}
 			action_name = {0: 'MOVE_FORWARD', 1: 'TURN_RIGHT', 2: 'TURN_LEFT', 3: 'MOVE_BACKWARD', 4: 'MOVE_RIGHT', 5: 'MOVE_LEFT'}
 			move_direction = {0: 'forward', 3: 'backward', 4: 'right', 5: 'left'}
+			move_coor = {0: [0.25, 0], 3: [-0.25, 0], 4: [0, -0.25], 5: [0, 0.25]}
 			for action_num in range(rand_action_step):
 
 				action = random.randint(0, self._total_action_num - 1)
 				action_prob = [0.20, 0.10, 0.10, 0.20, 0.20, 0.20]
 				action = np.random.choice([0, 1, 2, 3, 4, 5], p=action_prob)
+				# action = 0
+				while action == 4:
+					action = np.random.choice([0, 1, 2, 3, 4, 5], p=action_prob)
 				if first_rand_action in move_action_list:
 					prob = [0.225 for action_index in range(len(move_action_list))]
 					prob[move_action_list.index(first_rand_action)] = 0.40
 					prob[move_action_list.index(opposite_action[first_rand_action])] = 0.15
 					action = np.random.choice(move_action_list, p=prob)
+					# action = 0
+					# if action == 4 or action == 3:
+					# 	continue
 					# action = random.choice(move_action_list)
 				if self._debug:
 					print('action: ', action)
@@ -261,6 +272,7 @@ class Dumb_Navigetion():
 				if self._debug:
 					print('first_rand_action: ', first_rand_action)
 				if action in move_action_list:
+
 					success, moving_index = self.Move_navigation_specialized(starting_point_index=pre_point, direction=move_direction[action])
 					if first_rand_action == opposite_action[action] and not self.follow_init_move(first_traj, moving_index):
 						if self._debug:
@@ -270,6 +282,7 @@ class Dumb_Navigetion():
 						first_traj = [rand_point, moving_index]
 					if success:
 						action_taken = self._Agent_action.Teleport_agent(self._point_list[moving_index], useful=True)
+						coor_move = list(map(lambda x, y: x + y, coor_move, move_coor[action]))
 						pre_point = copy.deepcopy(moving_index)
 
 					elif init_action_just_assigned:
@@ -311,8 +324,20 @@ class Dumb_Navigetion():
 				# if action_num == rand_action_step - 1:
 					start_point = self._point_list[rand_point]
 					current_point = list(self.Get_agent_position().values())
-					position_error = [start_point[0] - current_point[0], start_point[2] - current_point[2]]
+					position_error = [current_point[0] - start_point[0], current_point[2] - start_point[2]]
+					# goal_facing = np.arctan2(position_error[0], position_error[1]) * 180 / np.pi + 180
+					# current_facing = init_orientation
+					# print('goal_facing: ', goal_facing)
+					# print('current_facing: ', current_facing)
+					# print('position_error: ', position_error)
+					# facing_error = current_facing - goal_facing
+					facing_error = np.arctan2(coor_move[1], coor_move[0]) * 180 / np.pi - pre_rand_rot_num * 30
+					if facing_error < 0:
+						facing_error = 180 - facing_error
+					# print('coor_move: ', coor_move)
+					# print('facing_error: ', facing_error)
 					self._train_data_distance.append(np.linalg.norm(position_error))
+					self._train_data_orientation.append(facing_error)
 					# print('distance: ', np.linalg.norm(position_error))
 					self._Agent_action._Save_RGB_label(self._Agent_action._action_type[action_name[first_rand_action]])
 			if self._debug:
@@ -356,27 +381,42 @@ class Dumb_Navigetion():
 		reach_node_positive = []
 		reach_node_negative = []
 		num_test = 0
+		test_num_test = 0
 		self._neighbor_nodes_dis = []
 		self._neighbor_nodes_facing = [[] for i in range(len(node_pair_list))]
+		self._neighbor_nodes_facing_degree = [[] for i in range(len(node_pair_list))]
+		self._neighbor_nodes_coor_difference = []
 		self._success_list = [[] for i in range(len(node_pair_list))]
 
 		for i in range(len(node_pair_list)):
-
+			# if i > 0:
+			# 	break
 			neighbor_node_delta_position = list(map(lambda x, y: x - y, self._point_list[node_pair_list[i][0]], self._point_list[node_pair_list[i][1]]))
+			# print('self._point_list[node_pair_list[i][0]]: ', self._point_list[node_pair_list[i][0]])
+			# print('self._point_list[node_pair_list[i][1]]: ', self._point_list[node_pair_list[i][1]])
 			self._neighbor_nodes_dis.append(np.linalg.norm(neighbor_node_delta_position))
-
+			self._neighbor_nodes_coor_difference.append(neighbor_node_delta_position)
 			# self._neighbor_nodes_dis.append()
 
 			num_test += 2 * len(subnodes[i])
+
 			node_pair = node_pair_list[i]
 			reverse_node_pair = copy.deepcopy(node_pair)
 			reverse_node_pair.reverse()
 			node_pair_bidir = [node_pair, reverse_node_pair]
 			# print('node_pair_bidir: ', node_pair_bidir)
 			for direction in range(len(node_pair_bidir)):
+				# print('node_pair_bidir[direction]: ',  node_pair_bidir[direction])
+				# if not direction == 0:
+				# 	break
 				goal_error = list(map(lambda x, y: x - y, self._point_list[node_pair_bidir[direction][0]], self._point_list[node_pair_bidir[direction][1]]))
 
 				goal_facing = np.arctan2(goal_error[0], goal_error[2]) * 180 / np.pi
+
+				# print('goal_facing: ', goal_facing)
+				if goal_facing < 0:
+					goal_facing = 360 + goal_facing
+				# print('goal_facing: ', goal_facing)
 				# self._neighbor_nodes_facing[i]
 
 				current_orientation = self.Get_agent_rotation()['y']
@@ -386,24 +426,41 @@ class Dumb_Navigetion():
 				# time.sleep(2)
 
 				for orientation_index in range(len(orientations)):
+					
+					# if not orientation_index == 1:
+					# 	continue
+					# print('orientation_index:', orientation_index)
+					# print('orientations[orientation_index]: ', orientations[orientation_index])
 					if not subnodes is None:
 						if not orientation_index in subnodes[i]:
 							continue
 					current_facing = orientations[orientation_index]
-					facing_error = goal_facing - current_facing
 					
+					facing_error = goal_facing - current_facing
+					# print('facing_error: ', facing_error)
+					self._neighbor_nodes_facing_degree[i].append(facing_error)
+					# if not 50 < facing_error <= 130:
+					# if not -130 <= facing_error < -50 or np.linalg.norm(neighbor_node_delta_position) > 0.5:
+					# 	continue
+					# print('goal_error: ', goal_error)
+					# print('current_facing: ', current_facing)
+					# print('facing_error: ', facing_error)
+					test_num_test += 1
+
 					while facing_error > 180:
 						facing_error -= 360
 					while facing_error < -180:
 						facing_error += 360
-					if -50 < facing_error < 50:
+					if -50 <= facing_error <= 50:
 						self._neighbor_nodes_facing[i].append('front')
 						# print('front')
-					elif 130 < facing_error <= 180 or -180 < facing_error < -130:
+					elif 130 < facing_error <= 180 or -180 <= facing_error < -130:
 						self._neighbor_nodes_facing[i].append('back')
 						# print('back')
-					else:
-						self._neighbor_nodes_facing[i].append('side')
+					elif 50 < facing_error <= 130:
+						self._neighbor_nodes_facing[i].append('left')
+					elif -130 <= facing_error < -50:
+						self._neighbor_nodes_facing[i].append('right')
 						# print('side')
 						# continue
 					
@@ -456,6 +513,7 @@ class Dumb_Navigetion():
 		print('success_case: ', success_case)
 		print('len(node_pair_list): ', len(node_pair_list) * 2 * 4)
 		print('num_test: ', num_test)
+		print('test_num_test: ', test_num_test)
 		print('positive: ', positive)
 		print('negative: ', negative)
 		print('reach_node_positive: ', reach_node_positive)
@@ -471,14 +529,15 @@ class Dumb_Navigetion():
 		result_writer = csv.writer(result)
 		for i in range(len(self._success_list)):
 			for j in range(len(self._success_list[i])):
-				result_writer.writerow([str(self._neighbor_nodes_dis[i]), str(self._neighbor_nodes_facing[i][j]), str(self._success_list[i][j])])
+				result_writer.writerow([str(self._neighbor_nodes_dis[i]), str(self._neighbor_nodes_facing[i][j]), str(self._success_list[i][j]),
+					str(self._neighbor_nodes_facing_degree[i][j])])
 		return
 
 	def Write_dis_csv(self):
 		distance = open('distance.csv','a')
 		distance_writer = csv.writer(distance)
 		for i in range(len(self._train_data_distance)):
-				distance_writer.writerow([self._train_data_distance[i]])
+				distance_writer.writerow([self._train_data_distance[i], self._train_data_orientation[i]])
 		return
 
 	def Navigation_test(self):
@@ -491,25 +550,30 @@ class Dumb_Navigetion():
 			for _ in range(pre_rand_rot_num):
 				self._Agent_action.Unit_rotate(random.choice([-1, 1]) * self._rotate_degree_for_train)
 			rand_point = random.randint(0, self._point_num - 1)
+			current_orientation = self.Get_agent_rotation()['y']
 			self._Agent_action.Teleport_agent(self._point_list[rand_point], useful=True)
 			current_point_index = rand_point
 			goal_pose = {}
 			rotation_change = 0
 			# time.sleep(1)
-			# for _ in range(self._rand_step_num + 2):
-			for _ in range(1):
+			for _ in range(self._rand_step_num - 2):
+			# for _ in range(1):
 			 	action = random.randint(0, len(self._Agent_action._action_type) - 2)
 			 	action = random.choice([0, 0, 0, 3, 4, 5])
+			 	action = 5
+			 	action = random.choice([0, 3, 5, 5])
+			 	
 			 	# action = 0
 			 	# print('action: ', action)
 			 	# time.sleep(0.5)
 			 	if action in [1, 2]:
 			 		continue
-			 	action = random.choice([1, 2])
+			 	# action = random.choice([1, 2])
 			 	if action in move_action:
 			 		success, moving_index = self.Move_navigation_specialized(current_point_index, direction=move_direction[action], do_move=True)
 			 		if success:
 			 			current_point_index = moving_index
+			 			print('action: ', action)
 			 	elif action == 1:
 			 		self._Agent_action.Unit_rotate(degree=90)
 			 		rotation_change += 90
@@ -519,10 +583,25 @@ class Dumb_Navigetion():
 			 	goal_pose = {'position': Dumb_Navigetion.Get_agent_position(), 'rotation': Dumb_Navigetion.Get_agent_rotation()}
 			 	goal_frame = Dumb_Navigetion._Agent_action._event.frame
 			# time.sleep(1)
+			
 			self._Agent_action.Teleport_agent(self._point_list[rand_point], useful=True)
+
 			# time.sleep(0.5)
 			# print('rotation_change: ', rotation_change)
 			# print('position change: ', list(map(lambda x, y: x - y, list(Dumb_Navigetion.Get_agent_position().values()), list(goal_pose['position'].values()))))
+			position_change = list(map(lambda x, y: y - x, list(Dumb_Navigetion.Get_agent_position().values()), list(goal_pose['position'].values())))
+			goal_orientation = np.arctan2(position_change[0], position_change[2]) / np.pi * 180
+			if goal_orientation < 0:
+				goal_orientation = 360 + goal_orientation
+			print('position_change: ', position_change)
+			print('goal_orientation: ', goal_orientation)
+			print('current_orientation: ', current_orientation)
+			print('-------------------------------')
+			self._train_data_distance.append(np.linalg.norm(position_change))
+			facing_error = goal_orientation - current_orientation
+			# if facing_error < 0:
+			# 			facing_error = 180 - facing_error
+			self._train_data_orientation.append(facing_error)
 			self._Agent_action.Unit_rotate(degree=-rotation_change)
 			if self.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, max_steps=self._Navigation_max_try):
 				success_case += 1
@@ -582,7 +661,7 @@ class Dumb_Navigetion():
 				# print('random action for loop')
 				# print('-----------------------------------------------')
 				pre_action = None
-				time.sleep(1)
+				# time.sleep(1)
 				continue
 
 
@@ -667,7 +746,7 @@ class Dumb_Navigetion():
 			moving_direction = {0: [1, 0, 0], 1: [0, 0, -1], 2: [-1, 0, 0], 3: [0, 0, 1]}
 		# if direction.lower() == 'right':
 		if direction.lower() == 'left':
-			moving_direction = {0: [-1, 0, 0], 1: [0, 0, 1], 2: [1, 0, 1], 3: [0, 0, -1]}
+			moving_direction = {0: [-1, 0, 0], 1: [0, 0, 1], 2: [1, 0, 0], 3: [0, 0, -1]}
 		moving_step = {}
 		for key in list(moving_direction.keys()):
 			moving_step[key] = map(lambda x: x * self._grid_size, moving_direction[key])
@@ -677,6 +756,9 @@ class Dumb_Navigetion():
 			heading_direction_index = 0
 		moving_point = list(map(lambda x, y: x + y, current_position, moving_step[heading_direction_index]))
 		connected_point_index = self._map[starting_point_index]
+		# if direction.lower() == 'left':
+		# 	print('connected_point_index: ', connected_point_index)
+		# 	print('moving_point: ', moving_point)
 		nearest_point_index = -1
 		distance_min = 1000
 		if len(connected_point_index) > 0:
@@ -688,6 +770,11 @@ class Dumb_Navigetion():
 		else:
 			logging.warning('Nowhere to go forward for no connected point')
 			return (False, -1)
+
+		# if direction.lower() == 'left':
+		# 	print('distance_min: ', distance_min)
+		# 	print('self._point_list[nearest_point_index]: ', self._point_list[nearest_point_index])
+
 		if distance_min > 0.5 * self._grid_size:
 			logging.warning('Nowhere to go forward')
 			return (False, -1)
@@ -1030,7 +1117,7 @@ class Agent_action():
 		if self._special:
 			self._scene_name += '_special'
 		elif self._more_special:
-			self._scene_name += '_more_special'
+			self._scene_name += '_right'
 		# self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, fieldOfView=120)
 		self._save_directory = save_directory
 		
@@ -1282,22 +1369,41 @@ if __name__ == '__main__':
 	# time.sleep(10)
 	# exit()
 	Dumb_Navigetion = Dumb_Navigetion(args.AI2THOR, args.scene_type, args.scene_num, args.grid_size,
-		args.rotation_step, args.sleep_time, args.save_directory, overwrite_data=args.overwrite_data, for_test_data=args.test_data, debug=args.debug, more_special=True)
+		args.rotation_step, args.sleep_time, args.save_directory, overwrite_data=args.overwrite_data,
+		for_test_data=args.test_data, debug=args.debug, more_special=True)
 
-	Dumb_Navigetion.Open_close_label_text()
-	# Dumb_Navigetion.Traverse_neighbor_map()
-	# Dumb_Navigetion.Dumb_traverse_map()
-	# Dumb_Navigetion.Long_range_data_specified()
-	Dumb_Navigetion.Long_range_data_more_specified()
+	# Dumb_Navigetion.Open_close_label_text()
+	# # Dumb_Navigetion.Traverse_neighbor_map()
+	# # Dumb_Navigetion.Dumb_traverse_map()
+	# # Dumb_Navigetion.Long_range_data_specified()
+	# # Dumb_Navigetion.Long_range_data_more_specified()
 	# Dumb_Navigetion.Random_SPTM_like_method()
-	# Dumb_Navigetion.Random_traverse_map(pair_num=7)
-	# Dumb_Navigetion.Fast_traverse_map(goal_points_num=24)
-	# position = Dumb_Navigetion.Get_agent_position()
-	# ori_position = copy.deepcopy(position)
-	# reach = Dumb_Navigetion._Agent_action.Get_reachable_coordinate()
-	Dumb_Navigetion.Open_close_label_text()
-	Dumb_Navigetion.Write_dis_csv()
-	exit()
+	# # Dumb_Navigetion.Random_traverse_map(pair_num=7)
+	# # Dumb_Navigetion.Fast_traverse_map(goal_points_num=24)
+	# # position = Dumb_Navigetion.Get_agent_position()
+	# # ori_position = copy.deepcopy(position)
+	# # reach = Dumb_Navigetion._Agent_action.Get_reachable_coordinate()
+	# Dumb_Navigetion.Open_close_label_text()
+	# Dumb_Navigetion.Write_dis_csv()
+	# exit()
+	# for i in range(10):
+	# 	rand_point = random.randint(0, Dumb_Navigetion._point_num - 1)
+	# 	rand_ori = random.randint(0, 12)
+	# 	Dumb_Navigetion._Agent_action.Unit_rotate(random.choice([-15, 15]) * rand_ori)
+	# 	current_orientation = Dumb_Navigetion.Get_agent_rotation()['y']
+	# 	print('current_orientation: ', current_orientation)
+	# 	print('position: ', Dumb_Navigetion._point_list[rand_point])
+	# 	Dumb_Navigetion._Agent_action.Teleport_agent(Dumb_Navigetion._point_list[rand_point], useful=True)
+	# 	success, moving_index = Dumb_Navigetion.Move_navigation_specialized(rand_point, direction='left', do_move=True)
+	# 	# time.sleep(1)
+	# 	Dumb_Navigetion._Agent_action.Teleport_agent(Dumb_Navigetion._point_list[moving_index], useful=True)
+	# 	print('position move: ', Dumb_Navigetion._point_list[moving_index])
+	# 	print('---------------------------------')
+	# exit()
+
+	# Dumb_Navigetion.Navigation_test()
+	# Dumb_Navigetion.Write_dis_csv()
+	# exit()
 
 
 	node_generator = Node_generator(controller=Dumb_Navigetion._Agent_action._controller, node_radius=1)
@@ -1311,8 +1417,7 @@ if __name__ == '__main__':
 	# # Dumb_Navigetion.Node_navigation_test(node_pair_list=test_pairs)
 	# # test_controller.step(action='RotateLeft', degrees=np.abs(30))
 	# action_network = Action_network()
-	# Dumb_Navigetion.Navigation_test()
-	# exit()
+	
 	# time.sleep(10)
 
 

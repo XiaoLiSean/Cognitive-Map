@@ -16,6 +16,7 @@ import os
 import sys
 sys.path.append('../')
 from Map import Topological_map
+from lib.object_dynamics import *
 from matplotlib.patches import Ellipse, Circle
 
 n_clusters = 3
@@ -26,7 +27,8 @@ class Node_generator():
 		self._grid_size = 0.25
 		self._fieldOfView = fieldOfView
 		if controller is None:
-			self._controller = Controller(scene='FloorPlan1', gridSize=self._grid_size, fieldOfView=self._fieldOfView, visibilityDistance=node_radius, agentMode='bot')
+			self._controller = Controller(scene='FloorPlan30', gridSize=self._grid_size, fieldOfView=self._fieldOfView, visibilityDistance=node_radius, agentMode='bot')
+			# self._controller = Controller(scene='FloorPlan_Train9_3', gridSize=self._grid_size, fieldOfView=self._fieldOfView, visibilityDistance=node_radius, agentMode='bot')
 		else:
 			self._controller = controller
 		self._event = self._controller.step(action='Pass')
@@ -89,21 +91,34 @@ class Node_generator():
 		self._neighbor_nodes_dis = None
 		self._neighbor_nodes_facing = None
 
+		# self.Shuffle_scene()
 		self.Update_event()
-		self._get_object()
+		
 		self._get_reachable()
 		self._build_tree()
 		self._get_cluster_center()
 		self._build_graph()
-		self._assign_obj_cluster()
+		# self._assign_obj_cluster()
+		self._get_object()
+		self._build_obj_tree()
 		self._get_node_vs_obj()
 
 		self.Build_node_map()
-		# self._node_index_list = [64, 196, 164, 38, 233, 11, 77, 176, 145]
-
+		# self._node_index_list = [0, 1, 4, 5, 7, 8, 9, 10, 11, 17, 21, 23, 32, 44, 47, 48, 52, 56, 58, 59, 81, 83, 90]
+		
 		# self.Get_navigatable_node_pair()
 		self.Get_boundary()
 		self.Get_connected_orientaton_by_overlap_scene()
+		
+	def Get_all_objects_shuffle(self):
+		for _ in range(5):
+			self.Shuffle_scene()
+			self._get_object()
+			self._build_obj_tree()
+			self._get_node_vs_obj()
+
+	def Shuffle_scene(self):
+		shuffle_scene_layout(controller=self._controller, num_attempts=1)
 
 	def Get_neighbor_nodes(self):
 		return self._neighbor_nodes
@@ -126,7 +141,7 @@ class Node_generator():
 
 		for node_pos_index in self._node_index_list:
 			node_index = self._node_index_list.index(node_pos_index)
-			# if not node_pos_index == 145 and not node_pos_index == 196 and not node_pos_index == 176:
+			# if not node_pos_index == 5:# and not node_pos_index == 4 and not node_pos_index == 5:
 			# 	continue
 
 			for orientation_index in range(len(orientations)):
@@ -451,9 +466,45 @@ class Node_generator():
 			best_node_obj_pair[obj] = best_node_index
 
 		node_list = list(set(list(best_node_obj_pair.values())))
+
+		node_percent_common = {}
+		for node_index, pos_index in enumerate(node_list):
+			for second_node_index, second_pos_index in enumerate(node_list):
+				
+				num_obj_common = 0
+				for obj_index in self._node_vs_visible_obj[pos_index]:
+					if obj_index in self._node_vs_visible_obj[second_pos_index]:
+						num_obj_common += 1
+				if node_index == second_node_index:
+					num_obj_common = - len(self._node_vs_visible_obj[pos_index])
+				if not pos_index in list(node_percent_common.keys()):
+					node_percent_common[pos_index] = [num_obj_common / len(self._node_vs_visible_obj[pos_index])]
+				else:
+					node_percent_common[pos_index].append(num_obj_common / len(self._node_vs_visible_obj[pos_index]))
+
+		# print('node_percent_common: ', node_percent_common)
+		to_remove_node_pos_index = []
+		for pos_index, percents in node_percent_common.items():
+			# print('to_remove_node_pos_index: ', to_remove_node_pos_index)
+			for node_index, percent in enumerate(percents):
+				if percent > 0.9 and not node_list[node_index] in to_remove_node_pos_index:
+					# print('percent > 0.8')
+					to_remove_node_pos_index.append(pos_index)
+					break
+
+		# print('node_list: ', node_list)
+		# print('to_remove_node_pos_index: ', to_remove_node_pos_index)
+
+		for pos_index in to_remove_node_pos_index:
+			node_list.remove(pos_index)
+
+		# print('node_list: ', node_list)
+
 		node_position = []
 		for node_index in node_list:
 			node_position.append(self._reachable_position[node_index])
+
+		print('node_position: ', node_position)
 		node_label = self._kmeans.predict(node_position)
 		for i in range(len(node_list)):
 			if not node_label[i] in list(self._label_vs_node.keys()):
@@ -489,8 +540,9 @@ class Node_generator():
 
 
 		for i in range(len(self._node_index_list)):
+			# if i == 3:
 			cir1 = Circle(xy = (self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1]), radius=self._node_radius, alpha=0.3)
-			plt.scatter(self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1], color='#DEB887')
+			plt.scatter(self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1], color='#00FFFF')
 			ax.add_patch(cir1)
 		print('len(self._node_index_list): ', len(self._node_index_list))
 
@@ -506,17 +558,17 @@ class Node_generator():
 		# 	plt.plot(x, y, color='#2ca02c')
 
 
-		direction = [[0.20, 0], [0, 0.20], [-0.20, 0], [0, -0.20]]
-		for i in range(len(self._connected_subnodes)):
-			for j in range(len(self._connected_subnodes[i])):
-				# if self._connected_subnodes[i][j]
-				x = []
-				x.append(self._reachable_position[self._neighbor_nodes[i][0]][0] + direction[self._connected_subnodes[i][j]][0])
-				x.append(self._reachable_position[self._neighbor_nodes[i][1]][0] + direction[self._connected_subnodes[i][j]][0])
-				y = []
-				y.append(self._reachable_position[self._neighbor_nodes[i][0]][1] + direction[self._connected_subnodes[i][j]][1])
-				y.append(self._reachable_position[self._neighbor_nodes[i][1]][1] + direction[self._connected_subnodes[i][j]][1])
-				plt.plot(x, y, color='#A52A2A')
+		# direction = [[0.20, 0], [0, 0.20], [-0.20, 0], [0, -0.20]]
+		# for i in range(len(self._connected_subnodes)):
+		# 	for j in range(len(self._connected_subnodes[i])):
+		# 		# if self._connected_subnodes[i][j]
+		# 		x = []
+		# 		x.append(self._reachable_position[self._neighbor_nodes[i][0]][0] + direction[self._connected_subnodes[i][j]][0])
+		# 		x.append(self._reachable_position[self._neighbor_nodes[i][1]][0] + direction[self._connected_subnodes[i][j]][0])
+		# 		y = []
+		# 		y.append(self._reachable_position[self._neighbor_nodes[i][0]][1] + direction[self._connected_subnodes[i][j]][1])
+		# 		y.append(self._reachable_position[self._neighbor_nodes[i][1]][1] + direction[self._connected_subnodes[i][j]][1])
+		# 		plt.plot(x, y, color='#A52A2A')
 
 
 		# plt.scatter(self._neighbor_x, self._neighbor_y, color='#2ca02c')
@@ -541,15 +593,13 @@ class Node_generator():
 		return
 
 	def _build_tree(self):
-		points_y = []
-		points_x = []
-		for point in self._reachable:
-			points_x.append(point['z'])
-			points_y.append(point['x'])
-
 		self._points = list(zip(self._reachable_x, self._reachable_y))
 		self._tree = spatial.KDTree(list(zip(self._reachable_x, self._reachable_y)))
 
+		# self._tree_obj = spatial.KDTree(list(zip(self._obj_x, self._obj_y)))
+		return
+
+	def _build_obj_tree(self):
 		self._tree_obj = spatial.KDTree(list(zip(self._obj_x, self._obj_y)))
 		return
 
@@ -586,6 +636,8 @@ class Node_generator():
 
 	def _get_object(self):
 		self.Update_event()
+		self._obj_x = []
+		self._obj_y = []
 		self._objects = self._event.metadata['objects']
 		for obj in self._objects:
 			self._obj_x.append(obj['position']['z'])
@@ -661,41 +713,44 @@ class Node_generator():
 			# print('center_point_index: ', center_point_index)
 			# print('center_connected_point_indexes: ', center_connected_point_indexes)
 			for goal_index in center_connected_point_indexes:
-				self._node_index_list = self._connect_by_node(self._node_index_list, center_point_index, goal_index)
-		# print('_node_index_list: ', self._node_index_list)
-		# print('len(node_index_list): ', len(self._node_index_list))
+				# self._node_index_list = self._connect_by_node(self._node_index_list, center_point_index, goal_index)
+				self._node_index_list = self._connect_by_node(self._node_index_list, goal_index, goal_index)
 
-		object_cover = {}
-		for node_index in self._node_index_list:
-			index = self._tree_obj.query_ball_point(self._reachable_position[node_index], r=self._node_radius)
-			object_cover[node_index] = index
-		object_cover_list = list(object_cover.values())
-		repeated_cover_node = []
-		for index, object_covered in enumerate(object_cover_list):
-			if object_cover_list.count(object_covered) > 1:
-				repeated_cover_node_temp = []
-				for i in range(len(object_cover_list)):
-					if object_cover_list[i] == object_covered:
-						repeated_cover_node_temp.append(i)
-				repeated_cover_node.append(repeated_cover_node_temp)
-		# repeated_cover_node = list(set(repeated_cover_node))
-		repeated_cover_node_no_dup = []
-		node_remove = []
-		for i in range(len(repeated_cover_node)):
-			if not repeated_cover_node[i] in repeated_cover_node_no_dup:
-				repeated_cover_node_no_dup.append(repeated_cover_node[i])
-				node_remove.append(self._node_index_list[repeated_cover_node[i][0]])
+
+		# object_cover = {}
+		# for node_index in self._node_index_list:
+		# 	index = self._tree_obj.query_ball_point(self._reachable_position[node_index], r=self._node_radius)
+		# 	object_cover[node_index] = index
+		# object_cover_list = list(object_cover.values())
+
+		# print('self._label_vs_node: ', self._label_vs_node)
+		# print('object_cover_list: ', object_cover_list)
+
+		# repeated_cover_node = []
+		# for index, object_covered in enumerate(object_cover_list):
+		# 	if object_cover_list.count(object_covered) > 1:
+		# 		repeated_cover_node_temp = []
+		# 		for i in range(len(object_cover_list)):
+		# 			if object_cover_list[i] == object_covered:
+		# 				repeated_cover_node_temp.append(i)
+		# 		repeated_cover_node.append(repeated_cover_node_temp)
+		# # repeated_cover_node = list(set(repeated_cover_node))
+
 		# print('repeated_cover_node: ', repeated_cover_node)
-		# print('repeated_cover_node_no_dup: ', repeated_cover_node_no_dup)
+		# repeated_cover_node_no_dup = []
+		# node_remove = []
+		# for i in range(len(repeated_cover_node)):
+		# 	if not repeated_cover_node[i] in repeated_cover_node_no_dup:
+		# 		repeated_cover_node_no_dup.append(repeated_cover_node[i])
+		# 		node_remove.append(self._node_index_list[repeated_cover_node[i][0]])
+		# # print('repeated_cover_node: ', repeated_cover_node)
+		# # print('repeated_cover_node_no_dup: ', repeated_cover_node_no_dup)
 
-		for i in range(len(node_remove)):
-			# print(repeated_cover_node_no_dup[i][0])
-			self._node_index_list.remove(node_remove[i])
+		# for i in range(len(node_remove)):
+		# 	# print(repeated_cover_node_no_dup[i][0])
+		# 	self._node_index_list.remove(node_remove[i])
 
 
-
-		# print('_node_index_list: ', self._node_index_list)
-		# print('len(node_index_list): ', len(self._node_index_list))
 
 		for center_index in range(len(self._cluster_center_point)):
 			for goal_center_index in range(center_index + 1, len(self._cluster_center_point)):
@@ -703,8 +758,7 @@ class Node_generator():
 				goal_center_point_index = self._reachable_position.index(self._cluster_center_point[goal_center_index])
 				self._node_index_list = self._connect_by_node(self._node_index_list, current_center_point_index, goal_center_point_index)
 		self._node_index_list = list(set(self._node_index_list))
-		print('_node_index_list: ', self._node_index_list)
-		# print('len(node_index_list): ', len(self._node_index_list))
+		print('self._node_index_list: ', self._node_index_list)
 		return
 
 if __name__ == '__main__':

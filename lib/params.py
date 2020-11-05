@@ -6,9 +6,11 @@ import numpy as np
 SIM_WINDOW_HEIGHT = 700
 SIM_WINDOW_WIDTH = 900
 BAN_TYPE_LIST = ['Floor']   # Ignore non-informative objectType e.g. 'Floor
-SCENE_TYPES = ['Kitchen', 'Living room', 'Bedroom', 'Bathroom']
-SCENE_NUM_PER_TYPE = 30
-# ------------------------------------------------------------------------------
+THIRD_PARTY_PATH = dirname(dirname(abspath(__file__))) + '/3rdparty' # File path for 3rdparty info
+GLOVE_FILE_NAME = 'glove.42B.300d.txt' # file name of glove vector
+# glove_embedding = np.load(THIRD_PARTY_PATH + '/' + 'glove_embedding.npy', allow_pickle='TRUE').item() # all Glove word Embedding vectors
+# THOR_2_VEC = np.load(THIRD_PARTY_PATH + '/' + 'THOR_2_VEC.npy', allow_pickle='TRUE').item() # objectType embedding using GLoVe vectors
+
 INFO_FILE_PATH = dirname(dirname(abspath(__file__))) + '/AI2THOR_info' # File path for info of iTHOR Env.
 obj_2_idx_dic = np.load(INFO_FILE_PATH + '/' + 'obj_2_idx_dic.npy', allow_pickle='TRUE').item()
 idx_2_obj_list = np.load(INFO_FILE_PATH + '/' + 'idx_2_obj_list.npy')
