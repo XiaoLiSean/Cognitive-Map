@@ -72,10 +72,15 @@ This part is used to document node list (manual construction)
 # This is set based on yidong's navigation heatmap
 ADJACENT_NODES_SHIFT_GRID = 2
 NODES = {'FloorPlan26': [[-2.00, 4.00], [-1.00, 4.00], [-2.00, 3.00], [-1.25, 3.00],
-                         [-2.00, 2.00], [-1.25, 2.00], [-2.00, 1.00], [-1.00, 1.00]]
+                         [-2.00, 2.00], [-1.25, 2.00], [-2.00, 1.00], [-1.00, 1.00]],
+         'FloorPlan27': [[0.25, -0.50], [1.25, -0.50], [0.50, 0.50], [1.25, 0.50], [0.50, 1.75], [1.25, 1.75]],
+         'FloorPlan226': [[1.00, -2.00], [0.75, -1.00], [-0.25, -1.00], [-1.25, -1.00], [-2.25, -1.00],
+                          [-2.25, 0.00], [-1.25, 0.25], [-0.25, 0.25], [0.75, 0.25]]
         }
 
 # The door is visible in node_i subnode_j: thus DOOR[scene_name] = (node_i, subnode_j)
 # Note Subnode is in degree [00, 90.0, 180.0, 270.0]
-DOOR_NODE = {'FloorPlan26': (7, 90.0)
+DOOR_NODE = {'FloorPlan26': (7, 90.0),
+             'FloorPlan27': (1, 180.0),
+             'FloorPlan226': (0, 180.0)
             }

@@ -136,6 +136,41 @@ class Agent_Sim():
 
 		return (nodes_x, nodes_y)
 
+	def is_reachable(self, pi, pj):
+		map = self.get_reachable_coordinate()
+		diff = (np.array(pj) - np.array(pi)) / self._grid_size
+		sign = np.sign(diff)
+		diff = np.abs(diff.astype(int))
+		current_pose = dict(x=pi[0], y=map[0]['y'], z=pi[1])
+		count = 0
+		for i in range(1, diff[0]+1):
+			current_pose['x'] += sign[0]*self._grid_size
+			if current_pose in map:
+				count += 1
+		for j in range(1, diff[1]+1):
+			current_pose['z'] += sign[1]*self._grid_size
+			if current_pose in map:
+				count += 1
+		if count == (diff[0] + diff[1]):
+			return True
+
+
+		current_pose = dict(x=pi[0], y=map[0]['y'], z=pi[1])
+		count = 0
+		for j in range(1, diff[1]+1):
+			current_pose['z'] += sign[1]*self._grid_size
+			if current_pose in map:
+				count += 1
+		for i in range(1, diff[0]+1):
+			current_pose['x'] += sign[0]*self._grid_size
+			if current_pose in map:
+				count += 1
+		if count == diff[0] + diff[1]:
+			return True
+
+		return False
+
+
 	def add_edges(self, nodes, ax=None):
 		edges = []
 		# Iterature through nodes to generate edges
@@ -148,15 +183,19 @@ class Agent_Sim():
 
 				if diff[0] < self._node_radius:
 					if diff[1] <= ADJACENT_NODES_SHIFT_GRID * self._grid_size:
-						cost = (diff[0] + diff[1]) / self._grid_size
-						edges.append((node_i, node_j, int(cost)))
-						is_edge = True
+						is_edge = self.is_reachable(node_i, node_j)
+						if is_edge:
+							cost = (diff[0] + diff[1]) / self._grid_size
+							edges.append((node_i, node_j, int(cost)))
+
 
 				if diff[1] < self._node_radius:
 					if diff[0] <= ADJACENT_NODES_SHIFT_GRID * self._grid_size:
-						cost = (diff[0] + diff[1]) / self._grid_size
-						edges.append((node_i, node_j, int(cost)))
-						is_edge = True
+						is_edge = self.is_reachable(node_i, node_j)
+						if is_edge:
+							cost = (diff[0] + diff[1]) / self._grid_size
+							edges.append((node_i, node_j, int(cost)))
+
 
 				if is_edge and ax != None:
 					ax.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0)
