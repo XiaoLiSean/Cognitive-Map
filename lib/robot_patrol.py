@@ -159,7 +159,7 @@ class Agent_Sim():
 						is_edge = True
 
 				if is_edge and ax != None:
-					ax.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', 'linewidth', 2.0)
+					ax.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0)
 					ax.text((node_i[0]+node_j[0]) / 2.0, (node_i[1]+node_j[1]) / 2.0, int(cost), size=8,
 					        ha="center", va="center",
 					        bbox=dict(boxstyle="round",
