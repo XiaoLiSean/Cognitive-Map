@@ -93,11 +93,12 @@ class Agent_Sim():
 		self._controller.reset(self._scene_name)
 
 		if Show_doorway and self._scene_name in DOOR_NODE:
-			node_idx = DOOR_NODE[self._scene_name][0]
-			node = NODES[self._scene_name][node_idx]
-			subnode = DOOR_NODE[self._scene_name][1]
-			self._controller.step(action='TeleportFull', x=node[0], y=self.get_agent_position()['y'], z=node[1], rotation=dict(x=0.0, y=subnode, z=0.0))
-			time.sleep(5)
+			if DOOR_NODE[self._scene_name] != None:
+				node_idx = DOOR_NODE[self._scene_name][0]
+				node = NODES[self._scene_name][node_idx]
+				subnode = DOOR_NODE[self._scene_name][1]
+				self._controller.step(action='TeleportFull', x=node[0], y=self.get_agent_position()['y'], z=node[1], rotation=dict(x=0.0, y=subnode, z=0.0))
+				time.sleep(5)
 
 		if ToggleMapView:   # Top view of the map to see the objets layout. issue: no SG can be enerated
 			self._controller.step({"action": "ToggleMapView"})
@@ -135,6 +136,17 @@ class Agent_Sim():
 			ax.text(p[0], p[1], str(idx))
 
 		return (nodes_x, nodes_y)
+
+	def is_node(self, pose):
+		is_node = False
+		node_identity = -1
+		for node_i, node in enumerate(NODES[self._scene_name]):
+			dis_sq = (pose[0]**2 + node[0]**2)**2 + (pose[1]**2 + node[1]**2)**2
+			if dis_sq < 1e-1:
+				node_identity = node_i
+				is_node = True
+		return is_node, node_identity
+
 
 	def is_reachable(self, pi, pj):
 		map = self.get_reachable_coordinate()

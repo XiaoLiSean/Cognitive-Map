@@ -1,6 +1,6 @@
 import argparse
 from termcolor import colored
-from lib.robot_patrol import Agent_Sim
+from lib.robot_env import Agent_Sim
 from lib.params import VISBILITY_DISTANCE, SCENE_TYPES, SCENE_NUM_PER_TYPE
 from Network.retrieval_network.params import DYNAMICS_ROUNDS, LOCALIZATION_GRID_TOL, TRAIN_FRACTION, VAL_FRACTION, DATA_DIR
 
