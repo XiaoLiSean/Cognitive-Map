@@ -2,14 +2,15 @@
 import torch
 import argparse, os, copy
 import numpy as np
+import matplotlib.pyplot as plt
 from PIL import Image
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from torchsummary import summary
 from termcolor import colored
-from lib.robot_patrol import Agent_Sim
+from lib.robot_env import Agent_Sim
 from lib.object_dynamics import shuffle_scene_layout
-from lib.params import SCENE_TYPES, SCENE_NUM_PER_TYPE
+from lib.params import SCENE_TYPES, SCENE_NUM_PER_TYPE, NODES
 from Network.retrieval_network.params import *
 from Network.retrieval_network.datasets import TripletImagesDataset, update_triplet_info
 from Network.retrieval_network.networks import TripletNetImage, SiameseNetImage
@@ -68,57 +69,137 @@ def training_pipeline(Dataset, Network, LossFcn, Training):
 # ------------------------------------------------------------------------------
 # -------------------------------Testing Pipeline-------------------------------
 # ------------------------------------------------------------------------------
-def get_nodes_features(robot, data_dir):
+def get_topo_map_features(robot, data_dir, map_round=0):
     features = []
     feature_transforms = transforms.Compose([transforms.Resize(IMAGE_SIZE),
                                              transforms.ToTensor(),
                                              transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-    round = np.random.randint(DYNAMICS_ROUNDS)
+
     subnode_angles = [0.0, 90.0, 180.0, 270.0]
     for node in NODES[robot._scene_name]:
         node_feature = []
         for subnode in subnode_angles:
-            file_name = 'round' + str(round) + '_' + str(node[0]) + '_' + str(node[1]) + '_' + str(subnode) + '_' + 'end.png'
+            file_name = 'round' + str(map_round) + '_' + str(node[0]) + '_' + str(node[1]) + '_' + str(subnode) + '_' + 'end.png'
             node_feature.append(feature_transforms(Image.open(data_dir + '/' + file_name)).unsqueeze(dim=0))
 
-        features.append(node_feature)
+        features.append(copy.deepcopy(node_feature))
     return features
 
-def localization(model, z, features, gt):
+# ------------------------------------------------------------------------------
+def wrapToPi(angle):
+    while angle < -180:
+        angle += 180
+    while angle > 180:
+        angle -= 180
+    return angle
+
+# pose_z = [p['x'], p['z'], subnode]
+# info = [is_node, node_i, subnode_i]
+def localization_eval(model, z, topo_features, pose_z, info, success_and_trial, heatmap_max, heatmap_min, robot, device):
     feature_transforms = transforms.Compose([transforms.Resize(IMAGE_SIZE),
                                              transforms.ToTensor(),
                                              transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-    is_localized = True
-    gt_img = features[gt[0]][gt[1]]
-    z_img = feature_transforms(z).unsqueeze(dim=0)
-    benchmark = COS(model.get_embedding(gt_img), model.get_embedding(z_img)).item()
 
-    for node_i, node_feature in enumerate(features):
+    z_img = feature_transforms(z).unsqueeze(dim=0)
+    z_img = z_img.to(device)
+    if info[0]:
+        gt_img = topo_features[info[1]][info[2]]
+        gt_img = gt_img.to(device)
+        benchmark = COS(model.get_embedding(gt_img), model.get_embedding(z_img)).item()
+        success_and_trial['trials'] += 1
+        is_success = True
+
+    for node_i, node_feature in enumerate(topo_features):
+        node = NODES[robot._scene_name][node_i]
+        d_xy = int((np.abs(pose_z[0]-node[0]) + np.abs(pose_z[1]-node[1])) / robot._grid_size)
+
         for subnode_i, subnode_feature in enumerate(node_feature):
-            if node_i == gt[0] and subnode_i == gt[1]:
-                continue
+            d_theta_idx = int(wrapToPi((info[2] - subnode_i)*90) / 90) + 2
+
+            subnode_feature = subnode_feature.to(device)
             score = COS(model.get_embedding(subnode_feature), model.get_embedding(z_img)).item()
-            if score >= benchmark:
-                is_localized = False
-                break
-        if not is_localized:
+
+            if heatmap_max[d_xy][d_theta_idx] < score:
+                heatmap_max[d_xy][d_theta_idx] = score
+                if d_theta_idx == 0:
+                    heatmap_max[d_xy][4] = score
+                elif d_theta_idx == 4:
+                    heatmap_max[d_xy][0] = score
+
+            if heatmap_min[d_xy][d_theta_idx] == -1:
+                heatmap_min[d_xy][d_theta_idx] = score
+                if d_theta_idx == 0:
+                    heatmap_min[d_xy][4] = score
+                elif d_theta_idx == 4:
+                    heatmap_min[d_xy][0] = score
+
+            if heatmap_min[d_xy][d_theta_idx] > score:
+                heatmap_min[d_xy][d_theta_idx] = score
+                if d_theta_idx == 0:
+                    heatmap_min[d_xy][4] = score
+                elif d_theta_idx == 4:
+                    heatmap_min[d_xy][0] = score
+
+            if info[0] and node_i != info[1] and subnode_i != info[2]:
+                if benchmark <= score:
+                    is_success = False
+
+    if info[0]:
+        if is_success:
+            success_and_trial['success'] += 1
+
+def plot_heatmap(heatmap_max, heatmap_min):
+    ax1 = plt.subplot(211)
+    ax2 = plt.subplot(212)
+    heatmap_max[heatmap_max < 0.0] = 0.0
+    heatmap_min[heatmap_min < 0.0] = 0.0
+    for row in range(heatmap_max.shape[0]-1,-1,-1):
+        if np.sum(heatmap_max[row,:]) == 0.0 and np.sum(heatmap_min[row,:]) == 0.0:
+            heatmap_max = np.delete(heatmap_max, row, 0)
+            heatmap_min = np.delete(heatmap_min, row, 0)
+        else:
             break
 
-    return is_localized
+    ax1.imshow(np.transpose(heatmap_max))
+    ax2.imshow(np.transpose(heatmap_min))
+    ax1.set_xticks(np.arange(heatmap_max.shape[0]))
+    ax1.set_yticks(np.arange(heatmap_max.shape[1]))
+    ax1.set_xticklabels(np.arange(heatmap_max.shape[0]))
+    ax1.set_yticklabels([-180, -90, 0, 90, 180])
+    ax2.set_xticks(np.arange(heatmap_max.shape[0]))
+    ax2.set_yticks(np.arange(heatmap_max.shape[1]))
+    ax2.set_xticklabels(np.arange(heatmap_max.shape[0]))
+    ax2.set_yticklabels([-180, -90, 0, 90, 180])
+    for i in range(heatmap_max.shape[0]):
+        for j in range(heatmap_max.shape[1]):
+            text = ax1.text(i, j, '{:.2f}'.format(int(heatmap_max[i, j]*100)/100.0), ha="center", va="center", color="k")
+            text = ax2.text(i, j, '{:.2f}'.format(int(heatmap_min[i, j]*100)/100.0), ha="center", va="center", color="w")
+
+    plt.show()
 
 # ------------------------------------------------------------------------------
-def testing_pipeline(Network, checkpoint):
+def testing_pipeline(Network, checkpoint, dynamcis_rounds=DYNAMICS_ROUNDS):
     # --------------------------------------------------------------------------
     # Initialize network
+    # ------------------------------------------------------------------
     model = Network()
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print("Model testing on: ", device)
+    model.to(device)
     model.load_state_dict(torch.load(checkpoint))
     model.eval()
     # ------------------------------------------------------------------
     # Initialize robot
+    # ------------------------------------------------------------------
     robot = Agent_Sim()
     test_path = DATA_DIR + '/test'
     # --------------------------------------------------------------------------
     # Iterate through test scene
+    # ------------------------------------------------------------------
+    success_and_trials = [dict(trials=0, success=0) for i in range(len(SCENE_TYPES) * SCENE_NUM_PER_TYPE)]
+    heatmap_max = -1.0*np.ones((60, 5))
+    heatmap_min = -1.0*np.ones((60, 5))
+    metric_idx = 0
     for scene_type in SCENE_TYPES:
         for scene_num in range(int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1, SCENE_NUM_PER_TYPE + 1):
             robot.reset_scene(scene_type=scene_type, scene_num=scene_num)
@@ -128,50 +209,47 @@ def testing_pipeline(Network, checkpoint):
                 print(colored('Testing Info: ','blue') + 'No Data for Scene' + robot._scene_name)
                 continue
             # ------------------------------------------------------------------
-            # Prepare Topo-map info: i.e. nodes and features (image + SG)
-            print('----'*20 + '\n' + colored('Testing Info: ','blue') + 'Testing in scene' + robot._scene_name)
-            features = get_nodes_features(robot, file_path)
+            # Prepare current scene info: i.e. nodes and features (image + SG)
+            # --------------------------------------------------------------
+            map = robot.get_reachable_coordinate()
             subnodes = [dict(x=0.0, y=0.0, z=0.0), dict(x=0.0, y=90.0, z=0.0), dict(x=0.0, y=180.0, z=0.0), dict(x=0.0, y=270.0, z=0.0)]
-            # --------------------Start testing in new scene--------------------
-            # Initialize test metrics
-            scene_trials = 0
-            scene_success = 0
+            observations = []
+            # Image store for every points and angles in map
+            for p in map:
+                is_node, node_i = robot.is_node([p['x'], p['z']], threshold=1e-8)
+                for subnode_i, subnode in enumerate(subnodes):
+                    robot._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=subnode)
+                    img_z = robot.get_current_fram()
+                    observations.append(([p['x'], p['z']], [is_node, node_i, subnode_i], img_z))
+            print('----'*20 + '\n' + colored('Testing Info: ','blue') + 'Testing in scene' + robot._scene_name)
             # ------------------------------------------------------------------
-            for round in range(DYNAMICS_ROUNDS):
+            # --------------------Start testing in new scene--------------------
+            # ------------------------------------------------------------------
+            for round in range(dynamcis_rounds):
                 # --------------------------------------------------------------
-                # change object layout
-                if round != 0:
-                    shuffle_scene_layout(robot._controller)
-                    robot.update_event()
+                # get diffrerent info with dynamcis in topological map
+                if dynamcis_rounds > 1:
+                    topo_features = copy.deepcopy(get_topo_map_features(robot, file_path, map_round=round))
+                else:
+                    topo_features = copy.deepcopy(get_topo_map_features(robot, file_path, map_round=0))
                 # --------------------------------------------------------------
-                # Get and prepare map info
-                map = robot.get_reachable_coordinate()
-                universal_y = robot.get_agent_position()['y']
-                # --------------------------------------------------------------
-                # Iterate testing through subnodes
-                for node_i, node in enumerate(NODES[robot._scene_name]):
-                    for subnode_i, subnode in enumerate(subnodes):
-                        # ------------------------------------------------------
-                        # Get testing through subnodes grid
-                        points = robot.get_near_grids({'x': node[0], 'y': universal_y, 'z': node[1]}, step=LOCALIZATION_GRID_TOL)
-                        grids = copy.deepcopy(points)
-                        for grid in grids:
-                            if grid not in map:
-                                points.remove(grid)
-                        if len(points) <= 0:
-                            continue
-                        # ------------------------------------------------------
-                        # Iterate testing through subnodes grid
-                        for p in points:
-                            robot._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=subnode)
-                            z = robot.get_current_fram()
-                            is_localized = localization(model, z, features, (node_i, subnode_i))
-                            # Update testing data and metrics
-                            scene_trials += 1
-                            scene_success += int(is_localized)
+                # Iterate testing through map
+                for pose_z, info, img_z in observations:
+                    localization_eval(model, img_z, topo_features, pose_z, info, success_and_trials[metric_idx], heatmap_max, heatmap_min, robot, device)
 
-            print(colored('Testing Info: ','blue') + '{}/{} ({}) success rate in scene {}'.format(scene_success, scene_trials, scene_success/scene_trials , robot._scene_name))
+            scene_trials = success_and_trials[metric_idx]['trials']
+            scene_success = success_and_trials[metric_idx]['success']
+            metric_idx += 1
+
+            print(colored('Testing Info: ','blue') + '{}/{} success rate in scene {}'.format(scene_success, scene_trials, robot._scene_name))
             print('----'*20 + '\n')
+
+            np.save("heatmap_max.npy", heatmap_max)
+            np.save("heatmap_min.npy", heatmap_min)
+            plot_heatmap(heatmap_max, heatmap_min)
+
+    np.save("success_and_trials.npy", success_and_trials)
+    plot_heatmap(heatmap_max, heatmap_min)
 
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -183,6 +261,10 @@ if __name__ == '__main__':
     parser.add_argument("--train", help="train network image branch", action="store_true")
     parser.add_argument("--test", help="test network image branch", action="store_true")
     args = parser.parse_args()
+
+    # heatmap_max = np.load('heatmap_max.npy')
+    # heatmap_min = np.load('heatmap_min.npy')
+    # plot_heatmap(heatmap_max, heatmap_min)
 
     # --------------------------------------------------------------------------
     # Use to load triplet infomation which is used to collect ground truth
@@ -198,11 +280,11 @@ if __name__ == '__main__':
         LossFcn = TripletLoss(constant_margin=False)
         TraningFcn = Training
         model_best_fit = training_pipeline(Dataset, Network, LossFcn, TraningFcn)
-        torch.save(model_best_fit.state_dict(), CHECKPOINTS_PREFIX + '_best_fit.pkl')
+        torch.save(model_best_fit.state_dict(), CHECKPOINTS_PREFIX + 'model_best_fit.pkl')
 
     # --------------------------------------------------------------------------
     # Testing corresponding networks
     if args.test:
         Network = SiameseNetImage
-        Checkpoint = CHECKPOINTS_PREFIX + '_best_fit.pkl'
+        Checkpoint = CHECKPOINTS_PREFIX + 'image_siamese_dynamics_best_fit.pkl'
         testing_pipeline(Network, Checkpoint)

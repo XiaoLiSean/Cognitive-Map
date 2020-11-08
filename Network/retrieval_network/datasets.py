@@ -28,7 +28,7 @@ def  get_pose_from_name(name):
 # filename = [FloorPlanX_x_z_theta_i_.png]
 def update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_POINTS, TRIPLET_MAX_NUM_PER_ANCHOR):
 
-    labels = ['train', 'val', 'test']
+    labels = ['train', 'val']
 
     for label in labels:
         for FloorPlan in os.listdir(DATA_DIR + '/' + label):
@@ -85,7 +85,6 @@ def update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_POINTS, 
 class TripletImagesDataset(torch.utils.data.Dataset):
     """
     Train: For each sample (anchor) randomly chooses a positive and negative samples
-    Test: Creates fixed triplets for testing
     """
 
     def __init__(self, DATA_DIR, IMAGE_SIZE, is_train=True):
@@ -136,7 +135,6 @@ class TripletImagesDataset(torch.utils.data.Dataset):
 class TripletSGsDataset(torch.utils.data.Dataset):
     """
     Train: For each sample (anchor) randomly chooses a positive and negative samples
-    Test: Creates fixed triplets for testing
     """
 
     def __init__(self, DATA_DIR, matrix_size=OBJ_TYPE_NUM, is_train=True):

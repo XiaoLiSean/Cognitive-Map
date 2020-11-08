@@ -80,7 +80,7 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
                 if checkpoints_prefix != None:
-                    FILE = checkpoints_prefix + '_acc_' + str(best_acc.item()) + '_epoch_' + str(epoch) + '.pkl'
+                    FILE = checkpoints_prefix + 'model_best_fit_acc_' + str(best_acc.item()) + '_epoch_' + str(epoch) + '.pkl'
                     torch.save(model.state_dict(), FILE)
             # ------------------------------------------------------------------
     # --------------------------------------------------------------------------
