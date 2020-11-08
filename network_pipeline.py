@@ -69,21 +69,17 @@ def training_pipeline(Dataset, Network, LossFcn, Training):
 # ------------------------------------------------------------------------------
 # -------------------------------Testing Pipeline-------------------------------
 # ------------------------------------------------------------------------------
-def get_topo_map_features(robot, data_dir, is_dynamics=False):
+def get_topo_map_features(robot, data_dir, map_round=0):
     features = []
     feature_transforms = transforms.Compose([transforms.Resize(IMAGE_SIZE),
                                              transforms.ToTensor(),
                                              transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-    if is_dynamics:
-        round = np.random.randint(DYNAMICS_ROUNDS)
-    else:
-        round = 0
 
     subnode_angles = [0.0, 90.0, 180.0, 270.0]
     for node in NODES[robot._scene_name]:
         node_feature = []
         for subnode in subnode_angles:
-            file_name = 'round' + str(round) + '_' + str(node[0]) + '_' + str(node[1]) + '_' + str(subnode) + '_' + 'end.png'
+            file_name = 'round' + str(map_round) + '_' + str(node[0]) + '_' + str(node[1]) + '_' + str(subnode) + '_' + 'end.png'
             node_feature.append(feature_transforms(Image.open(data_dir + '/' + file_name)).unsqueeze(dim=0))
 
         features.append(copy.deepcopy(node_feature))
@@ -97,9 +93,9 @@ def wrapToPi(angle):
         angle -= 180
     return angle
 
-# pose_z = [p['x'], p['y'], subnode]
+# pose_z = [p['x'], p['z'], subnode]
 # info = [is_node, node_i, subnode_i]
-def localization_eval(model, z, topo_features, pose_z, info, success_and_trials, heatmap_max, heatmap_min, robot, device):
+def localization_eval(model, z, topo_features, pose_z, info, success_and_trial, heatmap_max, heatmap_min, robot, device):
     feature_transforms = transforms.Compose([transforms.Resize(IMAGE_SIZE),
                                              transforms.ToTensor(),
                                              transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
@@ -110,38 +106,51 @@ def localization_eval(model, z, topo_features, pose_z, info, success_and_trials,
         gt_img = topo_features[info[1]][info[2]]
         gt_img = gt_img.to(device)
         benchmark = COS(model.get_embedding(gt_img), model.get_embedding(z_img)).item()
-        success_and_trials['trials'] += 1
+        success_and_trial['trials'] += 1
         is_success = True
 
     for node_i, node_feature in enumerate(topo_features):
         node = NODES[robot._scene_name][node_i]
+        d_xy = int((np.abs(pose_z[0]-node[0]) + np.abs(pose_z[1]-node[1])) / robot._grid_size)
+
         for subnode_i, subnode_feature in enumerate(node_feature):
-            d_theta = int(wrapToPi((info[2] - subnode_i)*90) / 90)
-            d_xy = int((pose_z[0]+pose_z[1]-node[0]-node[1]) / robot._grid_size)
+            d_theta_idx = int(wrapToPi((info[2] - subnode_i)*90) / 90) + 2
+
             subnode_feature = subnode_feature.to(device)
             score = COS(model.get_embedding(subnode_feature), model.get_embedding(z_img)).item()
-            if heatmap_max[d_xy][d_theta + 2] < score:
-                heatmap_max[d_xy][d_theta + 2] = score
-                if (d_theta + 2) == 0:
+
+            if heatmap_max[d_xy][d_theta_idx] < score:
+                heatmap_max[d_xy][d_theta_idx] = score
+                if d_theta_idx == 0:
                     heatmap_max[d_xy][4] = score
-                elif (d_theta + 2) == 4:
+                elif d_theta_idx == 4:
                     heatmap_max[d_xy][0] = score
-            if heatmap_min[d_xy][d_theta + 2] > score or heatmap_min[d_xy][d_theta + 2] == -1:
-                heatmap_min[d_xy][d_theta + 2] = score
-                if (d_theta + 2) == 0:
+
+            if heatmap_min[d_xy][d_theta_idx] == -1:
+                heatmap_min[d_xy][d_theta_idx] = score
+                if d_theta_idx == 0:
                     heatmap_min[d_xy][4] = score
-                elif (d_theta + 2) == 4:
+                elif d_theta_idx == 4:
                     heatmap_min[d_xy][0] = score
+
+            if heatmap_min[d_xy][d_theta_idx] > score:
+                heatmap_min[d_xy][d_theta_idx] = score
+                if d_theta_idx == 0:
+                    heatmap_min[d_xy][4] = score
+                elif d_theta_idx == 4:
+                    heatmap_min[d_xy][0] = score
+
             if info[0] and node_i != info[1] and subnode_i != info[2]:
                 if benchmark <= score:
                     is_success = False
+
     if info[0]:
         if is_success:
-            success_and_trials['success'] += 1
+            success_and_trial['success'] += 1
 
 def plot_heatmap(heatmap_max, heatmap_min):
-    ax1 = plt.subplot(121)
-    ax2 = plt.subplot(122)
+    ax1 = plt.subplot(211)
+    ax2 = plt.subplot(212)
     heatmap_max[heatmap_max < 0.0] = 0.0
     heatmap_min[heatmap_min < 0.0] = 0.0
     for row in range(heatmap_max.shape[0]-1,-1,-1):
@@ -150,17 +159,22 @@ def plot_heatmap(heatmap_max, heatmap_min):
             heatmap_min = np.delete(heatmap_min, row, 0)
         else:
             break
-    dxy_max = heatmap_max.shape[0]
-    ax1.imshow(heatmap_max)
-    ax2.imshow(heatmap_min)
-    ax1.set_xticks(np.arange(-2, 3, 1))
-    ax1.set_yticks(np.arange(0, dxy_max+1, 10))
-    ax1.set_xticklabels(np.arange(-180, 181, 90))
-    ax1.set_yticklabels(np.arange(0, dxy_max+1, 10))
-    ax2.set_xticks(np.arange(-2, 3, 1))
-    ax2.set_yticks(np.arange(0, dxy_max+1, 10))
-    ax2.set_xticklabels(np.arange(-180, 181, 90))
-    ax2.set_yticklabels(np.arange(0, dxy_max+1, 10))
+
+    ax1.imshow(np.transpose(heatmap_max))
+    ax2.imshow(np.transpose(heatmap_min))
+    ax1.set_xticks(np.arange(heatmap_max.shape[0]))
+    ax1.set_yticks(np.arange(heatmap_max.shape[1]))
+    ax1.set_xticklabels(np.arange(heatmap_max.shape[0]))
+    ax1.set_yticklabels([-180, -90, 0, 90, 180])
+    ax2.set_xticks(np.arange(heatmap_max.shape[0]))
+    ax2.set_yticks(np.arange(heatmap_max.shape[1]))
+    ax2.set_xticklabels(np.arange(heatmap_max.shape[0]))
+    ax2.set_yticklabels([-180, -90, 0, 90, 180])
+    for i in range(heatmap_max.shape[0]):
+        for j in range(heatmap_max.shape[1]):
+            text = ax1.text(i, j, '{:.2f}'.format(int(heatmap_max[i, j]*100)/100.0), ha="center", va="center", color="k")
+            text = ax2.text(i, j, '{:.2f}'.format(int(heatmap_min[i, j]*100)/100.0), ha="center", va="center", color="w")
+
     plt.show()
 
 # ------------------------------------------------------------------------------
@@ -183,8 +197,8 @@ def testing_pipeline(Network, checkpoint, dynamcis_rounds=DYNAMICS_ROUNDS):
     # Iterate through test scene
     # ------------------------------------------------------------------
     success_and_trials = [dict(trials=0, success=0) for i in range(len(SCENE_TYPES) * SCENE_NUM_PER_TYPE)]
-    heatmap_max = -np.ones((500, 5))
-    heatmap_min = -np.ones((500, 5))
+    heatmap_max = -1.0*np.ones((60, 5))
+    heatmap_min = -1.0*np.ones((60, 5))
     metric_idx = 0
     for scene_type in SCENE_TYPES:
         for scene_num in range(int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1, SCENE_NUM_PER_TYPE + 1):
@@ -195,35 +209,33 @@ def testing_pipeline(Network, checkpoint, dynamcis_rounds=DYNAMICS_ROUNDS):
                 print(colored('Testing Info: ','blue') + 'No Data for Scene' + robot._scene_name)
                 continue
             # ------------------------------------------------------------------
-            # Prepare Topo-map info: i.e. nodes and features (image + SG)
-            print('----'*20 + '\n' + colored('Testing Info: ','blue') + 'Testing in scene' + robot._scene_name)
-            topo_features = copy.deepcopy(get_topo_map_features(robot, file_path, is_dynamics=(dynamcis_rounds>1)))
+            # Prepare current scene info: i.e. nodes and features (image + SG)
+            # --------------------------------------------------------------
+            map = robot.get_reachable_coordinate()
             subnodes = [dict(x=0.0, y=0.0, z=0.0), dict(x=0.0, y=90.0, z=0.0), dict(x=0.0, y=180.0, z=0.0), dict(x=0.0, y=270.0, z=0.0)]
+            observations = []
+            # Image store for every points and angles in map
+            for p in map:
+                is_node, node_i = robot.is_node([p['x'], p['z']], threshold=1e-8)
+                for subnode_i, subnode in enumerate(subnodes):
+                    robot._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=subnode)
+                    img_z = robot.get_current_fram()
+                    observations.append(([p['x'], p['z']], [is_node, node_i, subnode_i], img_z))
+            print('----'*20 + '\n' + colored('Testing Info: ','blue') + 'Testing in scene' + robot._scene_name)
             # ------------------------------------------------------------------
             # --------------------Start testing in new scene--------------------
             # ------------------------------------------------------------------
             for round in range(dynamcis_rounds):
                 # --------------------------------------------------------------
-                # change object layout if dynamcis_rounds > 1
+                # get diffrerent info with dynamcis in topological map
                 if dynamcis_rounds > 1:
-                    shuffle_scene_layout(robot._controller)
-                    robot.update_event()
-                # --------------------------------------------------------------
-                # Get and prepare map info
-                map = robot.get_reachable_coordinate()
-                observations = []
-                # Image store for every points and angles in map
-                for p in map:
-                    for subnode_i, subnode in enumerate(subnodes):
-                        robot._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=subnode)
-                        img_z = robot.get_current_fram()
-                        is_node, node_i = robot.is_node([p['x'], p['y']])
-                        observations.append(([p['x'], p['y'], subnode], [is_node, node_i, subnode_i], img_z))
+                    topo_features = copy.deepcopy(get_topo_map_features(robot, file_path, map_round=round))
+                else:
+                    topo_features = copy.deepcopy(get_topo_map_features(robot, file_path, map_round=0))
                 # --------------------------------------------------------------
                 # Iterate testing through map
                 for pose_z, info, img_z in observations:
-                    metrics = localization_eval(model, img_z, topo_features, pose_z, info, success_and_trials[metric_idx], heatmap_max, heatmap_min, robot, device)
-
+                    localization_eval(model, img_z, topo_features, pose_z, info, success_and_trials[metric_idx], heatmap_max, heatmap_min, robot, device)
 
             scene_trials = success_and_trials[metric_idx]['trials']
             scene_success = success_and_trials[metric_idx]['success']
@@ -231,6 +243,13 @@ def testing_pipeline(Network, checkpoint, dynamcis_rounds=DYNAMICS_ROUNDS):
 
             print(colored('Testing Info: ','blue') + '{}/{} success rate in scene {}'.format(scene_success, scene_trials, robot._scene_name))
             print('----'*20 + '\n')
+
+            np.save("heatmap_max.npy", heatmap_max)
+            np.save("heatmap_min.npy", heatmap_min)
+            plot_heatmap(heatmap_max, heatmap_min)
+
+    np.save("success_and_trials.npy", success_and_trials)
+    plot_heatmap(heatmap_max, heatmap_min)
 
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -242,6 +261,10 @@ if __name__ == '__main__':
     parser.add_argument("--train", help="train network image branch", action="store_true")
     parser.add_argument("--test", help="test network image branch", action="store_true")
     args = parser.parse_args()
+
+    # heatmap_max = np.load('heatmap_max.npy')
+    # heatmap_min = np.load('heatmap_min.npy')
+    # plot_heatmap(heatmap_max, heatmap_min)
 
     # --------------------------------------------------------------------------
     # Use to load triplet infomation which is used to collect ground truth
@@ -257,11 +280,11 @@ if __name__ == '__main__':
         LossFcn = TripletLoss(constant_margin=False)
         TraningFcn = Training
         model_best_fit = training_pipeline(Dataset, Network, LossFcn, TraningFcn)
-        torch.save(model_best_fit.state_dict(), CHECKPOINTS_PREFIX + '_best_fit.pkl')
+        torch.save(model_best_fit.state_dict(), CHECKPOINTS_PREFIX + 'model_best_fit.pkl')
 
     # --------------------------------------------------------------------------
     # Testing corresponding networks
     if args.test:
         Network = SiameseNetImage
-        Checkpoint = CHECKPOINTS_PREFIX + 'image_siamese_nondynamics_best_fit.pkl'
+        Checkpoint = CHECKPOINTS_PREFIX + 'image_siamese_dynamics_best_fit.pkl'
         testing_pipeline(Network, Checkpoint)

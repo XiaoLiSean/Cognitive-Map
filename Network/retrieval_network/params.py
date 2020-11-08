@@ -30,7 +30,7 @@ MOMENTUM = 0.9
 STEP_SIZE = 7
 GAMMA = 0.1
 # ------------------------------------------------------------------------------
-DYNAMICS_ROUNDS = 1
+DYNAMICS_ROUNDS = 2
 TRAIN_FRACTION = 0.7
 VAL_FRACTION = 0.15
 TEST_FRACTION = 0.15

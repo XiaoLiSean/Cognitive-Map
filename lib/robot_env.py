@@ -137,12 +137,12 @@ class Agent_Sim():
 
 		return (nodes_x, nodes_y)
 
-	def is_node(self, pose):
+	def is_node(self, pose, threshold=1e-6):
 		is_node = False
 		node_identity = -1
 		for node_i, node in enumerate(NODES[self._scene_name]):
-			dis_sq = (pose[0]**2 + node[0]**2)**2 + (pose[1]**2 + node[1]**2)**2
-			if dis_sq < 1e-1:
+			dis_sq = (pose[0] - node[0])**2 + (pose[1] - node[1])**2
+			if dis_sq < threshold**2:
 				node_identity = node_i
 				is_node = True
 		return is_node, node_identity
