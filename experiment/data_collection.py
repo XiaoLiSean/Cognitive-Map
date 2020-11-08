@@ -13,7 +13,7 @@ import logging
 import os
 import sys
 import csv
-from node_generation import *
+# from node_generation import *
 sys.path.append('../Network')
 from action_network import Action_network
 
@@ -1094,7 +1094,7 @@ class Dumb_Navigetion():
 
 
 class Agent_action():
-	def __init__(self, AI2THOR, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, overwrite_data, for_test_data=False, debug=False, special=False, more_special=False):
+	def __init__(self, AI2THOR, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, overwrite_data=False, for_test_data=False, debug=False, special=False, more_special=False):
 		self._scene_type = scene_type
 		self._scene_num = scene_num
 		self._grid_size = grid_size
@@ -1109,7 +1109,7 @@ class Agent_action():
 				self._scene_name = 'FloorPlan_Train' + str(self._scene_type) + '_' + str(self._scene_num)
 			else:
 				self._scene_name = 'FloorPlan_Val' + str(self._scene_type) + '_' + str(self._scene_num)
-			print(self._scene_name)
+			print('scene_name: ', self._scene_name)
 			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, fieldOfView=120, agentMode='bot')
 		else:
 			self._scene_name = 'FloorPlan' + str(scene_setting[self._scene_type] + self._scene_num)
@@ -1216,6 +1216,11 @@ class Agent_action():
 	def Unit_move_right(self):
 		self._event = self._controller.step(action='MoveRight')
 		return 'MOVE_Right'
+
+	def Rotate_to_degree(self, goal_degree):
+		current_orientation = self.Get_agent_rotation()['y']
+		orientation_error = goal_degree - current_orientation
+		self.Unit_rotate(orientation_error)
 
 	def Unit_rotate(self, degree):
 		if np.abs(degree) < 2:
@@ -1364,246 +1369,246 @@ class Agent_action():
 		return True
 
 
-if __name__ == '__main__':
-	# controller = Controller(scene='FloorPlan_Train1_1', agentMode='bot')
-	# time.sleep(10)
-	# exit()
-	Dumb_Navigetion = Dumb_Navigetion(args.AI2THOR, args.scene_type, args.scene_num, args.grid_size,
-		args.rotation_step, args.sleep_time, args.save_directory, overwrite_data=args.overwrite_data,
-		for_test_data=args.test_data, debug=args.debug, more_special=True)
+# if __name__ == '__main__':
+# 	# controller = Controller(scene='FloorPlan_Train1_1', agentMode='bot')
+# 	# time.sleep(10)
+# 	# exit()
+# 	Dumb_Navigetion = Dumb_Navigetion(args.AI2THOR, args.scene_type, args.scene_num, args.grid_size,
+# 		args.rotation_step, args.sleep_time, args.save_directory, overwrite_data=args.overwrite_data,
+# 		for_test_data=args.test_data, debug=args.debug, more_special=True)
 
-	# Dumb_Navigetion.Open_close_label_text()
-	# # Dumb_Navigetion.Traverse_neighbor_map()
-	# # Dumb_Navigetion.Dumb_traverse_map()
-	# # Dumb_Navigetion.Long_range_data_specified()
-	# # Dumb_Navigetion.Long_range_data_more_specified()
-	# Dumb_Navigetion.Random_SPTM_like_method()
-	# # Dumb_Navigetion.Random_traverse_map(pair_num=7)
-	# # Dumb_Navigetion.Fast_traverse_map(goal_points_num=24)
-	# # position = Dumb_Navigetion.Get_agent_position()
-	# # ori_position = copy.deepcopy(position)
-	# # reach = Dumb_Navigetion._Agent_action.Get_reachable_coordinate()
-	# Dumb_Navigetion.Open_close_label_text()
-	# Dumb_Navigetion.Write_dis_csv()
-	# exit()
-	# for i in range(10):
-	# 	rand_point = random.randint(0, Dumb_Navigetion._point_num - 1)
-	# 	rand_ori = random.randint(0, 12)
-	# 	Dumb_Navigetion._Agent_action.Unit_rotate(random.choice([-15, 15]) * rand_ori)
-	# 	current_orientation = Dumb_Navigetion.Get_agent_rotation()['y']
-	# 	print('current_orientation: ', current_orientation)
-	# 	print('position: ', Dumb_Navigetion._point_list[rand_point])
-	# 	Dumb_Navigetion._Agent_action.Teleport_agent(Dumb_Navigetion._point_list[rand_point], useful=True)
-	# 	success, moving_index = Dumb_Navigetion.Move_navigation_specialized(rand_point, direction='left', do_move=True)
-	# 	# time.sleep(1)
-	# 	Dumb_Navigetion._Agent_action.Teleport_agent(Dumb_Navigetion._point_list[moving_index], useful=True)
-	# 	print('position move: ', Dumb_Navigetion._point_list[moving_index])
-	# 	print('---------------------------------')
-	# exit()
+# 	# Dumb_Navigetion.Open_close_label_text()
+# 	# # Dumb_Navigetion.Traverse_neighbor_map()
+# 	# # Dumb_Navigetion.Dumb_traverse_map()
+# 	# # Dumb_Navigetion.Long_range_data_specified()
+# 	# # Dumb_Navigetion.Long_range_data_more_specified()
+# 	# Dumb_Navigetion.Random_SPTM_like_method()
+# 	# # Dumb_Navigetion.Random_traverse_map(pair_num=7)
+# 	# # Dumb_Navigetion.Fast_traverse_map(goal_points_num=24)
+# 	# # position = Dumb_Navigetion.Get_agent_position()
+# 	# # ori_position = copy.deepcopy(position)
+# 	# # reach = Dumb_Navigetion._Agent_action.Get_reachable_coordinate()
+# 	# Dumb_Navigetion.Open_close_label_text()
+# 	# Dumb_Navigetion.Write_dis_csv()
+# 	# exit()
+# 	# for i in range(10):
+# 	# 	rand_point = random.randint(0, Dumb_Navigetion._point_num - 1)
+# 	# 	rand_ori = random.randint(0, 12)
+# 	# 	Dumb_Navigetion._Agent_action.Unit_rotate(random.choice([-15, 15]) * rand_ori)
+# 	# 	current_orientation = Dumb_Navigetion.Get_agent_rotation()['y']
+# 	# 	print('current_orientation: ', current_orientation)
+# 	# 	print('position: ', Dumb_Navigetion._point_list[rand_point])
+# 	# 	Dumb_Navigetion._Agent_action.Teleport_agent(Dumb_Navigetion._point_list[rand_point], useful=True)
+# 	# 	success, moving_index = Dumb_Navigetion.Move_navigation_specialized(rand_point, direction='left', do_move=True)
+# 	# 	# time.sleep(1)
+# 	# 	Dumb_Navigetion._Agent_action.Teleport_agent(Dumb_Navigetion._point_list[moving_index], useful=True)
+# 	# 	print('position move: ', Dumb_Navigetion._point_list[moving_index])
+# 	# 	print('---------------------------------')
+# 	# exit()
 
-	# Dumb_Navigetion.Navigation_test()
-	# Dumb_Navigetion.Write_dis_csv()
-	# exit()
-
-
-	node_generator = Node_generator(controller=Dumb_Navigetion._Agent_action._controller, node_radius=1)
-	# print('node_generator.Get_connected_subnodes(): ', node_generator.Get_connected_subnodes())
-	# test = [[1, 2, 3], [3], [3], [0], [0, 1, 2, 3], [0, 2], [0, 3], [0, 1, 2], [2], [0], [0, 1, 2], [], [0, 1, 2, 3], [0, 3], [0], [0, 3], [0], [0, 3], [0, 1, 2, 3], [2], [2]]
-	Dumb_Navigetion.Node_navigation_test(node_pair_list=node_generator.Get_neighbor_nodes(), subnodes=node_generator.Get_connected_subnodes())
-	# Dumb_Navigetion.Node_navigation_test(node_pair_list=node_generator.Get_neighbor_nodes(), subnodes=test)
-	Dumb_Navigetion.Write_result_csv()
+# 	# Dumb_Navigetion.Navigation_test()
+# 	# Dumb_Navigetion.Write_dis_csv()
+# 	# exit()
 
 
-	# # Dumb_Navigetion.Node_navigation_test(node_pair_list=test_pairs)
-	# # test_controller.step(action='RotateLeft', degrees=np.abs(30))
-	# action_network = Action_network()
+# 	node_generator = Node_generator(controller=Dumb_Navigetion._Agent_action._controller, node_radius=1)
+# 	# print('node_generator.Get_connected_subnodes(): ', node_generator.Get_connected_subnodes())
+# 	# test = [[1, 2, 3], [3], [3], [0], [0, 1, 2, 3], [0, 2], [0, 3], [0, 1, 2], [2], [0], [0, 1, 2], [], [0, 1, 2, 3], [0, 3], [0], [0, 3], [0], [0, 3], [0, 1, 2, 3], [2], [2]]
+# 	Dumb_Navigetion.Node_navigation_test(node_pair_list=node_generator.Get_neighbor_nodes(), subnodes=node_generator.Get_connected_subnodes())
+# 	# Dumb_Navigetion.Node_navigation_test(node_pair_list=node_generator.Get_neighbor_nodes(), subnodes=test)
+# 	Dumb_Navigetion.Write_result_csv()
+
+
+# 	# # Dumb_Navigetion.Node_navigation_test(node_pair_list=test_pairs)
+# 	# # test_controller.step(action='RotateLeft', degrees=np.abs(30))
+# 	# action_network = Action_network()
 	
-	# time.sleep(10)
+# 	# time.sleep(10)
 
 
-	# print(Dumb_Navigetion.degree_right_or_left(Dumb_Navigetion.Wrap_to_degree(350 - 30), 20))
-	# init = time.time()
-	# for _ in range(1000000):
-	# 	for _ in range(100):
-	# 		pass
-	# print(time.time() - init)
-	exit()
-	reach = Dumb_Navigetion._Agent_action.Get_reachable_coordinate()
-	# print('reach: ', len(reach))
+# 	# print(Dumb_Navigetion.degree_right_or_left(Dumb_Navigetion.Wrap_to_degree(350 - 30), 20))
+# 	# init = time.time()
+# 	# for _ in range(1000000):
+# 	# 	for _ in range(100):
+# 	# 		pass
+# 	# print(time.time() - init)
+# 	exit()
+# 	reach = Dumb_Navigetion._Agent_action.Get_reachable_coordinate()
+# 	# print('reach: ', len(reach))
 	
-	# frame = Dumb_Navigetion._Agent_action._event.frame
-	# current_frame = copy.deepcopy(frame)
-	# Dumb_Navigetion._Agent_action.Unit_rotate(30)
-	# print('Get_agent_position(): ', Dumb_Navigetion.Get_agent_position())
-	# Dumb_Navigetion._Agent_action.Unit_move()
-	# print('---------------move--------------')
-	# print('Get_agent_position(): ', Dumb_Navigetion.Get_agent_position())
-	# print('Get_agent_rotation: ', Dumb_Navigetion.Get_agent_rotation())
-	# Dumb_Navigetion._Agent_action.Unit_rotate(83)
-	# print('-----------------rotate--------------------')
-	# Dumb_Navigetion._Agent_action.Unit_move()
-	# print('---------------move--------------')
-	# print('Get_agent_position(): ', Dumb_Navigetion.Get_agent_position())
-	# print('Get_agent_rotation: ', Dumb_Navigetion.Get_agent_rotation())
-	# Dumb_Navigetion._Agent_action.Unit_rotate(90)
-	# print('-----------------rotate--------------------')
-	# Dumb_Navigetion._Agent_action.Unit_move()
-	# print('---------------move--------------')
-	# print('Get_agent_position(): ', Dumb_Navigetion.Get_agent_position())
-	# print('Get_agent_rotation: ', Dumb_Navigetion.Get_agent_rotation())
-	# Dumb_Navigetion._Agent_action.Unit_rotate(90)
-	# print('-----------------rotate--------------------')
-	# Dumb_Navigetion._Agent_action.Unit_move()
-	# print('---------------move--------------')
-	# print('Get_agent_position(): ', Dumb_Navigetion.Get_agent_position())
-	# print('Get_agent_rotation: ', Dumb_Navigetion.Get_agent_rotation())
-	# # Dumb_Navigetion._Agent_action.Unit_rotate(90)
-	# # exit()
-	# Dumb_Navigetion._Agent_action.Unit_rotate(15)
-	# print('Get_agent_rotation: ', Dumb_Navigetion.Get_agent_rotation())
-	# # time.sleep(2)
-	# # _, index = Dumb_Navigetion.Move_navigation_specialized(0)
-	# # print(index)
-	# # time.sleep(2)
-	# # _, index = Dumb_Navigetion.Move_navigation_specialized(index)
-	# # time.sleep(2)
-	# exit()
+# 	# frame = Dumb_Navigetion._Agent_action._event.frame
+# 	# current_frame = copy.deepcopy(frame)
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(30)
+# 	# print('Get_agent_position(): ', Dumb_Navigetion.Get_agent_position())
+# 	# Dumb_Navigetion._Agent_action.Unit_move()
+# 	# print('---------------move--------------')
+# 	# print('Get_agent_position(): ', Dumb_Navigetion.Get_agent_position())
+# 	# print('Get_agent_rotation: ', Dumb_Navigetion.Get_agent_rotation())
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(83)
+# 	# print('-----------------rotate--------------------')
+# 	# Dumb_Navigetion._Agent_action.Unit_move()
+# 	# print('---------------move--------------')
+# 	# print('Get_agent_position(): ', Dumb_Navigetion.Get_agent_position())
+# 	# print('Get_agent_rotation: ', Dumb_Navigetion.Get_agent_rotation())
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(90)
+# 	# print('-----------------rotate--------------------')
+# 	# Dumb_Navigetion._Agent_action.Unit_move()
+# 	# print('---------------move--------------')
+# 	# print('Get_agent_position(): ', Dumb_Navigetion.Get_agent_position())
+# 	# print('Get_agent_rotation: ', Dumb_Navigetion.Get_agent_rotation())
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(90)
+# 	# print('-----------------rotate--------------------')
+# 	# Dumb_Navigetion._Agent_action.Unit_move()
+# 	# print('---------------move--------------')
+# 	# print('Get_agent_position(): ', Dumb_Navigetion.Get_agent_position())
+# 	# print('Get_agent_rotation: ', Dumb_Navigetion.Get_agent_rotation())
+# 	# # Dumb_Navigetion._Agent_action.Unit_rotate(90)
+# 	# # exit()
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(15)
+# 	# print('Get_agent_rotation: ', Dumb_Navigetion.Get_agent_rotation())
+# 	# # time.sleep(2)
+# 	# # _, index = Dumb_Navigetion.Move_navigation_specialized(0)
+# 	# # print(index)
+# 	# # time.sleep(2)
+# 	# # _, index = Dumb_Navigetion.Move_navigation_specialized(index)
+# 	# # time.sleep(2)
+# 	# exit()
 
 
 
-	# # Dumb_Navigetion._Agent_action.Unit_rotate(-30)
-	# # time.sleep(2)
-	# # Dumb_Navigetion._Agent_action.Unit_rotate(-30)
-	# # Dumb_Navigetion._Agent_action.Unit_rotate(-30)
-	# print('rotation: ', Dumb_Navigetion.Get_agent_rotation())
-	# print('position: ', Dumb_Navigetion.Get_agent_position())
-	# Dumb_Navigetion._Agent_action.Unit_rotate(-90)
-	# Dumb_Navigetion._Agent_action.Unit_move()
-	# print('rotation: ', Dumb_Navigetion.Get_agent_rotation())
-	# print('position: ', Dumb_Navigetion.Get_agent_position())
-	# time.sleep(2)
-	# # Dumb_Navigetion._Agent_action.Unit_move_left()
-	# # time.sleep(2)
-	# # Dumb_Navigetion._Agent_action.Unit_move_right()
-	# # time.sleep(2)
-	# # print('position: ', Dumb_Navigetion.Get_agent_position())
-	# exit()
-	# time.sleep(1)
-	rand_point = random.randint(1, len(reach) - 1)
-	rand_point = 1
-	print('rand_point: ', rand_point)
-	Dumb_Navigetion._Agent_action.Teleport_agent(position=reach[rand_point], useful=True)
-	position_temp = reach[132]
-	# position_temp = copy.deepcopy(reach[20])
-	position_temp_0 = copy.deepcopy(reach[20])
-	# position_temp['x'] = 5.5
-	# position_temp_0['x'] = 5.5
-	# position_temp_0['z'] = -3.75
-	print(position_temp)
-	print(position_temp_0)
+# 	# # Dumb_Navigetion._Agent_action.Unit_rotate(-30)
+# 	# # time.sleep(2)
+# 	# # Dumb_Navigetion._Agent_action.Unit_rotate(-30)
+# 	# # Dumb_Navigetion._Agent_action.Unit_rotate(-30)
+# 	# print('rotation: ', Dumb_Navigetion.Get_agent_rotation())
+# 	# print('position: ', Dumb_Navigetion.Get_agent_position())
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(-90)
+# 	# Dumb_Navigetion._Agent_action.Unit_move()
+# 	# print('rotation: ', Dumb_Navigetion.Get_agent_rotation())
+# 	# print('position: ', Dumb_Navigetion.Get_agent_position())
+# 	# time.sleep(2)
+# 	# # Dumb_Navigetion._Agent_action.Unit_move_left()
+# 	# # time.sleep(2)
+# 	# # Dumb_Navigetion._Agent_action.Unit_move_right()
+# 	# # time.sleep(2)
+# 	# # print('position: ', Dumb_Navigetion.Get_agent_position())
+# 	# exit()
+# 	# time.sleep(1)
+# 	rand_point = random.randint(1, len(reach) - 1)
+# 	rand_point = 1
+# 	print('rand_point: ', rand_point)
+# 	Dumb_Navigetion._Agent_action.Teleport_agent(position=reach[rand_point], useful=True)
+# 	position_temp = reach[132]
+# 	# position_temp = copy.deepcopy(reach[20])
+# 	position_temp_0 = copy.deepcopy(reach[20])
+# 	# position_temp['x'] = 5.5
+# 	# position_temp_0['x'] = 5.5
+# 	# position_temp_0['z'] = -3.75
+# 	print(position_temp)
+# 	print(position_temp_0)
 	
-	# time.sleep(100)
+# 	# time.sleep(100)
 
-	# Dumb_Navigetion._Agent_action.Unit_rotate(180)
-	# # Dumb_Navigetion._Agent_action.Unit_move()
-	# # Dumb_Navigetion._Agent_action.Unit_move()
-	# # # Dumb_Navigetion._Agent_action.Unit_move()
-	# # Dumb_Navigetion._Agent_action.Unit_move()
-	# # Dumb_Navigetion._Agent_action.Unit_rotate(30)
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(180)
+# 	# # Dumb_Navigetion._Agent_action.Unit_move()
+# 	# # Dumb_Navigetion._Agent_action.Unit_move()
+# 	# # # Dumb_Navigetion._Agent_action.Unit_move()
+# 	# # Dumb_Navigetion._Agent_action.Unit_move()
+# 	# # Dumb_Navigetion._Agent_action.Unit_rotate(30)
 
-	position = list(Dumb_Navigetion.Get_agent_position().values())
+# 	position = list(Dumb_Navigetion.Get_agent_position().values())
 
-	# time.sleep(1)
-	# Dumb_Navigetion._Agent_action.Unit_move_back()
-	# time.sleep(1)
-	# Dumb_Navigetion._Agent_action.Unit_move_back()
-	# time.sleep(1)
+# 	# time.sleep(1)
+# 	# Dumb_Navigetion._Agent_action.Unit_move_back()
+# 	# time.sleep(1)
+# 	# Dumb_Navigetion._Agent_action.Unit_move_back()
+# 	# time.sleep(1)
 
-	Dumb_Navigetion._Agent_action.Unit_rotate(90)
-	# Dumb_Navigetion._Agent_action.Unit_move()
-	# Dumb_Navigetion._Agent_action.Unit_rotate(-90)
-	# time.sleep(1)
-	# Dumb_Navigetion._Agent_action.Unit_rotate(30)
-	# time.sleep(1)
-	# Dumb_Navigetion._Agent_action.Unit_rotate(-30)
-	# time.sleep(1)
-	# Dumb_Navigetion._Agent_action.Unit_rotate(-30)
-	# Dumb_Navigetion._Agent_action.Unit_move()
-	
-
-	# time.sleep(5)
-	Dumb_Navigetion._Agent_action.Unit_move()
-	time.sleep(1)
-	Dumb_Navigetion._Agent_action.Unit_move()
-	time.sleep(1)
-	Dumb_Navigetion._Agent_action.Unit_move()
-	time.sleep(1)
-	Dumb_Navigetion._Agent_action.Unit_rotate(90)
-	time.sleep(1)
-	Dumb_Navigetion._Agent_action.Unit_move()
-	# Dumb_Navigetion._Agent_action.Unit_move()
-	time.sleep(1)
-	Dumb_Navigetion._Agent_action.Unit_rotate(-90)
-	time.sleep(1)
-	Dumb_Navigetion._Agent_action.Unit_move()
-	
-	# Dumb_Navigetion._Agent_action.Unit_rotate(90)
-	# Dumb_Navigetion._Agent_action.Unit_move()
-	# Dumb_Navigetion._Agent_action.Unit_rotate(60)
-	# Dumb_Navigetion._Agent_action.Unit_rotate(180)
-	# Dumb_Navigetion._Agent_action.Teleport_agent(position=position_temp, useful=True)
-	# time.sleep(3)
+# 	Dumb_Navigetion._Agent_action.Unit_rotate(90)
+# 	# Dumb_Navigetion._Agent_action.Unit_move()
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(-90)
+# 	# time.sleep(1)
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(30)
+# 	# time.sleep(1)
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(-30)
+# 	# time.sleep(1)
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(-30)
+# 	# Dumb_Navigetion._Agent_action.Unit_move()
 	
 
-	goal_pose = {'position': Dumb_Navigetion.Get_agent_position(), 'rotation': Dumb_Navigetion.Get_agent_rotation()}
-	# Dumb_Navigetion._Agent_action.Update_event()
-	frame = Dumb_Navigetion._Agent_action._event.frame
-	time.sleep(3)
-	Dumb_Navigetion._Agent_action.Teleport_agent(position=position, useful=True)
-	time.sleep(5)
-	# Dumb_Navigetion._Agent_action.Teleport_agent(position=position_temp_0, useful=True)
-	# # Dumb_Navigetion._Agent_action.Unit_rotate(30)
-
+# 	# time.sleep(5)
+# 	Dumb_Navigetion._Agent_action.Unit_move()
+# 	time.sleep(1)
+# 	Dumb_Navigetion._Agent_action.Unit_move()
+# 	time.sleep(1)
+# 	Dumb_Navigetion._Agent_action.Unit_move()
+# 	time.sleep(1)
+# 	Dumb_Navigetion._Agent_action.Unit_rotate(90)
+# 	time.sleep(1)
+# 	Dumb_Navigetion._Agent_action.Unit_move()
+# 	# Dumb_Navigetion._Agent_action.Unit_move()
+# 	time.sleep(1)
+# 	Dumb_Navigetion._Agent_action.Unit_rotate(-90)
+# 	time.sleep(1)
+# 	Dumb_Navigetion._Agent_action.Unit_move()
 	
-	Dumb_Navigetion.Navigate_by_ActionNet(frame, goal_pose, max_steps=100)
-	time.sleep(100)
-	exit()
-
-
-
-	# print(Action_network(image_current=current_frame, image_goal=next_frame))
-	# time.sleep(2)
-	# Dumb_Navigetion._Agent_action.Teleport_agent(reach[100])
-	# time.sleep(2)
-
-	# Dumb_Navigetion._Agent_action.Update_event()
-	# objects = Dumb_Navigetion._Agent_action._event.metadata['objects']
-	# print(len(objects))
-	# print(objects[0].keys())
-	# Fridge_id = None
-	# for object in objects:
-	# 	if 'Fridge' in object['name']:
-	# 		Fridge_id = object['objectId']
-	# 		# print(object)
-	# 	# pass
-	# event = Dumb_Navigetion._Agent_action._controller.step('OpenObject', objectId=Fridge_id)
-	# time.sleep(1)
-	# event = Dumb_Navigetion._Agent_action._controller.step('CloseObject', objectId=Fridge_id)
-	# time.sleep(5)
-	# exit()
-	# print(Dumb_Navigetion._starting_point)
-	# devision = 36
-	# for _ in range(devision):
-	# 	Dumb_Navigetion._Agent_action.Unit_rotate(360 / devision)
-	# 	Dumb_Navigetion._Agent_action.Unit_move()
-	# 	print('Dumb_Navigetion._Agent_action.Get_agent_position()', Dumb_Navigetion._Agent_action.Get_agent_position())
-	# 	# print()
-	# 	if Dumb_Navigetion._Agent_action.Get_agent_position() == Dumb_Navigetion._starting_point:
-	# 		print('did not move')
-	# 	Dumb_Navigetion._Agent_action.Teleport_agent(Dumb_Navigetion._starting_point)
-	# 	pass
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(90)
+# 	# Dumb_Navigetion._Agent_action.Unit_move()
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(60)
+# 	# Dumb_Navigetion._Agent_action.Unit_rotate(180)
+# 	# Dumb_Navigetion._Agent_action.Teleport_agent(position=position_temp, useful=True)
+# 	# time.sleep(3)
 	
 
-	# position = Dumb_Navigetion.Get_agent_position()
+# 	goal_pose = {'position': Dumb_Navigetion.Get_agent_position(), 'rotation': Dumb_Navigetion.Get_agent_rotation()}
+# 	# Dumb_Navigetion._Agent_action.Update_event()
+# 	frame = Dumb_Navigetion._Agent_action._event.frame
+# 	time.sleep(3)
+# 	Dumb_Navigetion._Agent_action.Teleport_agent(position=position, useful=True)
+# 	time.sleep(5)
+# 	# Dumb_Navigetion._Agent_action.Teleport_agent(position=position_temp_0, useful=True)
+# 	# # Dumb_Navigetion._Agent_action.Unit_rotate(30)
 
-	# time.sleep(2)
+	
+# 	Dumb_Navigetion.Navigate_by_ActionNet(frame, goal_pose, max_steps=100)
+# 	time.sleep(100)
+# 	exit()
+
+
+
+# 	# print(Action_network(image_current=current_frame, image_goal=next_frame))
+# 	# time.sleep(2)
+# 	# Dumb_Navigetion._Agent_action.Teleport_agent(reach[100])
+# 	# time.sleep(2)
+
+# 	# Dumb_Navigetion._Agent_action.Update_event()
+# 	# objects = Dumb_Navigetion._Agent_action._event.metadata['objects']
+# 	# print(len(objects))
+# 	# print(objects[0].keys())
+# 	# Fridge_id = None
+# 	# for object in objects:
+# 	# 	if 'Fridge' in object['name']:
+# 	# 		Fridge_id = object['objectId']
+# 	# 		# print(object)
+# 	# 	# pass
+# 	# event = Dumb_Navigetion._Agent_action._controller.step('OpenObject', objectId=Fridge_id)
+# 	# time.sleep(1)
+# 	# event = Dumb_Navigetion._Agent_action._controller.step('CloseObject', objectId=Fridge_id)
+# 	# time.sleep(5)
+# 	# exit()
+# 	# print(Dumb_Navigetion._starting_point)
+# 	# devision = 36
+# 	# for _ in range(devision):
+# 	# 	Dumb_Navigetion._Agent_action.Unit_rotate(360 / devision)
+# 	# 	Dumb_Navigetion._Agent_action.Unit_move()
+# 	# 	print('Dumb_Navigetion._Agent_action.Get_agent_position()', Dumb_Navigetion._Agent_action.Get_agent_position())
+# 	# 	# print()
+# 	# 	if Dumb_Navigetion._Agent_action.Get_agent_position() == Dumb_Navigetion._starting_point:
+# 	# 		print('did not move')
+# 	# 	Dumb_Navigetion._Agent_action.Teleport_agent(Dumb_Navigetion._starting_point)
+# 	# 	pass
+	
+
+# 	# position = Dumb_Navigetion.Get_agent_position()
+
+# 	# time.sleep(2)

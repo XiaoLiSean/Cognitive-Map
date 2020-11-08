@@ -15,7 +15,7 @@ import logging
 import os
 import sys
 sys.path.append('../')
-from Map import Topological_map
+# from Map import Topological_map
 from lib.object_dynamics import *
 from matplotlib.patches import Ellipse, Circle
 
@@ -761,17 +761,29 @@ class Node_generator():
 		print('self._node_index_list: ', self._node_index_list)
 		return
 
+def test_func():
+	print(11111)
+
 if __name__ == '__main__':
-	node_generator = Node_generator()
-	node_pair_list = node_generator.Get_neighbor_nodes()
-	# subnodes = node_generator.Get_connected_subnodes()
+	pass
+	# test = test_func
+	# test()
+	# exit()
+	
+
+	# node_generator = Node_generator(controller=Agent_action._controller)
+	# node_pair_list = node_generator.Get_neighbor_nodes()
+	# # subnodes = node_generator.Get_connected_subnodes()
 
 	# map = Topological_map(controller=node_generator._controller,node_index_list=node_generator._node_index_list, neighbor_nodes_pair=node_pair_list)
+	# map.Set_Unit_rotate_func(Agent_action.Unit_rotate)
 	# map.Add_all_node()
 	# map.Add_all_edges(connected_subnodes=subnodes)
 	# map.Plot_graph()
 
-	node_generator.Plot_map()
-	print('_node_index_list: ', node_generator._node_index_list)
-	for i in range(len(node_generator._node_index_list)):
-		print(node_generator._node_index_list[i], node_generator._reachable_position[node_generator._node_index_list[i]])
+	# exit()
+
+	# node_generator.Plot_map()
+	# print('_node_index_list: ', node_generator._node_index_list)
+	# for i in range(len(node_generator._node_index_list)):
+	# 	print(node_generator._node_index_list[i], node_generator._reachable_position[node_generator._node_index_list[i]])
