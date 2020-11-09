@@ -218,6 +218,9 @@ class Topological_map():
 			weight_coeff = [0.5, 1, 1, 0.5]
 		weight = sum(node_position_diff)
 
+		if weight > 6 * self._grid_size:
+			weight *= 2
+
 		for orientation in orientations:
 			# print('orientation: ', orientation)
 			# print('weight * weight_coeff[self._orientations.index(orientation)]: ', weight * weight_coeff[orientation])
@@ -227,7 +230,7 @@ class Topological_map():
 		
 		return
 
-	def Add_edge(self, node_1, orientation_1, node_2, orientation_2, weight=1):
+	def Add_edge(self, node_1, orientation_1, node_2, orientation_2, weight=0.25):
 		self._graph.add_weighted_edges_from([
 			(self.Get_node_name(node_1, orientation_1), self.Get_node_name(node_2, orientation_2), weight)
 			])
@@ -239,6 +242,9 @@ class Topological_map():
 	def Get_node_index_orien(self, node_name):
 		name_split = node_name.split('_')
 		return int(name_split[1]), int(name_split[3])
+
+	def Get_node_value_by_name(self, node_name):
+		return self._graph.nodes[node_name]
 
 	def Get_node_value(self, node_num, orientation):
 		return self._graph.nodes[self.Get_node_name(node_num, orientation)]
@@ -256,7 +262,7 @@ class Topological_map():
 
 		return (bbox_x, bbox_z)
 
-	def show_map(self, show_nodes=False, show_edges=False):
+	def show_map(self, show_nodes=False, show_edges=False, show_weight=False):
 		self.Update_event()
 		# Plot reachable points
 		points = self.Get_reachable_coordinate()
@@ -334,7 +340,7 @@ class Topological_map():
 			         markeredgecolor="None",
 			         markeredgewidth=2)
 		if show_edges:
-			for node_name, nbrs in topo_map._graph.adj.items():
+			for node_name, nbrs in self._graph.adj.items():
 				# print('n: ', n)
 				node_position = copy.deepcopy(self._graph.nodes[node_name]['position'])
 
@@ -366,13 +372,14 @@ class Topological_map():
 					# print('node_position: ', node_position)
 					# print('neighbor_node_position: ', neighbor_node_position)
 					ax.plot([node_position[0], neighbor_node_position[0]], [node_position[2], neighbor_node_position[2]], 'r--', linewidth=2.0)
-					ax.text((node_position[0]+neighbor_node_position[0]) / 2.0, (node_position[2]+neighbor_node_position[2]) / 2.0, weight_dict['weight'], size=6,
-				        ha="center", va="center",
-				        bbox=dict(boxstyle="round",
-				                  ec=(0.5, 0.25, 0.25),
-				                  fc=(0.5, 0.4, 0.4),
-				                  )
-				        )
+					if show_weight:
+						ax.text((node_position[0]+neighbor_node_position[0]) / 2.0, (node_position[2]+neighbor_node_position[2]) / 2.0, weight_dict['weight'], size=6,
+					        ha="center", va="center",
+					        bbox=dict(boxstyle="round",
+					                  ec=(0.5, 0.25, 0.25),
+					                  fc=(0.5, 0.4, 0.4),
+					                  )
+					        )
 
 				# print('nbrs: ', nbrs)
 				# print('weight: ', nbrs[])
@@ -403,7 +410,7 @@ if __name__ == '__main__':
 	subnodes = [[0, 1, 2, 3], [0, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [0, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3],
 	[0, 1], [0, 1, 2, 3], [0, 1, 2], [0, 1, 3], [0, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [1, 2, 3], [1], [1, 2, 3], [1, 2, 3], [1, 2, 3], [2, 3], [2, 3], [2], [3]]
 	# map = Topological_map(controller=node_generator._controller, node_index_list=node_generator._node_index_list, neighbor_nodes_pair=node_pair_list)
-	topo_map = Topological_map(controller=Agent_action._controller,node_index_list=node_index_list, neighbor_nodes_pair=node_pair_list)
+	topo_map = Topological_map(controller=Agent_action._controller, node_index_list=node_index_list, neighbor_nodes_pair=node_pair_list)
 	# map.Set_Unit_rotate_func(Agent_action.Unit_rotate)
 	topo_map.init_data()
 	topo_map.Set_Teleport_agent_func(Agent_action.Teleport_agent)
@@ -423,7 +430,7 @@ if __name__ == '__main__':
 	# print('path: ', path)
 	# print('topo_map._graph: ', topo_map._graph.nodes)
 
-	topo_map.show_map()
+	topo_map.show_map(show_nodes=True, show_edges=True)
 
 	exit()
 

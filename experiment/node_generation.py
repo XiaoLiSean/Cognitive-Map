@@ -36,6 +36,7 @@ class Node_generator():
 		self._general_orientation = self._event.metadata['agent']['rotation']
 
 		self._reachable =None
+		self._reachable_list = []
 		self._reachable_position = []
 		self._objects = None
 		self._objects_position = []
@@ -102,14 +103,25 @@ class Node_generator():
 		self._get_object()
 		self._build_obj_tree()
 		self._get_node_vs_obj()
-
 		self.Build_node_map()
+
 		# self._node_index_list = [0, 1, 4, 5, 7, 8, 9, 10, 11, 17, 21, 23, 32, 44, 47, 48, 52, 56, 58, 59, 81, 83, 90]
 		
 		# self.Get_navigatable_node_pair()
-		self.Get_boundary()
+		
 		self.Get_connected_orientaton_by_overlap_scene()
 		
+	def Get_node_from_position(self, positions):
+		# print('self._reachable_list: ', self._reachable_list)
+		rand_reachable = self._reachable_list[0]
+		self._node_index_list = []
+		for position in positions:
+			position_temp = [position[0], rand_reachable[1], position[1]]
+			
+			self._node_index_list.append(self._reachable_list.index(position_temp))
+		print('self._node_index_list: ', self._node_index_list)
+		# exit()
+
 	def Get_all_objects_shuffle(self):
 		for _ in range(5):
 			self.Shuffle_scene()
@@ -127,6 +139,8 @@ class Node_generator():
 		return self._connected_subnodes
 
 	def Get_connected_orientaton_by_overlap_scene(self):
+
+		self.Get_boundary()
 		orientations = [[-60, 60], [30, 150], [120, -120], [-150, -30]]
 
 		right = list(range(-60, 61))
@@ -216,101 +230,6 @@ class Node_generator():
 		print('self._neighbor_nodes: ', self._neighbor_nodes)
 		print('self._connected_subnodes: ', self._connected_subnodes)
 		return self._connected_subnodes
-
-	# def Get_connected_orientaton_by_overlap_scene(self):
-	# 	orientations = [[-60, 60], [30, 150], [120, -120], [-150, -30]]
-
-	# 	boundary_consider_radius = self._node_radius * 2.5
-	# 	self._connected_subnodes = [[] for i in range(len(self._neighbor_nodes))]
-	# 	self._neighbor_nodes_facing = [[] for i in range(len(self._neighbor_nodes))]
-	# 	self._neighbor_nodes_dis = []
-
-	# 	for node_pair_index in range(len(self._neighbor_nodes)):
-	# 		# print('node_pair_index: ', self._neighbor_nodes[node_pair_index])
-	# 		node_pair = self._neighbor_nodes[node_pair_index]
-
-	# 		# if not node_pair == [228, 238]:
-	# 		# 	continue
-	# 		visible_boundary = [[[] for j in range(4)] for i in range(2)]
-
-	# 		for node_index in range(len(node_pair)):
-	# 			# if not self._reachable_position[node_pair[node_index]] == [-3, 4.5] or not self._reachable_position[node_pair[node_index]] == [-2.5, 4.5]:
-	# 			# 	continue
-	# 			potential_visible_boundary_index = self._boundary_tree.query_ball_point(self._reachable_position[node_pair[node_index]], r=boundary_consider_radius)
-	# 			# print('potential_visible_boundary_index: ', potential_visible_boundary_index)
-	# 			# print('self._reachable_position[node_pair[node_index]]: ', self._reachable_position[node_pair[node_index]])
-	# 			visible_boundary_index = []
-	# 			# lines_
-	# 			for boundary_index in potential_visible_boundary_index:
-
-	# 				delta_position = list(map(lambda x, y: x - y, self._map_boundary[boundary_index],
-	# 					self._reachable_position[node_pair[node_index]]))
-	# 				dx, dy = delta_position
-	# 				steps = max(int(max(np.abs(dx) / 0.05, np.abs(dy) / 0.05)), 0)
-	# 				add = True
-
-	# 				for i in range(steps):
-	# 					searching_point = list(map(lambda x, y: x + y, self._reachable_position[node_pair[node_index]], [dx * i / steps, dy * i / steps]))
-	# 					ineighbor_indexes = self._boundary_tree.query_ball_point(searching_point, r=0.5 * self._grid_size)
-
-	# 					# if self._map_boundary[boundary_index] == [-2.25, 7.0] or boundary_index ==83:
-	# 						# print('searching_point: ', searching_point)
-	# 					if len(ineighbor_indexes) > 0:
-	# 						# if self._map_boundary[boundary_index] == [-3.0, 7.0]:
-	# 						# 	print(ineighbor_indexes)
-	# 						# 	for j in ineighbor_indexes:
-	# 						# 		print(self._map_boundary[j])
-	# 						if not boundary_index in ineighbor_indexes:
-	# 							add = False
-	# 							break
-	# 						else:
-	# 							break
-	# 				if add:
-	# 					visible_boundary_index.append(boundary_index)
-	# 					self._test_x.append(self._map_boundary[boundary_index][0])
-	# 					self._test_y.append(self._map_boundary[boundary_index][1])
-	# 			# print('visible_boundary: ', visible_boundary)
-	# 			# print('visible_boundary_index: ', visible_boundary_index)
-	# 			for boundary_index in visible_boundary_index:
-	# 				delta_position = list(map(lambda x, y: x - y, self._map_boundary[boundary_index],
-	# 					self._reachable_position[node_pair[node_index]]))
-	# 				goal_angle = np.arctan2(delta_position[1], delta_position[0]) * 180 / np.pi
-	# 				# print('goal_angle: ', goal_angle)
-	# 				for i in [0, 1, 3]:
-	# 					# print('i: ', i)
-	# 					if goal_angle > orientations[i][0] and goal_angle < orientations[i][1]:
-	# 						visible_boundary[node_index][i].append(boundary_index)
-	# 						self._group_x[i].append(self._map_boundary[boundary_index][0])
-	# 						self._group_y[i].append(self._map_boundary[boundary_index][1])
-	# 				if goal_angle > orientations[2][0] and goal_angle <= 180 or goal_angle < orientations[2][1] and goal_angle >= -180:
-	# 					visible_boundary[node_index][2].append(boundary_index)
-	# 					# print('adding: ', boundary_index)
-	# 					# print('visible_boundary[node_index]: ', visible_boundary[node_index])
-	# 					self._group_x[2].append(self._map_boundary[boundary_index][0])
-	# 					self._group_y[2].append(self._map_boundary[boundary_index][1])
-	# 			# print('self._group_x: ', self._group_x)
-	# 			# print('visible_boundary[node_index]: ', visible_boundary[node_index])
-	# 			# return
-	# 		for i in range(len(orientations)):
-	# 			num_overlap = 0
-	# 			boundary_vislble_ori_first = copy.deepcopy(visible_boundary[0][i])
-	# 			boundary_vislble_ori_second = copy.deepcopy(visible_boundary[1][i])
-	# 			for point_index in boundary_vislble_ori_first:
-	# 				if point_index in boundary_vislble_ori_second:
-	# 					num_overlap += 1
-	# 			if len(boundary_vislble_ori_first) == 0 or len(boundary_vislble_ori_second) == 0:
-	# 				first_percent = 0
-	# 				second_percent = 0
-	# 			else:
-	# 				first_percent = num_overlap / len(boundary_vislble_ori_first)
-	# 				second_percent = num_overlap / len(boundary_vislble_ori_second)
-	# 			# print('first_percent: ', first_percent)
-	# 			# print('second_percent: ', second_percent)
-	# 			# print('---------------------')
-	# 			if first_percent > 0.3 or second_percent > 0.3:
-	# 				self._connected_subnodes[node_pair_index].append(i)
-	# 	# print('self._connected_subnodes: ', self._connected_subnodes)
-	# 	return self._connected_subnodes
 
 	def Get_boundary(self):
 		all_neighbors_relative = [[0, self._grid_size], [0, -self._grid_size], [self._grid_size, 0], [-self._grid_size, 0]]
@@ -616,6 +535,7 @@ class Node_generator():
 		self._y_min = 10
 
 		for point in self._reachable:
+			self._reachable_list.append(list(point.values()))
 			self._reachable_x.append(point['z'])
 
 			if point['z'] > self._x_max:

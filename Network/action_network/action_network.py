@@ -25,6 +25,8 @@ print(current_path)
 print(type(current_path.find('Cognitive-Map') + len('Cognitive-Map/')))
 initial_path = current_path[0:current_path.find('Cognitive-Map') + len('Cognitive-Map/')]
 print(initial_path)
+if not initial_path[-1] == '/':
+	initial_path = initial_path + '/'
 action_network_path = initial_path + 'Network/action_network/'
 sys.path.append(initial_path + 'Network/action_network')
 
