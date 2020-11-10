@@ -90,6 +90,7 @@ class Dumb_Navigetion():
 
 		self._goal_num = 0
 		self._current_num = 0
+		self._step_poses = []
 
 		self._train_data_distance = []
 		self._train_data_orientation = []
@@ -661,13 +662,19 @@ class Dumb_Navigetion():
 
 		Image_goal = Image.fromarray(image_goal)
 		Image_current = Image.fromarray(image_current)
-
+		position_current = list(self.Get_agent_position().values())
+		rotation_current = list(self.Get_agent_rotation().values())
+		self._current_num += 1
+		self._step_poses.append({'position': position_current, 'rotation': rotation_current})
 		# Image_goal.save('./images/' + str(self._goal_num) + '_0.jpg')
-		# Image_current.save('./images/' + str(self._current_num) + '_1.jpg')
+
 
 		localized = is_localized_static(self._model, self._device, Image_goal, Image_current)
 
-		return not localized 
+		Image_current.save('./images/' + str(self._current_num) + '_' + str(position_current[0])+ '_' + str(position_current[2]) +
+			 '_' +str(int(rotation_current[1])) + '_' + str(localized) + '.jpg')
+
+		return not localized
 
 	def Navigate_by_ActionNet(self, image_goal, goal_pose, max_steps):
 		goal_position = goal_pose['position']

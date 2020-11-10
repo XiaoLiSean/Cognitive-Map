@@ -112,4 +112,6 @@ if __name__ == '__main__':
 	Navigate_by_path(Dumb_Navigetion, topo_map, path)
 	# print('topo_map._graph: ', topo_map._graph.nodes)
 
+	print('self._step_poses: ', Dumb_Navigetion._step_poses)
+
 	topo_map.show_map(show_nodes=True, show_edges=True)

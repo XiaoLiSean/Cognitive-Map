@@ -26,17 +26,17 @@ def is_localized_static(model, device, current_img, goal_img):
     goal_img = goal_img.to(device)
     similarity = COS(model.get_embedding(current_img), model.get_embedding(goal_img)).item()
 
-    return similarity == 1.0
+    return similarity >= 0.93
 
-if __name__ == '__main__':
-    # Prepare model and load checkpoint
-    checkpoint = CHECKPOINTS_PREFIX + 'image_siamese_nondynamics_best_fit.pkl'
-    model = SiameseNetImage()
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print("Model testing on: ", device)
-    model.to(device)
-    model.load_state_dict(torch.load(checkpoint))
-    model.eval()
-    # Generate images for 
-    array = Image.fromarray(np.zeros([512, 512, 3], dtype=np.uint8))
-    print(is_localized_static(model, device, array, array))
+# if __name__ == '__main__':
+#     # Prepare model and load checkpoint
+#     checkpoint = CHECKPOINTS_PREFIX + 'image_siamese_nondynamics_best_fit.pkl'
+#     model = SiameseNetImage()
+#     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#     print("Model testing on: ", device)
+#     model.to(device)
+#     model.load_state_dict(torch.load(checkpoint))
+#     model.eval()
+#     # Generate images for 
+#     array = Image.fromarray(np.zeros([512, 512, 3], dtype=np.uint8))
+#     print(is_localized_static(model, device, array, array))
