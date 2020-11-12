@@ -273,7 +273,6 @@ class Agent_Sim():
 
 		plt.show()
 
-
 	# --------------------------------------------------------------------------
 	'''
 	Following functions is used to collect data with and without dynamcis

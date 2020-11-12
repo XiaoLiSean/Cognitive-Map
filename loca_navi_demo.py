@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
 	Dumb_Navigetion.Set_localization_network()
 
-	node_list = [[2.00, -1.50], [2.00, -2.50], [2.00, -3.50], [3.00, -2.50], [3.00, -3.50], [3.00, -4.50], [4.00, -1.50], [4.00, -2.50], [4.00, -4.50], 
+	node_list = [[2.00, -1.50], [2.00, -2.50], [2.00, -3.50], [3.00, -2.50], [3.00, -3.50], [3.00, -4.50], [4.00, -1.50], [4.00, -2.50], [4.00, -4.50],
 	[5.00,-4.50], [6.00, -4.50], [6.00, -2.50], [6.00, -3.25], [7.00, -3.25], [7.00, -2.50], [8.00, -3.25], [8.00, -4.25], [8.00, -2.50], [8.00, -1.50], [9.00, -2.50], [9.00, -1.50]]
 
 	# node_generator = Node_generator(controller=Dumb_Navigetion._Agent_action._controller)
@@ -106,6 +106,19 @@ if __name__ == '__main__':
 	topo_map.Build_dij_graph()
 
 	path = topo_map.Find_dij_path(current_node_index=0, current_orientation=270, goal_node_index=20, goal_orientation=90)
+
+	path = ['node_0_degree_270', 'node_0_degree_180',
+	 		'node_1_degree_180', 'node_2_degree_180',
+			'node_2_degree_90', 'node_4_degree_90',
+			'node_4_degree_180', 'node_5_degree_180',
+			'node_5_degree_90', 'node_8_degree_90',
+			'node_9_degree_90', 'node_10_degree_90',
+			'node_10_degree_0', 'node_12_degree_0',
+			'node_12_degree_90', 'node_13_degree_90',
+			'node_15_degree_90', 'node_15_degree_0',
+			'node_17_degree_0', 'node_18_degree_0',
+			'node_18_degree_90', 'node_20_degree_90']
+
 	print('path: ', path)
 	# exit()
 

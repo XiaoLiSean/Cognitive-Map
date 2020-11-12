@@ -26,7 +26,7 @@ def is_localized_static(model, device, current_img, goal_img):
     goal_img = goal_img.to(device)
     similarity = COS(model.get_embedding(current_img), model.get_embedding(goal_img)).item()
 
-    return similarity >= 0.93
+    return similarity >= 0.94
 
 # if __name__ == '__main__':
 #     # Prepare model and load checkpoint
@@ -37,6 +37,6 @@ def is_localized_static(model, device, current_img, goal_img):
 #     model.to(device)
 #     model.load_state_dict(torch.load(checkpoint))
 #     model.eval()
-#     # Generate images for 
+#     # Generate images for
 #     array = Image.fromarray(np.zeros([512, 512, 3], dtype=np.uint8))
 #     print(is_localized_static(model, device, array, array))

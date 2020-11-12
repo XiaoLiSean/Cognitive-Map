@@ -1,6 +1,6 @@
 # Import params and similarity from lib module
 import torch
-import argparse, os, copy
+import argparse, os, copy, pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -95,7 +95,7 @@ def wrapToPi(angle):
 
 # pose_z = [p['x'], p['z'], subnode]
 # info = [is_node, node_i, subnode_i]
-def localization_eval(model, z, topo_features, pose_z, info, success_and_trial, heatmap_max, heatmap_min, robot, device):
+def localization_eval(model, z, topo_features, pose_z, info, success_and_trial, robot, device, staticstics):
     feature_transforms = transforms.Compose([transforms.Resize(IMAGE_SIZE),
                                              transforms.ToTensor(),
                                              transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
@@ -109,36 +109,29 @@ def localization_eval(model, z, topo_features, pose_z, info, success_and_trial, 
         success_and_trial['trials'] += 1
         is_success = True
 
+    idx_offset = int(staticstics[0]['n'].shape[0] / 2.0)
+
     for node_i, node_feature in enumerate(topo_features):
         node = NODES[robot._scene_name][node_i]
-        d_xy = int((np.abs(pose_z[0]-node[0]) + np.abs(pose_z[1]-node[1])) / robot._grid_size)
-
+        d_x = int((pose_z[0]-node[0]) / robot._grid_size) + idx_offset
+        d_z = int((pose_z[1]-node[1]) / robot._grid_size) + idx_offset
         for subnode_i, subnode_feature in enumerate(node_feature):
-            d_theta_idx = int(wrapToPi((info[2] - subnode_i)*90) / 90) + 2
+            d_theta = int(wrapToPi((info[2] - subnode_i)*90) / 90)
+            if d_theta == 0:
+                d_theta_idx = 0
+            elif d_theta == -1:
+                d_theta_idx = 1
+            elif d_theta == 1:
+                d_theta_idx = 2
+            else:
+                d_theta_idx = 3
 
             subnode_feature = subnode_feature.to(device)
             score = COS(model.get_embedding(subnode_feature), model.get_embedding(z_img)).item()
 
-            if heatmap_max[d_xy][d_theta_idx] < score:
-                heatmap_max[d_xy][d_theta_idx] = score
-                if d_theta_idx == 0:
-                    heatmap_max[d_xy][4] = score
-                elif d_theta_idx == 4:
-                    heatmap_max[d_xy][0] = score
-
-            if heatmap_min[d_xy][d_theta_idx] == -1:
-                heatmap_min[d_xy][d_theta_idx] = score
-                if d_theta_idx == 0:
-                    heatmap_min[d_xy][4] = score
-                elif d_theta_idx == 4:
-                    heatmap_min[d_xy][0] = score
-
-            if heatmap_min[d_xy][d_theta_idx] > score:
-                heatmap_min[d_xy][d_theta_idx] = score
-                if d_theta_idx == 0:
-                    heatmap_min[d_xy][4] = score
-                elif d_theta_idx == 4:
-                    heatmap_min[d_xy][0] = score
+            staticstics[d_theta_idx]['n'][d_x, d_z] += 1
+            staticstics[d_theta_idx]['sum'][d_x, d_z] += score
+            staticstics[d_theta_idx]['sq_sum'][d_x, d_z] += score**2
 
             if info[0] and node_i != info[1] and subnode_i != info[2]:
                 if benchmark <= score:
@@ -148,35 +141,61 @@ def localization_eval(model, z, topo_features, pose_z, info, success_and_trial, 
         if is_success:
             success_and_trial['success'] += 1
 
-def plot_heatmap(heatmap_max, heatmap_min):
-    ax1 = plt.subplot(211)
-    ax2 = plt.subplot(212)
-    heatmap_max[heatmap_max < 0.0] = 0.0
-    heatmap_min[heatmap_min < 0.0] = 0.0
-    for row in range(heatmap_max.shape[0]-1,-1,-1):
-        if np.sum(heatmap_max[row,:]) == 0.0 and np.sum(heatmap_min[row,:]) == 0.0:
-            heatmap_max = np.delete(heatmap_max, row, 0)
-            heatmap_min = np.delete(heatmap_min, row, 0)
-        else:
-            break
+# ------------------------------------------------------------------------------
+# Visualize Test Staticstics
+def plot_heatmap(staticstics):
+    map_len = staticstics[0]['n'].shape[0]
+    angles = [0.0, -90.0, 90.0, 180]
+    for k in range(4):
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        num = copy.deepcopy(staticstics[k]['n'])
+        num[staticstics[k]['sum'] == 0] = 1.0
+        mean = np.true_divide(staticstics[k]['sum'], num)
+        img_mean = ax1.imshow(mean)
+        img_mean.set_clim(0,1)
+        fig.colorbar(img_mean, ax=ax1, shrink=0.6)
 
-    ax1.imshow(np.transpose(heatmap_max))
-    ax2.imshow(np.transpose(heatmap_min))
-    ax1.set_xticks(np.arange(heatmap_max.shape[0]))
-    ax1.set_yticks(np.arange(heatmap_max.shape[1]))
-    ax1.set_xticklabels(np.arange(heatmap_max.shape[0]))
-    ax1.set_yticklabels([-180, -90, 0, 90, 180])
-    ax2.set_xticks(np.arange(heatmap_max.shape[0]))
-    ax2.set_yticks(np.arange(heatmap_max.shape[1]))
-    ax2.set_xticklabels(np.arange(heatmap_max.shape[0]))
-    ax2.set_yticklabels([-180, -90, 0, 90, 180])
-    for i in range(heatmap_max.shape[0]):
-        for j in range(heatmap_max.shape[1]):
-            text = ax1.text(i, j, '{:.2f}'.format(int(heatmap_max[i, j]*100)/100.0), ha="center", va="center", color="k")
-            text = ax2.text(i, j, '{:.2f}'.format(int(heatmap_min[i, j]*100)/100.0), ha="center", va="center", color="w")
+        std = np.true_divide(staticstics[k]['sq_sum'], num) - np.true_divide(np.power(staticstics[k]['sum'], 2), np.power(num, 2))
+        sigma = np.power(std, 0.5)
+        sigma_max = np.amax(sigma)
+        sigma_min = np.amin(sigma)
+        sigma = (sigma - sigma_min) / (sigma_max - sigma_min)
+        img_sigma = ax2.imshow(sigma)
+        img_sigma.set_clim(0,1)
+        fig.colorbar(img_sigma, ax=ax2, shrink=0.6)
+
+        for ax, data in zip([ax1, ax2], [mean, sigma]):
+            tick_step = 5
+            ax.set_xticks(np.arange(0, map_len+1, tick_step))
+            ax.set_yticks(np.arange(0, map_len+1, tick_step))
+            ax.set_xticklabels(np.arange(0, map_len+1, tick_step) - int(map_len / 2.0))
+            ax.set_yticklabels(np.arange(0, map_len+1, tick_step) - int(map_len / 2.0))
+            # for i in range(map_len):
+            #     for j in range(map_len):
+            #         if mean[i,j] >= 0.5:
+            #             text = ax.text(i, j, '{:.2f}'.format(int(data[i,j]*100)/100.0), ha="center", va="center", color="k")
+
+        fig.suptitle('Heatmap for view angle difference of {} degree'.format(angles[k]))
 
     plt.show()
 
+def plot_success(success_and_trials):
+    fig, ax = plt.subplots()
+    tags = []
+    success = [data['success'] for data in success_and_trials]
+    trails = [data['trials'] for data in success_and_trials]
+    for scene_type in SCENE_TYPES:
+        for scene_num in range(int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1, SCENE_NUM_PER_TYPE + 1):
+            tags.append([scene_type+str(scene_num)])
+
+    plt.bar(np.arange(len(success_and_trials)), trails)
+    plt.bar(np.arange(len(success_and_trials)), success)
+    ax.set_xticks(np.arange(len(success_and_trials)))
+    ax.set_xticklabels(tags)
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# Test Main
 # ------------------------------------------------------------------------------
 def testing_pipeline(Network, checkpoint, dynamcis_rounds=DYNAMICS_ROUNDS):
     # --------------------------------------------------------------------------
@@ -193,13 +212,16 @@ def testing_pipeline(Network, checkpoint, dynamcis_rounds=DYNAMICS_ROUNDS):
     # ------------------------------------------------------------------
     robot = Agent_Sim()
     test_path = DATA_DIR + '/test'
+
+    # Initialize testing staticstics
+    success_and_trials = [dict(trials=0, success=0) for i in range(len(SCENE_TYPES) * SCENE_NUM_PER_TYPE)]
+    heatmap_size = (73, 73)
+    template = dict(n=np.zeros(heatmap_size), sum=np.zeros(heatmap_size), sq_sum=np.zeros(heatmap_size))
+    staticstics = [copy.deepcopy(template) for i in range(4)]
+    metric_idx = 0
     # --------------------------------------------------------------------------
     # Iterate through test scene
     # ------------------------------------------------------------------
-    success_and_trials = [dict(trials=0, success=0) for i in range(len(SCENE_TYPES) * SCENE_NUM_PER_TYPE)]
-    heatmap_max = -1.0*np.ones((60, 5))
-    heatmap_min = -1.0*np.ones((60, 5))
-    metric_idx = 0
     for scene_type in SCENE_TYPES:
         for scene_num in range(int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1, SCENE_NUM_PER_TYPE + 1):
             robot.reset_scene(scene_type=scene_type, scene_num=scene_num)
@@ -235,7 +257,7 @@ def testing_pipeline(Network, checkpoint, dynamcis_rounds=DYNAMICS_ROUNDS):
                 # --------------------------------------------------------------
                 # Iterate testing through map
                 for pose_z, info, img_z in observations:
-                    localization_eval(model, img_z, topo_features, pose_z, info, success_and_trials[metric_idx], heatmap_max, heatmap_min, robot, device)
+                    localization_eval(model, img_z, topo_features, pose_z, info, success_and_trials[metric_idx], robot, device, staticstics)
 
             scene_trials = success_and_trials[metric_idx]['trials']
             scene_success = success_and_trials[metric_idx]['success']
@@ -244,12 +266,13 @@ def testing_pipeline(Network, checkpoint, dynamcis_rounds=DYNAMICS_ROUNDS):
             print(colored('Testing Info: ','blue') + '{}/{} success rate in scene {}'.format(scene_success, scene_trials, robot._scene_name))
             print('----'*20 + '\n')
 
-            np.save("heatmap_max.npy", heatmap_max)
-            np.save("heatmap_min.npy", heatmap_min)
-            plot_heatmap(heatmap_max, heatmap_min)
+            with open('staticstics.pickle', 'wb') as handle:
+                pickle.dump(staticstics, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open('success_and_trials.pickle', 'wb') as handle:
+                pickle.dump(success_and_trials, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    np.save("success_and_trials.npy", success_and_trials)
-    plot_heatmap(heatmap_max, heatmap_min)
+    plot_heatmap(staticstics)
+    plot_success(success_and_trials)
 
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -262,9 +285,16 @@ if __name__ == '__main__':
     parser.add_argument("--test", help="test network image branch", action="store_true")
     args = parser.parse_args()
 
-    # heatmap_max = np.load('heatmap_max.npy')
-    # heatmap_min = np.load('heatmap_min.npy')
-    # plot_heatmap(heatmap_max, heatmap_min)
+    with open('staticstics.pickle', 'rb') as handle:
+       staticstics = pickle.load(handle)
+
+    success_and_trials = [dict(success=64, trials=64), dict(success=43, trials=48), dict(success=119, trials=128), dict(success=111, trials=128),
+                          dict(success=119, trials=128), dict(success=58, trials=72), dict(success=154, trials=192), dict(success=81, trials=104),
+                          dict(success=219, trials=296), dict(success=361, trials=488), dict(success=105, trials=120), dict(success=64, trials=80),
+                          dict(success=89, trials=112), dict(success=113, trials=136), dict(success=131, trials=160), dict(success=56, trials=56),
+                          dict(success=48, trials=48), dict(success=51, trials=56), dict(success=89, trials=104), dict(success=120, trials=120)]
+    plot_success(success_and_trials)
+    plot_heatmap(staticstics)
 
     # --------------------------------------------------------------------------
     # Use to load triplet infomation which is used to collect ground truth
