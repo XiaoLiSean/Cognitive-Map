@@ -47,6 +47,8 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
             for batch_idx, (inputs, alphas) in enumerate(data_loaders[phase]):
                 # zero the parameter gradients
                 optimizer.zero_grad()
+                print(inputs)
+                exit(0)
                 inputs = tuple(input.to(device) for input in inputs) # to GPU
                 alphas = tuple(alpha.to(device) for alpha in alphas) # to GPU
 
@@ -80,7 +82,7 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
                 if checkpoints_prefix != None:
-                    FILE = checkpoints_prefix + 'model_best_fit_acc_' + str(best_acc.item()) + '_epoch_' + str(epoch) + '.pkl'
+                    FILE = checkpoints_prefix + 'best_fit_acc_' + str(best_acc.item()) + '_epoch_' + str(epoch) + '.pkl'
                     torch.save(model.state_dict(), FILE)
             # ------------------------------------------------------------------
     # --------------------------------------------------------------------------

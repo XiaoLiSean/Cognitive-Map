@@ -12,7 +12,7 @@ from lib.robot_env import Agent_Sim
 from lib.object_dynamics import shuffle_scene_layout
 from lib.params import SCENE_TYPES, SCENE_NUM_PER_TYPE, NODES
 from Network.retrieval_network.params import *
-from Network.retrieval_network.datasets import TripletImagesDataset, update_triplet_info
+from Network.retrieval_network.datasets import TripletImagesDataset, TripletSGsDataset, update_triplet_info
 from Network.retrieval_network.networks import TripletNetImage, SiameseNetImage
 from Network.retrieval_network.losses import TripletLoss
 from Network.retrieval_network.trainer import Training
@@ -25,13 +25,13 @@ def training_pipeline(Dataset, Network, LossFcn, Training):
     dataset_sizes = {}
     # ---------------------------Loading training dataset---------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading training dataset...')
-    train_dataset = Dataset(DATA_DIR, IMAGE_SIZE, is_train=True)
+    train_dataset = Dataset(DATA_DIR, is_train=True)
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     dataset_sizes.update({'train': len(train_dataset)})
 
     # --------------------------Loading validation dataset--------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading validation dataset...')
-    val_dataset = Dataset(DATA_DIR, IMAGE_SIZE, is_train=False)
+    val_dataset = Dataset(DATA_DIR, is_train=False)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     dataset_sizes.update({'val': len(val_dataset)})
 
@@ -129,6 +129,11 @@ def localization_eval(model, z, topo_features, pose_z, info, success_and_trial, 
             subnode_feature = subnode_feature.to(device)
             score = COS(model.get_embedding(subnode_feature), model.get_embedding(z_img)).item()
 
+            # print sepecial/exception case
+            if d_theta == 2 and d_x + d_z > 30:
+                if score > 0.95:
+                    print('exception score {} at:{}{} versus {}{}'.format(score, pose_z, info[2], node, subnode_i))
+
             staticstics[d_theta_idx]['n'][d_x, d_z] += 1
             staticstics[d_theta_idx]['sum'][d_x, d_z] += score
             staticstics[d_theta_idx]['sq_sum'][d_x, d_z] += score**2
@@ -180,22 +185,30 @@ def plot_heatmap(staticstics):
     plt.show()
 
 def plot_success(success_and_trials):
-    fig, ax = plt.subplots()
+    fig, ax1 = plt.subplots()
     tags = []
     success = [data['success'] for data in success_and_trials]
-    trails = [data['trials'] for data in success_and_trials]
+    trials = [data['trials'] for data in success_and_trials]
     for scene_type in SCENE_TYPES:
         for scene_num in range(int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1, SCENE_NUM_PER_TYPE + 1):
-            tags.append([scene_type+str(scene_num)])
+            tags.append(scene_type+str(scene_num))
 
-    plt.bar(np.arange(len(success_and_trials)), trails)
+    plt.bar(np.arange(len(success_and_trials)), trials)
     plt.bar(np.arange(len(success_and_trials)), success)
-    ax.set_xticks(np.arange(len(success_and_trials)))
-    ax.set_xticklabels(tags)
+    ax1.set_xticks(np.arange(len(success_and_trials)))
+    ax1.set_xticklabels(tags, rotation=90)
+
+    ax2 = ax1.twinx()
+    ax2.plot(np.arange(len(success_and_trials)), np.true_divide(np.array(success), np.array(trials)), 'r--')
+    ax2.set_yticks(np.arange(11)/10)
+    ax2.set_yticklabels(np.arange(11)/10)
+    plt.title('Overall Success Rate {}'.format(np.true_divide(np.sum(np.array(success)), np.sum(np.array(trials)))))
+
+    fig.tight_layout()
     plt.show()
 
 # ------------------------------------------------------------------------------
-# Test Main
+# Testing Main
 # ------------------------------------------------------------------------------
 def testing_pipeline(Network, checkpoint, dynamcis_rounds=DYNAMICS_ROUNDS):
     # --------------------------------------------------------------------------
@@ -210,7 +223,7 @@ def testing_pipeline(Network, checkpoint, dynamcis_rounds=DYNAMICS_ROUNDS):
     # ------------------------------------------------------------------
     # Initialize robot
     # ------------------------------------------------------------------
-    robot = Agent_Sim()
+    robot = Agent_Sim(applyActionNoise=True)
     test_path = DATA_DIR + '/test'
 
     # Initialize testing staticstics
@@ -240,7 +253,12 @@ def testing_pipeline(Network, checkpoint, dynamcis_rounds=DYNAMICS_ROUNDS):
             for p in map:
                 is_node, node_i = robot.is_node([p['x'], p['z']], threshold=1e-8)
                 for subnode_i, subnode in enumerate(subnodes):
-                    robot._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=subnode)
+                    # Add Gaussian Noise to pose
+                    rotation = copy.deepcopy(subnode)
+                    rotation['y'] += np.random.randn()*2
+                    p['x'] += np.random.randn()*robot._grid_size*0.25
+                    p['z'] += np.random.randn()*robot._grid_size*0.25
+                    robot._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=rotation)
                     img_z = robot.get_current_fram()
                     observations.append(([p['x'], p['z']], [is_node, node_i, subnode_i], img_z))
             print('----'*20 + '\n' + colored('Testing Info: ','blue') + 'Testing in scene' + robot._scene_name)
@@ -281,20 +299,23 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--update_triplet_info", help="update triplets npy list for both image and SG brach for train and validation",
                         action="store_true")
-    parser.add_argument("--train", help="train network image branch", action="store_true")
-    parser.add_argument("--test", help="test network image branch", action="store_true")
+    parser.add_argument("--train", help="train network", action="store_true")
+    parser.add_argument("--test", help="test network", action="store_true")
+    parser.add_argument("--image", help="network image branch", action="store_true")
+    parser.add_argument("--sg", help="network scene graph branch", action="store_true")
     args = parser.parse_args()
 
-    with open('staticstics.pickle', 'rb') as handle:
-       staticstics = pickle.load(handle)
-
-    success_and_trials = [dict(success=64, trials=64), dict(success=43, trials=48), dict(success=119, trials=128), dict(success=111, trials=128),
-                          dict(success=119, trials=128), dict(success=58, trials=72), dict(success=154, trials=192), dict(success=81, trials=104),
-                          dict(success=219, trials=296), dict(success=361, trials=488), dict(success=105, trials=120), dict(success=64, trials=80),
-                          dict(success=89, trials=112), dict(success=113, trials=136), dict(success=131, trials=160), dict(success=56, trials=56),
-                          dict(success=48, trials=48), dict(success=51, trials=56), dict(success=89, trials=104), dict(success=120, trials=120)]
-    plot_success(success_and_trials)
-    plot_heatmap(staticstics)
+    # This part is used to plot test data for static image branch
+    # with open('staticstics.pickle', 'rb') as handle:
+    #    staticstics = pickle.load(handle)
+    #
+    # success_and_trials = [dict(success=64, trials=64), dict(success=43, trials=48), dict(success=119, trials=128), dict(success=111, trials=128),
+    #                       dict(success=119, trials=128), dict(success=58, trials=72), dict(success=154, trials=192), dict(success=81, trials=104),
+    #                       dict(success=219, trials=296), dict(success=361, trials=488), dict(success=105, trials=120), dict(success=64, trials=80),
+    #                       dict(success=89, trials=112), dict(success=113, trials=136), dict(success=131, trials=160), dict(success=56, trials=56),
+    #                       dict(success=48, trials=48), dict(success=51, trials=56), dict(success=89, trials=104), dict(success=120, trials=120)]
+    # plot_success(success_and_trials)
+    # plot_heatmap(staticstics)
 
     # --------------------------------------------------------------------------
     # Use to load triplet infomation which is used to collect ground truth
@@ -305,16 +326,22 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # Train corresponding networks
     if args.train:
-        Dataset = TripletImagesDataset
-        Network = TripletNetImage
+        if args.image and not args.sg:
+            Dataset = TripletImagesDataset
+            Network = TripletNetImage
+        elif args.sg and not args.image:
+            Dataset = TripletSGsDataset
+            Network = TripletNetImage
+        else:
+            print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/sg)')
         LossFcn = TripletLoss(constant_margin=False)
         TraningFcn = Training
         model_best_fit = training_pipeline(Dataset, Network, LossFcn, TraningFcn)
-        torch.save(model_best_fit.state_dict(), CHECKPOINTS_PREFIX + 'model_best_fit.pkl')
+        torch.save(model_best_fit.state_dict(), CHECKPOINTS_PREFIX + 'best_fit.pkl')
 
     # --------------------------------------------------------------------------
     # Testing corresponding networks
     if args.test:
         Network = SiameseNetImage
-        Checkpoint = CHECKPOINTS_PREFIX + 'image_siamese_dynamics_best_fit.pkl'
+        Checkpoint = CHECKPOINTS_PREFIX + 'best_fit.pkl'
         testing_pipeline(Network, Checkpoint)

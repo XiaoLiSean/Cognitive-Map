@@ -30,10 +30,10 @@ MOMENTUM = 0.9
 STEP_SIZE = 7
 GAMMA = 0.1
 # ------------------------------------------------------------------------------
-DYNAMICS_ROUNDS = 2
+DYNAMICS_ROUNDS = 3
 TRAIN_FRACTION = 0.7
 VAL_FRACTION = 0.15
 TEST_FRACTION = 0.15
 LOCALIZATION_GRID_TOL = 1 # Tolerance for correct localization with in one gridstep distance
 DATA_DIR = './Network/retrieval_network/datasets' # Training and validation data directory
-CHECKPOINTS_PREFIX = './Network/retrieval_network/checkpoints/'
+CHECKPOINTS_PREFIX = './Network/retrieval_network/checkpoints/image_siamese_dynamics_'

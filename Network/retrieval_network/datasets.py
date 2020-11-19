@@ -1,7 +1,8 @@
 import numpy as np
-import os, sys, random
+import os, sys, random, scipy
 import torch
 from torchvision import datasets, transforms
+from Network.retrieval_network.params import IMAGE_SIZE
 from PIL import Image
 from os.path import dirname, abspath
 from termcolor import colored
@@ -87,10 +88,10 @@ class TripletImagesDataset(torch.utils.data.Dataset):
     Train: For each sample (anchor) randomly chooses a positive and negative samples
     """
 
-    def __init__(self, DATA_DIR, IMAGE_SIZE, is_train=True):
+    def __init__(self, DATA_DIR, image_size=IMAGE_SIZE, is_train=True):
         super(TripletImagesDataset, self).__init__()
         self.data_dir = DATA_DIR
-        self.image_size = IMAGE_SIZE
+        self.image_size = image_size
         self.is_train = is_train
         self.transforms = transforms.Compose([transforms.Resize(self.image_size),
                                               transforms.ToTensor(),
@@ -132,23 +133,42 @@ class TripletImagesDataset(torch.utils.data.Dataset):
         return len(self.triplets_img)
 
 # ------------------------------------------------------------------------------
+# Import vector embeding related parameters
+from lib.params import idx_2_obj_list, THOR_2_VEC
+
+# Third party function from git@github.com:tkipf/pygcn.git
+def row_normalize(mx):
+    """Row-normalize sparse matrix"""
+    rowsum = np.array(mx.sum(1))
+    r_inv = np.power(rowsum, -1).flatten()
+    r_inv[np.isinf(r_inv)] = 0.
+    r_mat_inv = scipy.sparse.diags(r_inv)
+    mx = r_mat_inv.dot(mx)
+    return mx
+
+# Third party function from git@github.com:tkipf/pygcn.git
+def sparse_mx_to_torch_sparse_tensor(sparse_mx):
+    """Convert a scipy sparse matrix to a torch sparse tensor."""
+    sparse_mx = sparse_mx.tocoo().astype(np.float32)
+    indices = torch.from_numpy(np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64))
+    values = torch.from_numpy(sparse_mx.data)
+    shape = torch.Size(sparse_mx.shape)
+    return torch.sparse.FloatTensor(indices, values, shape)
+# ------------------------------------------------------------------------------
 class TripletSGsDataset(torch.utils.data.Dataset):
     """
     Train: For each sample (anchor) randomly chooses a positive and negative samples
     """
 
-    def __init__(self, DATA_DIR, matrix_size=OBJ_TYPE_NUM, is_train=True):
-        super(TripletImagesDataset, self).__init__()
+    def __init__(self, DATA_DIR, is_train=True):
+        super(TripletSGsDataset, self).__init__()
         self.data_dir = DATA_DIR
-        self.matrix_size = matrix_size
         self.is_train = is_train
-        self.transforms = transforms.Compose([transforms.Resize(self.image_size),
-                                              transforms.ToTensor(),
-                                              transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
         self.triplets_SG, self.triplets_alphas = self.get_triplets()
+        self.feature_matrix = self.get_features_matrix()
 
     def get_triplets(self):
-        triplets_img = []
+        triplets_SGs = []
         triplets_alphas = []
         if self.is_train:
             path = self.data_dir + '/' + 'train'
@@ -160,23 +180,42 @@ class TripletSGsDataset(torch.utils.data.Dataset):
             anchor_to_positives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_positives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-positives
             anchor_to_negatives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-negatives
             for anchor in anchor_to_positives:
-                anchor_img = path + '/' + FloorPlan + '/' + anchor + '.png'
+                anchor_SG = path + '/' + FloorPlan + '/' + anchor + '.npy'
                 positives = anchor_to_positives[anchor]
                 negatives = anchor_to_negatives[anchor]
                 for i in range(min([len(positives), len(negatives)])):
-                    positive_img = path + '/' + FloorPlan + '/' + positives[i][0] + '.png'
-                    negative_img = path + '/' + FloorPlan + '/' + negatives[i][0] + '.png'
+                    positive_SG = path + '/' + FloorPlan + '/' + positives[i][0] + '.npy'
+                    negative_SG = path + '/' + FloorPlan + '/' + negatives[i][0] + '.npy'
                     # append path to desired image triplets
-                    triplets_img.append((deepcopy(anchor_img), deepcopy(positive_img), deepcopy(negative_img)))
+                    triplets_SGs.append((deepcopy(anchor_SG), deepcopy(positive_SG), deepcopy(negative_SG)))
                     triplets_alphas.append((deepcopy(positives[i][1]), deepcopy(negatives[i][1])))
 
-        return triplets_img, triplets_alphas
+        return triplets_SGs, triplets_alphas
+
+    def get_features_matrix(self):
+        features = []
+        for obj_name in idx_2_obj_list:
+            features.append(np.true_divide(THOR_2_VEC[obj_name], np.linalg.norm(THOR_2_VEC[obj_name])))
+
+        return torch.FloatTensor(np.asarray(features))
+
+    def get_adj_matrix(self, SG):
+        adj = SG.transpose()
+        adj = adj.tocoo()
+        adj = row_normalize(adj + scipy.sparse.eye(adj.shape[0]))
+        return sparse_mx_to_torch_sparse_tensor(adj)
 
     def __getitem__(self, index):
         # Path to triplet data_points
-        paths = self.triplets_img[index]
-        triplet = (self.transforms(Image.open(paths[0])), self.transforms(Image.open(paths[1])), self.transforms(Image.open(paths[2])))
-        return triplet, self.triplets_alphas[index]
+        paths = self.triplets_SG[index]
+        anchor_SG = np.load(paths[0], allow_pickle='TRUE').item()
+        positive_SG = np.load(paths[0], allow_pickle='TRUE').item()
+        negative_SG = np.load(paths[0], allow_pickle='TRUE').item()
+
+        adj_on = (self.get_adj_matrix(anchor_SG['on']), self.get_adj_matrix(positive_SG['on']), self.get_adj_matrix(negative_SG['on']))
+        adj_in = (self.get_adj_matrix(anchor_SG['in']), self.get_adj_matrix(positive_SG['in']), self.get_adj_matrix(negative_SG['in']))
+        adj_proximity = (self.get_adj_matrix(anchor_SG['proximity']), self.get_adj_matrix(positive_SG['proximity']), self.get_adj_matrix(negative_SG['proximity']))
+        return adj_on, adj_in, adj_proximity, self.triplets_alphas[index]
 
     def __len__(self):
-        return len(self.triplets_img)
+        return len(self.triplets_SG)
