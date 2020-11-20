@@ -133,9 +133,6 @@ class TripletImagesDataset(torch.utils.data.Dataset):
         return len(self.triplets_img)
 
 # ------------------------------------------------------------------------------
-# Import vector embeding related parameters
-from lib.params import idx_2_obj_list, THOR_2_VEC
-
 # Third party function from git@github.com:tkipf/pygcn.git
 def row_normalize(mx):
     """Row-normalize sparse matrix"""
@@ -154,6 +151,24 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     values = torch.from_numpy(sparse_mx.data)
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse.FloatTensor(indices, values, shape)
+
+def sparse_to_tuple(sparse_mx):
+    """Convert sparse matrix to tuple representation."""
+    def to_tuple(mx):
+        if not scipy.sparse.isspmatrix_coo(mx):
+            mx = mx.tocoo()
+        coords = np.vstack((mx.row, mx.col)).transpose()
+        values = mx.data
+        shape = mx.shape
+        return coords, values, shape
+
+    if isinstance(sparse_mx, list):
+        for i in range(len(sparse_mx)):
+            sparse_mx[i] = to_tuple(sparse_mx[i])
+    else:
+        sparse_mx = to_tuple(sparse_mx)
+
+    return sparse_mx
 # ------------------------------------------------------------------------------
 class TripletSGsDataset(torch.utils.data.Dataset):
     """
@@ -165,7 +180,6 @@ class TripletSGsDataset(torch.utils.data.Dataset):
         self.data_dir = DATA_DIR
         self.is_train = is_train
         self.triplets_SG, self.triplets_alphas = self.get_triplets()
-        self.feature_matrix = self.get_features_matrix()
 
     def get_triplets(self):
         triplets_SGs = []
@@ -192,18 +206,12 @@ class TripletSGsDataset(torch.utils.data.Dataset):
 
         return triplets_SGs, triplets_alphas
 
-    def get_features_matrix(self):
-        features = []
-        for obj_name in idx_2_obj_list:
-            features.append(np.true_divide(THOR_2_VEC[obj_name], np.linalg.norm(THOR_2_VEC[obj_name])))
-
-        return torch.FloatTensor(np.asarray(features))
-
     def get_adj_matrix(self, SG):
         adj = SG.transpose()
         adj = adj.tocoo()
         adj = row_normalize(adj + scipy.sparse.eye(adj.shape[0]))
-        return sparse_mx_to_torch_sparse_tensor(adj)
+
+        return sparse_mx_to_torch_sparse_tensor(adj).to_dense()
 
     def __getitem__(self, index):
         # Path to triplet data_points
@@ -215,7 +223,7 @@ class TripletSGsDataset(torch.utils.data.Dataset):
         adj_on = (self.get_adj_matrix(anchor_SG['on']), self.get_adj_matrix(positive_SG['on']), self.get_adj_matrix(negative_SG['on']))
         adj_in = (self.get_adj_matrix(anchor_SG['in']), self.get_adj_matrix(positive_SG['in']), self.get_adj_matrix(negative_SG['in']))
         adj_proximity = (self.get_adj_matrix(anchor_SG['proximity']), self.get_adj_matrix(positive_SG['proximity']), self.get_adj_matrix(negative_SG['proximity']))
-        return adj_on, adj_in, adj_proximity, self.triplets_alphas[index]
+        return adj_on + adj_in + adj_proximity, self.triplets_alphas[index]
 
     def __len__(self):
         return len(self.triplets_SG)

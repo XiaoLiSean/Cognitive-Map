@@ -13,7 +13,7 @@ from lib.object_dynamics import shuffle_scene_layout
 from lib.params import SCENE_TYPES, SCENE_NUM_PER_TYPE, NODES
 from Network.retrieval_network.params import *
 from Network.retrieval_network.datasets import TripletImagesDataset, TripletSGsDataset, update_triplet_info
-from Network.retrieval_network.networks import TripletNetImage, SiameseNetImage
+from Network.retrieval_network.networks import TripletNetImage, SiameseNetImage, TripletNetSG
 from Network.retrieval_network.losses import TripletLoss
 from Network.retrieval_network.trainer import Training
 from os.path import dirname, abspath
@@ -331,7 +331,7 @@ if __name__ == '__main__':
             Network = TripletNetImage
         elif args.sg and not args.image:
             Dataset = TripletSGsDataset
-            Network = TripletNetImage
+            Network = TripletNetSG
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/sg)')
         LossFcn = TripletLoss(constant_margin=False)

@@ -380,56 +380,21 @@ class Topological_map():
 					                  fc=(0.5, 0.4, 0.4),
 					                  )
 					        )
-
-				# print('nbrs: ', nbrs)
-				# print('weight: ', nbrs[])
-		# ax.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0)
-		# ax.text((node_i[0]+node_j[0]) / 2.0, (node_i[1]+node_j[1]) / 2.0, int(cost), size=8,
-		#         ha="center", va="center",
-		#         bbox=dict(boxstyle="round",
-		#                   ec=(1., 0.5, 0.5),
-		#                   fc=(1., 0.8, 0.8),
-		#                   )
-		#         )
 		plt.show()
 
 
 if __name__ == '__main__':
 
-	Agent_action = Agent_action(AI2THOR=False, scene_type=1, scene_num=1, grid_size=0.25, rotation_step=30, sleep_time=0.1,
-			save_directory='./data')
+	Agent_action = Agent_action(AI2THOR=False, scene_type=1, scene_num=1, grid_size=0.25, rotation_step=30, sleep_time=0.1, save_directory='./data')
+	topo_map = Topological_map(controller=Agent_action._controller)
 
-	# node_generator = Node_generator(controller=Agent_action._controller)
-	# node_pair_list = node_generator.Get_neighbor_nodes()
-	# print('node_pair_list: ', node_pair_list)
-	# subnodes = node_generator.Get_connected_subnodes()
-
-	node_index_list = [0, 129, 1, 16, 18, 157, 42, 181, 196, 215, 90, 221, 95, 225, 232, 110, 114, 116, 246]
-	node_pair_list = [[0, 1], [0, 16], [0, 18], [129, 157], [1, 16], [1, 18], [16, 18], [18, 42], [181, 196], [90, 114], [221, 225], [95, 110], [95, 116], [110, 116],
-	[129, 110], [1, 42], [157, 110], [225, 232], [232, 246], [129, 95], [129, 116], [157, 95], [157, 116]]
-	subnodes = [[0, 1, 2, 3], [0, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [0, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3],
-	[0, 1], [0, 1, 2, 3], [0, 1, 2], [0, 1, 3], [0, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [1, 2, 3], [1], [1, 2, 3], [1, 2, 3], [1, 2, 3], [2, 3], [2, 3], [2], [3]]
-	# map = Topological_map(controller=node_generator._controller, node_index_list=node_generator._node_index_list, neighbor_nodes_pair=node_pair_list)
-	topo_map = Topological_map(controller=Agent_action._controller, node_index_list=node_index_list, neighbor_nodes_pair=node_pair_list)
-	# map.Set_Unit_rotate_func(Agent_action.Unit_rotate)
 	topo_map.init_data()
 	topo_map.Set_Teleport_agent_func(Agent_action.Teleport_agent)
 	topo_map.Set_Rotate_to_degree_func(Agent_action.Rotate_to_degree)
+
 	topo_map.Add_all_node()
-
 	topo_map.Add_all_edges(connected_subnodes=subnodes)
-
-	# for n, nbrs in topo_map._graph.adj.items():
-	# 	print('n: ', n)
-	# 	print('nbrs: ', nbrs)
-	# 	print('weight: ', nbrs[])
-
 	topo_map.Build_dij_graph()
 
 	path = topo_map.Find_dij_path(current_node_index=13, current_orientation=0, goal_node_index=18, goal_orientation=90)
-	print('path: ', path)
-	# print('topo_map._graph: ', topo_map._graph.nodes)
-
 	topo_map.show_map(show_nodes=True, show_edges=True)
-
-	exit()

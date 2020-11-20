@@ -25,12 +25,13 @@ class TripletLoss(torch.nn.Module):
 
         if self.constant_margin:
             alphas = self.margin*torch.ones(BATCH_SIZE)
-            alphas.to(device)
+            alphas = alphas.to(device)
             # Using ReLU instead of max since max is not differentiable
             losses = F.relu(COS(anchors, negatives) - COS(anchors, positives) + alphas)
         else:
             # Using ReLU instead of max since max is not differentiable
             losses = F.relu(COS(anchors, negatives) - COS(anchors, positives) + alphas[0] - alphas[1])
+
         corrects = (COS(anchors, negatives) < COS(anchors, positives))
 
         return losses.mean() if batch_average_loss else losses.sum(), torch.sum(corrects.int())

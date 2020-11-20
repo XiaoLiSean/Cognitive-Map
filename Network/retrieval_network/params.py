@@ -19,16 +19,16 @@ NUM_WORKERS = 4 # dataloader workers
 IMAGE_ENCODING_VEC_LENGTH = 2048 # encoding vector length of the image
 # ------------------------------------------------------------------------------
 # Traning parameters/setting
-BATCH_SIZE = 16 # larger than one
-NUM_EPOCHS = 50
+BATCH_SIZE = 120 # common settings for networks {image=16, SG=120}
+NUM_EPOCHS = 1000 # common settings for networks {image=50, SG=1000}
 # --------------------------------------------
 # Training hyper-parameter
-LEARNING_RATE = 0.001
-MOMENTUM = 0.9
+LEARNING_RATE = 0.01 # common settings for networks {image=0.001, SG=0.01}
+MOMENTUM = 5e-4 # common settings for networks {image=0.9, SG=5e-4}
 # --------------------------------------------
-# Decay LR by a factor of 0.1 every 7 epochs
-STEP_SIZE = 7
-GAMMA = 0.1
+# Decay LR by a factor of GAMMA every STEP_SIZE epochs
+STEP_SIZE = 20 # common settings for networks {image=7, SG=10}
+GAMMA = 0.5 # common settings for networks {image=0.1, SG=0.01}
 # ------------------------------------------------------------------------------
 DYNAMICS_ROUNDS = 3
 TRAIN_FRACTION = 0.7
@@ -36,4 +36,4 @@ VAL_FRACTION = 0.15
 TEST_FRACTION = 0.15
 LOCALIZATION_GRID_TOL = 1 # Tolerance for correct localization with in one gridstep distance
 DATA_DIR = './Network/retrieval_network/datasets' # Training and validation data directory
-CHECKPOINTS_PREFIX = './Network/retrieval_network/checkpoints/image_siamese_dynamics_'
+CHECKPOINTS_PREFIX = './Network/retrieval_network/checkpoints/sg_siamese_dynamics_'
