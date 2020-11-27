@@ -5,7 +5,7 @@ import sys
 if __name__ == '__main__':
 	print(os.getcwd())
 	# action_groundtruth = open('data/test_dataset/action.txt', 'r')
-	action_groundtruth = open('data_normal/action_1.txt', 'r')
+	action_groundtruth = open('data/action.txt', 'r')
 
 	labels = []
 	file_name = []

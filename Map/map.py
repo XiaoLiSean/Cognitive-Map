@@ -25,13 +25,18 @@ class Topological_map():
 		self._controller = controller
 		self._neighbor_nodes_pair = neighbor_nodes_pair
 		self._node_index_list = node_index_list
+		self._updated_needed = False
+		if not self._node_index_list is None:
+			self.init_data()
+			self._updated_needed = True
+
 		self._reachable = None
 		self._connected_subnodes = connected_subnodes
 		self._dij_graph = dij.Graph()
 		self._grid_size = 0.25
 		self._node_radius = 1.5
 
-		self._rotation_cost = 1
+		self._rotation_cost = 0.1
 		self._action_direction = {'forward': 0, 'right': 1, 'left': 2, 'backward': 3}
 		self._action_direction_cost_coeff = [0.5, 1, 1, 0.7]
 
@@ -43,46 +48,53 @@ class Topological_map():
 		self._Teleport_agent_func = None
 		if not self._controller is None:
 			self.Get_reachable_coordinate()
+		self._subnode_plan = False
 
-	def Get_node_dij_index(self, node_name):
-		node_num, orientation = self.Get_node_index_orien(node_name)
-		return node_num * len(self._orientations) + self._orientations.index(orientation)
+	def Set_env_from_Dumb_Navigetion(self, dumb_navigetion):
+		self._controller = dumb_navigetion._Agent_action._controller
+		self.Set_Teleport_agent_func(dumb_navigetion._Agent_action.Teleport_agent)
+		self.Set_Rotate_to_degree_func(dumb_navigetion._Agent_action.Rotate_to_degree)
 
-	def Get_node_index_from_dij_index(self, dij_index):
-		node_num = int(dij_index / len(self._orientations))
-		orientation = int(dij_index % len(self._orientations))
-		node_name = self.Get_node_name(node_num=node_num, orientation=self._orientations[orientation])
-		return node_name
+	def Clear_graph(self):
+		self._graph = nx.Graph()
 
-	def Build_dij_graph(self):
+	def Export_graph(self):
+		if self._updated_needed:
+			logging.warning('Graph needs to be updated to match node list')
+		return copy.deepcopy(self._graph)
 
-		for current_node_name, neighbor_nodes in self._graph.adj.items():
+	def Update_topo_map(self, node_index_list=None, node_pair_list=None, connected_subnodes=None):
+		if self._Rotate_to_degree_func is None or self._Teleport_agent_func is None:
+			logging.error('Action function not set in topo map class')
+			return
+		self.Get_reachable_coordinate()
+		if self._controller is None:
+			logging.error('Controller not set in topo map class')
+			return
 
-			current_node_dij_index = self.Get_node_dij_index(node_name=current_node_name)
+		if not node_index_list is None:
+			self.Set_node_index_list(node_index_list=node_index_list)
 
-			for neighbor_node_name, weight_dict in neighbor_nodes.items():
+		if not node_pair_list is None:
+			self.Set_neighbor_node(neighbor_nodes_pair=node_pair_list)
 
-				neighbor_node_dij_index = self.Get_node_dij_index(node_name=neighbor_node_name)
-				self._dij_graph.add_edge(current_node_dij_index, neighbor_node_dij_index, weight_dict['weight'])
+		if not connected_subnodes is None:
+			self.Set_subnode_connection(connected_subnodes=connected_subnodes)
 
-		return
+		if self._node_index_list is None or self._connected_subnodes is None:
+			logging.error('Node list or subnode connection is not set')
+			return
 
-	def Find_dij_path(self, current_node_index, current_orientation, goal_node_index, goal_orientation):
+		self.Add_all_node()
+		self.Add_all_edges()
+		self._updated_needed = False
 
-		current_node_name = self.Get_node_name(node_num=current_node_index, orientation=current_orientation)
-		current_dij_index = self.Get_node_dij_index(node_name=current_node_name)
-
-		goal_node_name = self.Get_node_name(node_num=goal_node_index, orientation=goal_orientation)
-		goal_dij_index = self.Get_node_dij_index(node_name=goal_node_name)
-
-		result = dij.find_path(self._dij_graph, current_dij_index, goal_dij_index)
-		path = result.nodes
-
-		path_nodes_name = []
-		for node_dij_index in path:
-			path_nodes_name.append(self.Get_node_index_from_dij_index(node_dij_index))
-
-		return path_nodes_name
+	def _wrap_to_360(self, degree):
+		while degree >= 360:
+			degree -=360
+		while degree < 0:
+			degree +=360
+		return int(degree)
 
 	def init_data(self):
 		if not self._node_index_list is None:
@@ -119,6 +131,12 @@ class Topological_map():
 
 	def Set_node_index_list(self, node_index_list):
 		self._node_index_list = node_index_list
+		self._updated_needed = True
+		self.init_data()
+
+	def Set_subnode_connection(self, connected_subnodes):
+		self._connected_subnodes = connected_subnodes
+		self._updated_needed = True
 
 	def Update_event(self):
 		self._event = self._controller.step('Pass')
@@ -136,15 +154,24 @@ class Topological_map():
 		self.Update_event()
 		return self._event.frame
 
+	# Clear the current graph and add all nodes in graph
 	def Add_all_node(self, node_index_list=None):
 
 		if not node_index_list is None:
-			self._node_index_list = node_index_list
+			self.Set_node_index_list(node_index_list)
 		# print('self._node_index_list: ', self._node_index_list)
+
+		if self._node_index_list is None or len(self._node_index_list) == 0:
+			logging.error('There is no node in map')
+			return
+
+		self.Clear_graph()
+
 		for node_index in range(len(self._node_index_list)):
 			# print('node_index: ', node_index)
 			frames = []
 			scene_graphs = []
+			# print('self._node_index_list[node_index]: ', self._node_index_list[node_index])
 			node_position = list(self._reachable[self._node_index_list[node_index]].values())
 
 			self._Teleport_agent_func(position=node_position, useful=True)
@@ -198,10 +225,10 @@ class Topological_map():
 	def Add_all_edges(self, connected_subnodes=None):
 
 		if not connected_subnodes is None:
-			self._connected_subnodes = connected_subnodes
+			self.Set_subnode_connection(connected_subnodes=connected_subnodes)
 
 		for nodes_pair_index in range(len(self._connected_subnodes)):
-			self.Add_edge_between_nodes(node_pair_index=nodes_pair_index, orientations=connected_subnodes[nodes_pair_index])
+			self.Add_edge_between_nodes(node_pair_index=nodes_pair_index, orientations=self._connected_subnodes[nodes_pair_index])
 
 	def Add_edge_between_nodes(self, node_pair_index, orientations):
 
@@ -221,6 +248,8 @@ class Topological_map():
 		if weight > 6 * self._grid_size:
 			weight *= 2
 
+		# print('self._neighbor_nodes_pair: ', self._neighbor_nodes_pair)
+
 		for orientation in orientations:
 			# print('orientation: ', orientation)
 			# print('weight * weight_coeff[self._orientations.index(orientation)]: ', weight * weight_coeff[orientation])
@@ -229,6 +258,16 @@ class Topological_map():
 				node_2=self._node_index_list.index(self._neighbor_nodes_pair[node_pair_index][1]), orientation_2=self._orientations[orientation], weight=weight * weight_coeff[orientation])
 		
 		return
+
+	def Get_object_closest_node(self):
+		pass
+
+	def Get_adj(self):
+		return self._graph.adj.items()
+
+	def Get_node_adj_by_name(self, node_name):
+		node_adj = self._graph.adj
+		return node_adj[node_name]
 
 	def Add_edge(self, node_1, orientation_1, node_2, orientation_2, weight=0.25):
 		self._graph.add_weighted_edges_from([
@@ -243,11 +282,19 @@ class Topological_map():
 		name_split = node_name.split('_')
 		return int(name_split[1]), int(name_split[3])
 
-	def Get_node_value_by_name(self, node_name):
+	def Get_node_value_dict_by_name(self, node_name):
 		return self._graph.nodes[node_name]
 
-	def Get_node_value(self, node_num, orientation):
+	def Get_node_value_dict(self, node_num, orientation):
 		return self._graph.nodes[self.Get_node_name(node_num, orientation)]
+
+	def Get_node_value_by_name(self, node_name):
+		values = self._graph.nodes[node_name]
+		return values['position'], values['image'], values['scene_graph']
+
+	def Get_node_value(self, node_num, orientation):
+		values = self._graph.nodes[self.Get_node_name(node_num, orientation)]
+		return values['position'], values['image'], values['scene_graph']
 
 	def get_scene_bbox(self):
 		self.Update_event()
@@ -419,14 +466,14 @@ if __name__ == '__main__':
 
 	topo_map.Add_all_edges(connected_subnodes=subnodes)
 
-	# for n, nbrs in topo_map._graph.adj.items():
-	# 	print('n: ', n)
-	# 	print('nbrs: ', nbrs)
-	# 	print('weight: ', nbrs[])
+	for n, nbrs in topo_map._graph.adj.items():
+		print('n: ', n)
+		print('nbrs: ', nbrs)
+		# print('weight: ', nbrs[])
 
 	topo_map.Build_dij_graph()
 
-	path = topo_map.Find_dij_path(current_node_index=13, current_orientation=0, goal_node_index=18, goal_orientation=90)
+	path = topo_map.Find_subnode_dij_path(current_node_index=13, current_orientation=0, goal_node_index=18, goal_orientation=90)
 	# print('path: ', path)
 	# print('topo_map._graph: ', topo_map._graph.nodes)
 

@@ -239,13 +239,14 @@ if __name__ == '__main__':
 		heat_map_prob_index[0] += 8
 		heat_map_prob_index[1] += 8
 
-		heat_map_prob[heat_map_prob_index[0], heat_map_prob_index[1]] = round(coor_diff_corres_success_cases[index] / coor_diff_corres_cases[index], 3)
+		heat_map_prob[heat_map_prob_index[0], heat_map_prob_index[1]] = round(float(coor_diff_corres_success_cases[index]) / float(coor_diff_corres_cases[index]), 3)
 		heat_map_num[heat_map_prob_index[0], heat_map_prob_index[1]] = coor_diff_corres_cases[index]
 		num_test += coor_diff_corres_cases[index]
 
 	print('coordinate_differences: ', coordinate_differences)
-	print('success_rate: ', num_success / (num_success + num_failure))
+	print('success_rate: ', float(num_success) / float(num_success + num_failure))
 	print('total num: ', (num_success + num_failure))
+	print('num_success:', num_success)
 	print('num_test: ', num_test)
 
 	fig, ax = plt.subplots()

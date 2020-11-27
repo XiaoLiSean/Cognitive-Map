@@ -93,34 +93,43 @@ class Node_generator():
 		self._neighbor_nodes_facing = None
 
 		# self.Shuffle_scene()
+		# self.Update_event()
+		
+		# self._get_reachable()
+		# self._build_tree()
+		# self._get_cluster_center()
+		# self._build_graph()
+		self.Init_node_generator()
+		# self._assign_obj_cluster()
+
+		# self._get_object()
+		# self._build_obj_tree()
+
+		# self._get_node_vs_obj()
+		# self.Build_node_map()
+
+		# self._node_index_list = [0, 1, 4, 5, 7, 8, 9, 10, 11, 17, 21, 23, 32, 44, 47, 48, 52, 56, 58, 59, 81, 83, 90]
+		
+		# self.Get_navigatable_node_pair()
+		
+		# self.Get_connected_orientaton_by_overlap_scene()
+	
+	def Init_node_generator(self):
 		self.Update_event()
 		
 		self._get_reachable()
 		self._build_tree()
 		self._get_cluster_center()
 		self._build_graph()
-		# self._assign_obj_cluster()
-		self._get_object()
-		self._build_obj_tree()
-		self._get_node_vs_obj()
-		self.Build_node_map()
 
-		# self._node_index_list = [0, 1, 4, 5, 7, 8, 9, 10, 11, 17, 21, 23, 32, 44, 47, 48, 52, 56, 58, 59, 81, 83, 90]
-		
-		# self.Get_navigatable_node_pair()
-		
-		self.Get_connected_orientaton_by_overlap_scene()
-		
 	def Get_node_from_position(self, positions):
-		# print('self._reachable_list: ', self._reachable_list)
+		
 		rand_reachable = self._reachable_list[0]
 		self._node_index_list = []
 		for position in positions:
 			position_temp = [position[0], rand_reachable[1], position[1]]
 			
 			self._node_index_list.append(self._reachable_list.index(position_temp))
-		print('self._node_index_list: ', self._node_index_list)
-		# exit()
 
 	def Get_all_objects_shuffle(self):
 		for _ in range(5):
@@ -130,7 +139,10 @@ class Node_generator():
 			self._get_node_vs_obj()
 
 	def Shuffle_scene(self):
-		shuffle_scene_layout(controller=self._controller, num_attempts=1)
+		shuffle_scene_layout(controller=self._controller)
+
+	def Get_node_list(self):
+		return self._node_index_list
 
 	def Get_neighbor_nodes(self):
 		return self._neighbor_nodes
@@ -139,7 +151,7 @@ class Node_generator():
 		return self._connected_subnodes
 
 	def Get_connected_orientaton_by_overlap_scene(self):
-
+		print('')
 		self.Get_boundary()
 		orientations = [[-60, 60], [30, 150], [120, -120], [-150, -30]]
 
@@ -187,6 +199,8 @@ class Node_generator():
 				# print('subnode_visible_boundary: ', node_pos_index, orientation_index, len(subnode_visible_boundary[node_index][orientation_index]))
 
 		self._connected_subnodes = []
+		self._neighbor_nodes = []
+		# print('self._neighbor_nodes: ', self._neighbor_nodes)
 		for orientation_index in range(len(orientations)):
 
 			for node_index in range(len(self._node_index_list)):
@@ -226,13 +240,18 @@ class Node_generator():
 							elif reverse_node_pair in self._neighbor_nodes:
 								if not orientation_index in self._connected_subnodes[self._neighbor_nodes.index(reverse_node_pair)]:
 									self._connected_subnodes[self._neighbor_nodes.index(reverse_node_pair)].append(orientation_index)
-
+		print('self._node_index_list: ', self._node_index_list)
 		print('self._neighbor_nodes: ', self._neighbor_nodes)
 		print('self._connected_subnodes: ', self._connected_subnodes)
 		return self._connected_subnodes
 
 	def Get_boundary(self):
 		all_neighbors_relative = [[0, self._grid_size], [0, -self._grid_size], [self._grid_size, 0], [-self._grid_size, 0]]
+		self._map_boundary = []
+		self._map_boundary_x = []
+		self._map_boundary_y = []
+		print('len(self._reachable_position): ', len(self._reachable_position))
+
 		for index in range(len(self._reachable_position)):
 			all_neighbor_indexes = self._tree.query_ball_point(self._reachable_position[index], r=1.02 * self._grid_size)
 			# print(index)
@@ -312,7 +331,7 @@ class Node_generator():
 
 		self._boundary_tree = spatial.KDTree(list(zip(self._map_boundary_x, self._map_boundary_y)))
 		self._map_boundary = copy.deepcopy(self._smaller_grid_map_boundary)
-		print(len(self._map_boundary))
+		print('len(self._map_boundary): ', len(self._map_boundary))
 
 
 		# print(self._boundary_tree.query_ball_point(self._map_boundary[0], r=0.8 * self._grid_size))
@@ -528,6 +547,10 @@ class Node_generator():
 	def _get_reachable(self):
 		self._event = self._controller.step(action='GetReachablePositions')
 		self._reachable = self._event.metadata['actionReturn']
+		self._reachable_list = []
+		self._reachable_position = []
+		self._reachable_x = []
+		self._reachable_y = []
 
 		self._x_max = -10
 		self._x_min = 10
@@ -551,6 +574,9 @@ class Node_generator():
 			self._reachable_y.append(point['x'])
 			self._general_y = point['y']
 			self._reachable_position.append([point['z'], point['x']])
+
+		print('self._reachable_list: ', len(self._reachable_list))
+		print('self._reachable_position: ', len(self._reachable_position))
 
 		return
 

@@ -18,6 +18,8 @@ import yaml
 import pickle
 from PIL import Image
 import logging
+import cv2
+from skimage.transform import resize
 
 # print(os.getcwd())
 current_path = os.getcwd()
@@ -152,7 +154,7 @@ class Action_dataset(torch.utils.data.Dataset):
 
 
 class Action_network():
-	def __init__(self, num_classes=6, weight_file_path=action_network_path + 'weight/params_SPTM_like_back_left_right_large_rot_90_new_long_more_more_left_more_special.pkl'):
+	def __init__(self, num_classes=6, weight_file_path=action_network_path + 'weight/ithor.pkl'):
 		self._model = resnet18(pretrained=False, num_classes=num_classes)
 		print('torch.cuda.is_available(): ', torch.cuda.is_available())
 		if torch.cuda.is_available():
@@ -161,11 +163,16 @@ class Action_network():
 		self._model.eval()
 
 	def predict(self, image_current, image_goal):
-		img = np.concatenate((image_current, image_goal), axis=1)
+
+		image_current_resize = np.resize(resize(image_current, (300, 300, 3)), (300, 300, 3))
+		image_goal_resize = np.resize(resize(image_goal, (300, 300, 3)), (300, 300, 3))
+
+		img = np.concatenate((image_current_resize, image_goal_resize), axis=1)
+
 		img = transforms.ToTensor()(img)
 		img_shape = img.shape
-		# img.resize_((1, img_shape[0], img_shape[1], img_shape[2]))
 		img = img.view(1, img_shape[0], img_shape[1], img_shape[2])
+
 		if torch.cuda.is_available():
 			img = img.cuda()
 		out = self._model(img.float())
@@ -194,7 +201,7 @@ if __name__ == '__main__':
 	num_ftrs = model.fc.in_features
 	model.fc = nn.Linear(num_ftrs, params['num_classes'])
 
-	model.load_state_dict(torch.load('weight/params_SPTM_like_back_left_right_large_rot_90_new_long_more_more_left_special.pkl'))
+	# model.load_state_dict(torch.load('weight/params_SPTM_like_back_left_right_large_rot_90_new_long_more_more_left_special.pkl'))
 	# exit()
 	# model.load_state_dict(torch.load('weight/params_SPTM_like_back_left_right_large.pkl'))
 

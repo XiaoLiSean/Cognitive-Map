@@ -13,11 +13,13 @@ import logging
 import os
 import sys
 import csv
-# from node_generation import *
+from node_generation import *
 sys.path.append('../Network')
 sys.path.append('..')
 from action_network import Action_network
+from experiment_config import *
 from localization import *
+from lib.params import *
 # from localization import is_localized_static
 
 SIM_WINDOW_HEIGHT = 700
@@ -51,7 +53,7 @@ logging.basicConfig(level=log_setting[args.log_level])
 
 
 class Dumb_Navigetion():
-	def __init__(self, AI2THOR, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, overwrite_data, for_test_data=False, debug=False, special=False, more_special=False):
+	def __init__(self, scene_type, scene_num, save_directory, overwrite_data=False, AI2THOR=False, grid_size=0.25, rotation_step=90, sleep_time=0.005, for_test_data=False, debug=False, special=False, more_special=False):
 		self._map = {}
 		self._point_list = []
 		self._grid_size = grid_size
@@ -64,16 +66,14 @@ class Dumb_Navigetion():
 		self._map_searched = [False] * len(self._coordinate_dict)
 		self._for_test_data = for_test_data
 		self._debug = debug
-		# if self._debug:
-		# 	self._map_searched = [True] * len(self._coordinate_dict)
+
 		self._point_x = []
 		self._point_y = []
-		# plt.ion()
 		self._build_map()
 		self._action_network = Action_network()
 		
 		self._rotate_degree_for_train = 90
-		self._SPTM_like_method_try = 900
+		self._SPTM_like_method_try = 2000
 		self._Navigation_test_num = 5
 		self._Navigation_max_try = 18
 		self._rand_step_num = 8
@@ -88,12 +88,19 @@ class Dumb_Navigetion():
 		self._neighbor_nodes_coor_difference = None
 		self._success_list = None
 
+		self._agent_current_pos_index = None
+
 		self._goal_num = 0
 		self._current_num = 0
 		self._step_poses = []
 
 		self._train_data_distance = []
 		self._train_data_orientation = []
+
+		self.Set_localization_network()
+
+	def Reset_scene(self, scene_type, scene_num):
+		self._Agent_action.Reset_scene(scene_type=scene_type, scene_num=scene_num)
 
 	def Wrap_to_degree(self, degree):
 		degree_wrap = copy.deepcopy(degree)
@@ -273,7 +280,7 @@ class Dumb_Navigetion():
 					# action = 0
 					# if action == 4 or action == 3:
 					# 	continue
-					# action = random.choice(move_action_list)
+					action = random.choice(move_action_list)
 				if self._debug:
 					print('action: ', action)
 					print('action_num: ', action_num)
@@ -356,6 +363,23 @@ class Dumb_Navigetion():
 				print('---------------------------------------')
 				# time.sleep(0.5)
 		return
+
+	# Make a random action, all_actions false for only making forward/backward/move_right/move_left move. Weight is probability of actions
+	def Random_move_w_weight(self, all_actions=True, weight=None):
+
+		if all_actions:
+			if weight is None:
+				action_index = np.random.choice(list(range(0, self._total_action_num)))
+			else:
+				action_index = np.random.choice(list(range(0, self._total_action_num)), p=weight)
+		else:
+			if weight is None:
+				action_index = np.random.choice(list(TRANSLATION_ACTION_TYPE.values()))
+			else:
+				action_index = np.random.choice(list(TRANSLATION_ACTION_TYPE.values()), p=weight)
+
+		success, self._agent_current_pos_index = self.Move_navigation_specialized(self._agent_current_pos_index, direction=TRANSLATION_DIRECTION[action_index], do_move=True)
+		return success, self._agent_current_pos_index
 
 	def Random_action(self, starting_point_index, rotation_degree):
 		current_point_index = starting_point_index
@@ -521,7 +545,7 @@ class Dumb_Navigetion():
 					# time.sleep(2)
 					goal_pose = {'position': self.Get_agent_position(), 'rotation': self.Get_agent_rotation()}
 					self._Agent_action.Update_event()
-					goal_frame = self._Agent_action._event.frame
+					goal_frame = self._Agent_action.Get_frame()
 					# print('Teleport_agent to start')
 					# print('--------------------------------')
 
@@ -618,7 +642,7 @@ class Dumb_Navigetion():
 			 		self._Agent_action.Unit_rotate(degree=-90)
 			 		rotation_change -= 90
 			 	goal_pose = {'position': Dumb_Navigetion.Get_agent_position(), 'rotation': Dumb_Navigetion.Get_agent_rotation()}
-			 	goal_frame = Dumb_Navigetion._Agent_action._event.frame
+			 	goal_frame = Dumb_Navigetion._Agent_action.Get_frame()
 			# time.sleep(1)
 			
 			self._Agent_action.Teleport_agent(self._point_list[rand_point], useful=True)
@@ -648,8 +672,8 @@ class Dumb_Navigetion():
 		return
 
 	def Set_localization_network(self):
-		# checkpoint = '../Network/retrieval_network/checkpoints/image_siamese_nondynamics_best_fit.pkl'
-		checkpoint = CHECKPOINTS_PREFIX + 'image_siamese_nondynamics_best_fit.pkl'
+		checkpoint = './Network/retrieval_network/checkpoints/image_siamese_nondynamics_best_fit.pkl'
+		# checkpoint = CHECKPOINTS_PREFIX + 'image_siamese_nondynamics_best_fit.pkl'
 		self._model = SiameseNetImage()
 		self._device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 		# print("Model testing on: ", device)
@@ -657,13 +681,35 @@ class Dumb_Navigetion():
 		self._model.to(self._device)
 		self._model.load_state_dict(torch.load(checkpoint))
 		self._model.eval()
+		pass
 
-	def Navigation_stop(self, image_goal, image_current):
+	def Navigation_stop(self, image_goal, image_current, goal_pose=None, hardcode=False):
+
+		position_current = list(self.Get_agent_position().values())
+		rotation_current = list(self.Get_agent_rotation().values())
+
+		if hardcode is True:
+			if goal_pose is None:
+				return False
+			goal_position = goal_pose['position']
+			goal_rotation = goal_pose['rotation']
+
+			if isinstance(goal_position, dict):
+				goal_position = list(goal_position.values())
+			if isinstance(goal_rotation, dict):
+				goal_rotation = list(goal_rotation.values())
+
+			distance = np.linalg.norm(np.array(list(map(lambda x, y: x - y, goal_position, position_current))))
+			rotation_difference = np.abs(goal_rotation[1] - rotation_current[1])
+
+			if distance > 0.5 * self._grid_size or rotation_difference > 10:
+				return False
+			else:
+				return True
 
 		Image_goal = Image.fromarray(image_goal)
 		Image_current = Image.fromarray(image_current)
-		position_current = list(self.Get_agent_position().values())
-		rotation_current = list(self.Get_agent_rotation().values())
+
 		self._current_num += 1
 		self._step_poses.append({'position': position_current, 'rotation': rotation_current})
 		# Image_goal.save('./images/' + str(self._goal_num) + '_0.jpg')
@@ -674,26 +720,16 @@ class Dumb_Navigetion():
 		Image_current.save('./images/' + str(self._current_num) + '_' + str(position_current[0])+ '_' + str(position_current[2]) +
 			 '_' +str(int(rotation_current[1])) + '_' + str(localized) + '.jpg')
 
-		return not localized
+		return localized
 
-	def Navigate_by_ActionNet(self, image_goal, goal_pose, max_steps):
-		goal_position = goal_pose['position']
-		goal_rotation = goal_pose['rotation']
-		if isinstance(goal_position, dict):
-			goal_position = list(goal_position.values())
-		if isinstance(goal_rotation, dict):
-			goal_rotation = list(goal_rotation.values())
-		current_position = list(self._Agent_action.Get_agent_position().values())
-		current_rotation = list(self._Agent_action.Get_agent_rotation().values())
+	def Self_localize(self):
 
+		current_position = list(self.Get_agent_position().values())
 		distance_search_min = 1000
 		nearest_index = -1
-		pre_action = None
-		loop_action = [3, 2, 1, 0, 5, 4]
-		move_direction = {0: 'forward', 3: 'backward', 4: 'right', 5: 'left'}
-		move_action = [0, 3, 4, 5]
 
 		for i, point in enumerate(self._point_list):
+
 			distance_search = np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, current_position))))
 			if distance_search < distance_search_min:
 				distance_search_min = distance_search
@@ -702,26 +738,67 @@ class Dumb_Navigetion():
 		if distance_search_min > 0.5 * self._grid_size:
 			logging.error('Can not find starting point in point list')
 			return False
+		return nearest_index
 
-		current_point_index = nearest_index
-		distance = np.linalg.norm(np.array(list(map(lambda x, y: x - y, goal_position, current_position))))
-		rotation_difference = np.abs(goal_rotation[1] - current_rotation[1])
+	def Node_localize(self, node_position):
 
-		if rotation_difference > 180:
-			rotation_difference = 360 - rotation_difference
+		if isinstance(node_position, dict):
+			node_position_list = list(node_position.values())
+		else:
+			node_position_list = copy.deepcopy(node_position)
+		distance_search_min = 1000
+		nearest_index = -1
+
+		for i, point in enumerate(self._point_list):
+
+			distance_search = np.linalg.norm(np.array(list(map(lambda x, y: x - y, point, node_position_list))))
+			if distance_search < distance_search_min:
+				distance_search_min = distance_search
+				nearest_index = i
+
+		if distance_search_min > 0.5 * self._grid_size:
+			logging.error('Can not find starting point in point list')
+			return False
+		return nearest_index
+
+	def Navigate_by_ActionNet(self, image_goal, goal_pose, max_steps):
+		goal_position = goal_pose['position']
+		goal_rotation = goal_pose['rotation']
+		if isinstance(goal_position, dict):
+			goal_position = list(goal_position.values())
+		if isinstance(goal_rotation, dict):
+			goal_rotation = list(goal_rotation.values())
+
+		pre_action = None
+		loop_action = [3, 2, 1, 0, 5, 4]
+		move_direction = {0: 'forward', 3: 'backward', 4: 'right', 5: 'left'}
+		rot_direction = {1: 90, 2: -90}
+		move_action = [0, 3, 4, 5]
+		rotation_action = [1, 2]
+
+		nearest_index = self.Self_localize()
+		if nearest_index is False:
+			return False
+		else:
+			self._agent_current_pos_index = nearest_index
+		
 		# print('goal_position: ', goal_position)
 		# print('current_position: ', current_position)
 		# print('goal_rotation: ', goal_rotation)
 		# print('current_rotation: ', current_rotation)
 		step = 0
 		self._Agent_action.Update_event()
-		current_frame = self._Agent_action._event.frame
+		current_frame = self._Agent_action.Get_frame()
 
-		# while distance > 0.5 * self._grid_size or rotation_difference > 10:
-		while self.Navigation_stop(image_goal=image_goal, image_current=current_frame):
-			# if not distance > 0.5 * self._grid_size or not rotation_difference > 10:
-			# 	break
+		while not self.Navigation_stop(image_goal=image_goal, image_current=current_frame, goal_pose=goal_pose, hardcode=True):
 
+			self._current_num += 1
+			position_current = list(self.Get_agent_position().values())
+			rotation_current = list(self.Get_agent_rotation().values())
+			Image_current = Image.fromarray(current_frame)
+
+			Image_current.save('./images/' + str(self._current_num) + '_' + str(position_current[0])+ '_' + str(position_current[2]) +
+			 	'_' +str(int(rotation_current[1])) + '_' + str(False) + '.jpg')
 			step += 1
 			if step >= max_steps:
 				return False
@@ -730,7 +807,7 @@ class Dumb_Navigetion():
 			
 			if loop_action[action_predict] == pre_action:
 
-				current_point_index = self.Random_action(starting_point_index=current_point_index, rotation_degree=30)
+				self._agent_current_pos_index = self.Random_action(starting_point_index=self._agent_current_pos_index, rotation_degree=30)
 				pre_action = None
 				continue
 
@@ -738,33 +815,20 @@ class Dumb_Navigetion():
 				print('action_predict: ', action_predict)
 
 			if action_predict in move_action:
-				success, moving_index = self.Move_navigation_specialized(current_point_index, direction=move_direction[action_predict.item()], do_move=True)
+				success, moving_index = self.Move_navigation_specialized(self._agent_current_pos_index, direction=move_direction[action_predict.item()], do_move=True)
 				if success:
-					current_point_index = moving_index
+					self._agent_current_pos_index = moving_index
 					pre_action = action_predict.item()
 				else:
-					current_point_index = self.Random_action(starting_point_index=current_point_index, rotation_degree=30)
+					self._agent_current_pos_index = self.Random_action(starting_point_index=self._agent_current_pos_index, rotation_degree=30)
 					# print('can not move forward')
 					pre_action = None
 
-			elif action_predict == 1:
-				self._Agent_action.Unit_rotate(degree=90)
-				pre_action = 1
+			elif action_predict in rotation_action:
+				self._Agent_action.Unit_rotate(degree=rot_direction[action_predict.item()])
+				pre_action = action_predict.item()
 
-			elif action_predict == 2:
-				self._Agent_action.Unit_rotate(degree=-90)
-				pre_action = 2
-
-			current_position = list(self._Agent_action.Get_agent_position().values())
-			current_rotation = list(self._Agent_action.Get_agent_rotation().values())
-
-			distance = np.linalg.norm(np.array(list(map(lambda x, y: x - y, goal_position, current_position))))
-			rotation_difference = np.abs(goal_rotation[1] - current_rotation[1])
-			if rotation_difference > 180:
-				rotation_difference = 360 - rotation_difference
-
-			self._Agent_action.Update_event()
-			current_frame = self._Agent_action._event.frame
+			current_frame = self._Agent_action.Get_frame()
 			# print('goal_position: ', goal_position)
 			# print('current_position: ', current_position)
 			# print('goal_rotation: ', goal_rotation)
@@ -1152,16 +1216,13 @@ class Agent_action():
 		self._for_test_data = for_test_data
 		self._special = special
 		self._more_special = more_special
+		self._scene_name = self.Get_scene_name()
 		if self._AI2THOR:
-			if not self._for_test_data:
-				self._scene_name = 'FloorPlan_Train' + str(self._scene_type) + '_' + str(self._scene_num)
-			else:
-				self._scene_name = 'FloorPlan_Val' + str(self._scene_type) + '_' + str(self._scene_num)
-			print('scene_name: ', self._scene_name)
 			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, fieldOfView=120, agentMode='bot')
 		else:
-			self._scene_name = 'FloorPlan' + str(scene_setting[self._scene_type] + self._scene_num)
 			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, fieldOfView=120)
+
+		self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)
 		if self._special:
 			self._scene_name += '_special'
 		elif self._more_special:
@@ -1178,6 +1239,26 @@ class Agent_action():
 		self._action_label_text_file = None
 		self._action_type = {'INVALID_ACTION': -1, 'MOVE_FORWARD': 0, 'TURN_RIGHT': 1, 'TURN_LEFT': 2, 'MOVE_BACKWARD': 3, 'MOVE_RIGHT': 4, 'MOVE_LEFT': 5}
 		self._pre_image_name = None
+
+	def Reset_scene(self, scene_type, scene_num):
+		self._scene_name = self.Get_scene_name(scene_type=scene_type, scene_num=scene_num)
+		self._controller.reset(scene=self._scene_name)
+
+	def Get_scene_name(self, scene_type=None, scene_num=None):
+
+		if not scene_type is None and not scene_num is None:
+			self._scene_type = scene_type
+			self._scene_num = scene_num
+
+		if self._AI2THOR:
+			if not self._for_test_data:
+				scene_name = 'FloorPlan_Train' + str(self._scene_type) + '_' + str(self._scene_num)
+			else:
+				scene_name = 'FloorPlan_Val' + str(self._scene_type) + '_' + str(self._scene_num)
+			print('scene_name: ', self._scene_name)
+		else:
+			scene_name = 'FloorPlan' + str(scene_setting[self._scene_type] + self._scene_num)
+		return scene_name
 
 	def Update_event(self):
 		self._event = self._controller.step('Pass')
@@ -1201,7 +1282,7 @@ class Agent_action():
 		self.Update_event()
 		RGB_file_name = str(time.time() - self._start_time)
 		# print('action: ', action, RGB_file_name)
-		frame = self._event.frame
+		frame = self.Get_frame()
 		img = Image.fromarray(frame, 'RGB')
 		if not os.path.exists(self._save_directory + '/images'):
 			os.makedirs(self._save_directory + '/images')
@@ -1439,11 +1520,13 @@ if __name__ == '__main__':
 	# # # time.sleep(10)
 	# exit()
 
-	Dumb_Navigetion = Dumb_Navigetion(args.AI2THOR, args.scene_type, args.scene_num, args.grid_size,
-		args.rotation_step, args.sleep_time, args.save_directory, overwrite_data=args.overwrite_data,
-		for_test_data=args.test_data, debug=args.debug, more_special=True)
+	Dumb_Navigetion = Dumb_Navigetion(AI2THOR=args.AI2THOR, scene_type=args.scene_type, scene_num=args.scene_num, grid_size=args.grid_size,
+		rotation_step=args.rotation_step, sleep_time=args.sleep_time, save_directory=args.save_directory, overwrite_data=args.overwrite_data,
+		for_test_data=args.test_data, debug=args.debug, special=args.special, more_special=False)
 
-	Dumb_Navigetion.Set_localization_network()
+	# Dumb_Navigetion.Set_localization_network()
+
+
 	# Dumb_Navigetion.Open_close_label_text()
 	# # Dumb_Navigetion.Traverse_neighbor_map()
 	# # Dumb_Navigetion.Dumb_traverse_map()
@@ -1478,13 +1561,19 @@ if __name__ == '__main__':
 	# exit()
 
 
-	# node_generator = Node_generator(controller=Dumb_Navigetion._Agent_action._controller, node_radius=1)
-	node_pair = [[1, 8], [1, 16], [1, 28], [102, 107], [8, 16], [8, 28], [139, 140], [206, 242], [206, 180], [206, 221], [16, 28], [241, 221], [242, 180], [180, 221], [139, 206], [140, 206],
-	[241, 242], [242, 221], [64, 28], [104, 16], [104, 28], [64, 1], [64, 8], [64, 16], [1, 104], [8, 104]]
-	subnodes = [[0, 1, 2, 3], [0, 2, 3], [0, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [0, 2], [0, 1, 2, 3], [0, 1], [0, 1, 2, 3],
-	[0, 3], [0, 2], [0, 1], [1], [1], [1], [1], [2, 3], [2, 3], [2, 3], [3], [3], [3], [3], [3]]
-	# Dumb_Navigetion.Node_navigation_test(node_pair_list=node_generator.Get_neighbor_nodes(), subnodes=node_generator.Get_connected_subnodes())
-	Dumb_Navigetion.Node_navigation_test(node_pair_list=node_pair, subnodes=subnodes)
+	node_generator = Node_generator(controller=Dumb_Navigetion._Agent_action._controller, node_radius=1)
+	# node_list = NODES[Dumb_Navigetion._Agent_action.Get_scene_name()]
+
+	# node_generator.Get_node_from_position(node_list)
+	# node_generator.Get_connected_orientaton_by_overlap_scene()
+	# node_pair_list = node_generator.Get_neighbor_nodes()
+	# subnodes = node_generator.Get_connected_subnodes()
+	# node_pair = [[1, 8], [1, 16], [1, 28], [102, 107], [8, 16], [8, 28], [139, 140], [206, 242], [206, 180], [206, 221], [16, 28], [241, 221], [242, 180], [180, 221], [139, 206], [140, 206],
+	# [241, 242], [242, 221], [64, 28], [104, 16], [104, 28], [64, 1], [64, 8], [64, 16], [1, 104], [8, 104]]
+	# subnodes = [[0, 1, 2, 3], [0, 2, 3], [0, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [0, 2], [0, 1, 2, 3], [0, 1], [0, 1, 2, 3],
+	# [0, 3], [0, 2], [0, 1], [1], [1], [1], [1], [2, 3], [2, 3], [2, 3], [3], [3], [3], [3], [3]]
+	Dumb_Navigetion.Node_navigation_test(node_pair_list=node_generator.Get_neighbor_nodes(), subnodes=node_generator.Get_connected_subnodes())
+	# Dumb_Navigetion.Node_navigation_test(node_pair_list=node_pair, subnodes=subnodes)
 	Dumb_Navigetion.Write_result_csv()
 
 
@@ -1631,7 +1720,7 @@ if __name__ == '__main__':
 
 	goal_pose = {'position': Dumb_Navigetion.Get_agent_position(), 'rotation': Dumb_Navigetion.Get_agent_rotation()}
 	# Dumb_Navigetion._Agent_action.Update_event()
-	frame = Dumb_Navigetion._Agent_action._event.frame
+	frame = Dumb_Navigetion._Agent_action.Get_frame()
 	time.sleep(3)
 	Dumb_Navigetion._Agent_action.Teleport_agent(position=position, useful=True)
 	time.sleep(5)
