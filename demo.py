@@ -5,8 +5,8 @@ import multiprocessing, random
 
 def server_nav(server, comfirmed):
     # prepare date for navigator process
-    # robot = Agent_Sim(scene_type='Kitchen', scene_num=30) # For iTHOR
-    robot = Agent_Sim(scene_name='FloorPlan_Train1_1') # For RoboTHOR
+    robot = Agent_Sim(scene_type='Kitchen', scene_num=1) # For iTHOR
+    # robot = Agent_Sim(scene_name='FloorPlan_Train1_1') # For RoboTHOR
     navigator = Dumb_Navigetor(robot)
     reachable_poses = navigator._agent_sim.get_reachable_coordinate()
     goal = reachable_poses[random.randint(int(len(reachable_poses) / 3), len(reachable_poses))]

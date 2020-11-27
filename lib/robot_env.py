@@ -60,7 +60,8 @@ class Agent_Sim():
 	def update_event(self):
 		self._event = self._controller.step('Pass')
 		self._SG.reset()
-		self._SG.update_from_data(self._event.metadata['objects'])
+		self._SG.update_from_data([obj for obj in self._event.metadata['objects'] if obj['visible']])
+		# self._SG.visualize_SG()
 
 	def get_agent_position(self):
 		self.update_event()

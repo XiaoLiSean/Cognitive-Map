@@ -19,7 +19,7 @@ import time, copy, random
 
 
 if __name__ == '__main__':
-    
+
     # controller = Controller(scene='FloorPlan1', gridSize=0.25)
     # controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)
     # controller.step('Pass')
@@ -58,7 +58,9 @@ if __name__ == '__main__':
     event = controller.step(action='RotateLeft', degrees=90.0)
     time.sleep(5)
     event = shuffle_scene_layout(controller)
+    event = controller.step(action='RotateLeft', degrees=90.0)
     time.sleep(5)
+    event = controller.step(action='RotateLeft', degrees=90.0)
 
     # --------------------------------------------------------------------------
     # Test for move small objects

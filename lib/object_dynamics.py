@@ -43,7 +43,7 @@ def get_possible_parentReceptacles(furniture, objs, floor_ID):
 # ------------------------------------------------------------------------------
 # This function is used to shuffle objects in scenes
 # Input the controller handle and output the event data
-def shuffle_scene_layout(controller, num_attempts=40, verbose=False):
+def shuffle_scene_layout(controller, num_attempts=40, floor_obstacle_avoidance=False, verbose=False):
 
     event = controller.step("Pass")
     # Disable small objects
@@ -117,6 +117,12 @@ def shuffle_scene_layout(controller, num_attempts=40, verbose=False):
         # High dynamics object move randomly on its parentReceptacles
         if obj['objectType'] in HIGH_DYNAMICS:
             pass
+
+        # Case there is no obstical avoidance code, object previously on the floor will not moved
+        if not floor_obstacle_avoidance and furnitures_prev[obj_sorted['name']]['parentReceptacles'][0] == floor['objectId']:
+            successfully_placed[obj_sorted['name']] = True
+            continue
+
         # Low dynamics object can only move on its parentReceptacles within certain range
         if obj['objectType'] in LOW_DYNAMICS:
             pose_prev = furnitures_prev[obj_sorted['name']]['position']

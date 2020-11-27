@@ -5,8 +5,6 @@ from Network.retrieval_network.params import *
 from Network.retrieval_network.datasets import get_pose_from_name
 import sys
 from os.path import dirname, abspath
-root_folder = dirname(dirname(dirname(abspath(__file__))))
-sys.path.append(root_folder)
 from lib.similarity import view_similarity
 
 # ------------------------------------------------------------------------------

@@ -15,7 +15,7 @@ PN_THRESHOLD = {'p': 0.6, 'n': 0.5} # triplet, anchor to positive and negative t
 TRIPLET_MAX_FRACTION_TO_IMAGES = 0.10
 TRIPLET_MAX_NUM_PER_ANCHOR = 40
 NEGATIVE_RAND_NUM = 1 # randomly chooses NEGTIVE_RAND_NUM of negative for each anchor-positive pair
-NUM_WORKERS = 4 # dataloader workers
+NUM_WORKERS = 1 # dataloader workers
 IMAGE_ENCODING_VEC_LENGTH = 2048 # encoding vector length of the image
 # ------------------------------------------------------------------------------
 # Traning parameters/setting
@@ -30,7 +30,7 @@ MOMENTUM = 5e-4 # common settings for networks {image=0.9, SG=5e-4}
 STEP_SIZE = 20 # common settings for networks {image=7, SG=10}
 GAMMA = 0.5 # common settings for networks {image=0.1, SG=0.01}
 # ------------------------------------------------------------------------------
-DYNAMICS_ROUNDS = 3
+DYNAMICS_ROUNDS = 10
 TRAIN_FRACTION = 0.7
 VAL_FRACTION = 0.15
 TEST_FRACTION = 0.15

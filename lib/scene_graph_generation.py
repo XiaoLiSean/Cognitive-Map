@@ -198,12 +198,14 @@ def group_up(objs, visualization_on=False, verbose=False):
 #-------------------------------------------------------------------------------
 class Scene_Graph:
     #---------------------------------------------------------------------------
-    def __init__(self):
+    def __init__(self, R_on=lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool),
+                 R_in=lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool),
+                 R_proximity=lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)):
         # All vector and sparse matrix initialized with 'False' boolean
         self._obj_vec = lil_matrix((OBJ_TYPE_NUM, 1), dtype=np.bool)    # binary object occurence vector where index follow 'obj_2_idx_dic.npy'
-        self._R_on = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)    # Relationship sparse matrix _R_on[i,j] = True , obj_i on obj_j
-        self._R_in = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
-        self._R_proximity = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
+        self._R_on = R_on    # Relationship sparse matrix _R_on[i,j] = True , obj_i on obj_j
+        self._R_in = R_in
+        self._R_proximity = R_proximity
         self._R_disjoint = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
 
     #---------------------------------------------------------------------------
@@ -400,7 +402,7 @@ class Scene_Graph:
                             if objs[i]['parentReceptacles'][0] == receptacle['objectId']:
                                 i_on_j = True
 
-                elif objs[j]['parentReceptacles'] is not None: # This automatically rule out objs[j] in GROUP_UP_LIST
+                if objs[j]['parentReceptacles'] is not None: # This automatically rule out objs[j] in GROUP_UP_LIST
                     # Update normal receptacles
                     if objs[i]['objectType'] not in GROUP_UP_LIST and objs[j]['parentReceptacles'][0] == objs[i]['objectId']:
                         j_on_i = True

@@ -1,19 +1,18 @@
 import numpy as np
 import os, sys, random, scipy
 import torch
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+from scipy.sparse import find as find_sparse_idx
 from torchvision import datasets, transforms
 from Network.retrieval_network.params import IMAGE_SIZE
 from PIL import Image
 from os.path import dirname, abspath
 from termcolor import colored
 from copy import deepcopy
-
-
-# import from root/lib
-root_folder = dirname(dirname(dirname(abspath(__file__))))
-sys.path.append(root_folder)
 from lib.params import OBJ_TYPE_NUM
 from lib.similarity import view_similarity
+from lib.scene_graph_generation import Scene_Graph
 
 # ------------------------------------------------------------------------------
 # Get pose dict from file name
@@ -195,16 +194,29 @@ class TripletSGsDataset(torch.utils.data.Dataset):
             anchor_to_negatives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-negatives
             for anchor in anchor_to_positives:
                 anchor_SG = path + '/' + FloorPlan + '/' + anchor + '.npy'
+                if self.sg_is_empty(anchor_SG):
+                    continue
                 positives = anchor_to_positives[anchor]
                 negatives = anchor_to_negatives[anchor]
                 for i in range(min([len(positives), len(negatives)])):
                     positive_SG = path + '/' + FloorPlan + '/' + positives[i][0] + '.npy'
                     negative_SG = path + '/' + FloorPlan + '/' + negatives[i][0] + '.npy'
+                    if self.sg_is_empty(positive_SG):
+                        continue
                     # append path to desired image triplets
                     triplets_SGs.append((deepcopy(anchor_SG), deepcopy(positive_SG), deepcopy(negative_SG)))
                     triplets_alphas.append((deepcopy(positives[i][1]), deepcopy(negatives[i][1])))
 
         return triplets_SGs, triplets_alphas
+
+    def sg_is_empty(self, sg_path):
+        is_empty = True
+        SG = np.load(sg_path, allow_pickle='TRUE').item()
+        for A in [SG['on'], SG['in'], SG['proximity']]:
+            idx = find_sparse_idx(A)
+            if len(idx) != 0:
+                is_empty = False
+        return is_empty
 
     def get_adj_matrix(self, SG):
         adj = SG.transpose()
@@ -213,12 +225,21 @@ class TripletSGsDataset(torch.utils.data.Dataset):
 
         return sparse_mx_to_torch_sparse_tensor(adj).to_dense()
 
+    def show_data_points(self, On, In, R_prox):
+        SG = Scene_Graph(R_on=On, R_in=In, R_proximity=R_prox)
+        SG.visualize_SG()
+
+
     def __getitem__(self, index):
         # Path to triplet data_points
         paths = self.triplets_SG[index]
         anchor_SG = np.load(paths[0], allow_pickle='TRUE').item()
-        positive_SG = np.load(paths[0], allow_pickle='TRUE').item()
-        negative_SG = np.load(paths[0], allow_pickle='TRUE').item()
+        positive_SG = np.load(paths[1], allow_pickle='TRUE').item()
+        negative_SG = np.load(paths[2], allow_pickle='TRUE').item()
+
+        for idx, sg in enumerate([anchor_SG, positive_SG, negative_SG]):
+            plt.title(str(idx))
+            self.show_data_points(sg['on'], sg['in'], sg['proximity'])
 
         adj_on = (self.get_adj_matrix(anchor_SG['on']), self.get_adj_matrix(positive_SG['on']), self.get_adj_matrix(negative_SG['on']))
         adj_in = (self.get_adj_matrix(anchor_SG['in']), self.get_adj_matrix(positive_SG['in']), self.get_adj_matrix(negative_SG['in']))
