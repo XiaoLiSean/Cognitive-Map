@@ -168,6 +168,7 @@ class Action_network():
 		image_goal_resize = np.resize(resize(image_goal, (300, 300, 3)), (300, 300, 3))
 
 		img = np.concatenate((image_current_resize, image_goal_resize), axis=1)
+		# img = np.concatenate((image_current, image_goal), axis=1)
 
 		img = transforms.ToTensor()(img)
 		img_shape = img.shape

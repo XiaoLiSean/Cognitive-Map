@@ -167,8 +167,9 @@ class Node_generator():
 
 		for node_pos_index in self._node_index_list:
 			node_index = self._node_index_list.index(node_pos_index)
-			# if not node_pos_index == 5:# and not node_pos_index == 4 and not node_pos_index == 5:
+			# if not node_pos_index == 1:# and not node_pos_index == 4 and not node_pos_index == 5:
 			# 	continue
+			# print('node_pos_index: ', node_pos_index)
 
 			for orientation_index in range(len(orientations)):
 
@@ -192,8 +193,8 @@ class Node_generator():
 								if not beam_boundary_index in subnode_visible_boundary[node_index][orientation_index]:
 
 									subnode_visible_boundary[node_index][orientation_index].append(beam_boundary_index)
-									self._test_x.append(self._map_boundary[beam_boundary_index][0])
-									self._test_y.append(self._map_boundary[beam_boundary_index][1])
+									# self._test_x.append(self._map_boundary[beam_boundary_index][0])
+									# self._test_y.append(self._map_boundary[beam_boundary_index][1])
 							break
 				subnode_visible_boundary[node_index][orientation_index] = list(set(subnode_visible_boundary[node_index][orientation_index]))
 				# print('subnode_visible_boundary: ', node_pos_index, orientation_index, len(subnode_visible_boundary[node_index][orientation_index]))
@@ -222,7 +223,7 @@ class Node_generator():
 					percent_common_view_first = boundary_pts_in_common_num / len(subnode_visible_boundary[node_index][orientation_index])
 					percent_common_view_second = boundary_pts_in_common_num / len(subnode_visible_boundary[other_node_index][orientation_index])
 
-					if percent_common_view_first > 0.6 or percent_common_view_second > 0.6:
+					if percent_common_view_first > 0.7 or percent_common_view_second > 0.7:
 
 						node_pair = [self._node_index_list[node_index], self._node_index_list[other_node_index]]
 						reverse_node_pair = [self._node_index_list[other_node_index], self._node_index_list[node_index]]
@@ -250,13 +251,10 @@ class Node_generator():
 		self._map_boundary = []
 		self._map_boundary_x = []
 		self._map_boundary_y = []
-		print('len(self._reachable_position): ', len(self._reachable_position))
 
 		for index in range(len(self._reachable_position)):
 			all_neighbor_indexes = self._tree.query_ball_point(self._reachable_position[index], r=1.02 * self._grid_size)
-			# print(index)
-			# print(ineighbor_indexes)
-			# exit()
+
 			if len(all_neighbor_indexes) < 5:
 				# self._map_boundary.append(self._reachable_position[index])
 				# self._map_boundary_x.append(self._reachable_position[index][0])
@@ -299,13 +297,16 @@ class Node_generator():
 
 		self._smaller_grid_map_boundary = []
 		for boundary_point_position in self._map_boundary:
+
 			self._smaller_grid_map_boundary.append(boundary_point_position)
 			neighbot_boundary_indexes = self._boundary_tree.query_ball_point(boundary_point_position, r=1.02 * self._grid_size)
 			node_num_to_add = self._grid_size / self._boundary_grid_size - 1
-			# print('node_num_to_add: ', node_num_to_add)
+
 			for neighbor_boundary_index in neighbot_boundary_indexes:
+
 				goal_direction_errors = list(map(lambda x, y: x - y, self._map_boundary[neighbor_boundary_index], boundary_point_position))
 				goal_direction = []
+
 				for goal_direction_error in goal_direction_errors:
 					if goal_direction_error > 0:
 						goal_direction.append(self._boundary_grid_size)
@@ -315,8 +316,10 @@ class Node_generator():
 						goal_direction.append(0)
 
 				for adding_node_index in range(int(node_num_to_add)):
+
 					adding_step = [i * (adding_node_index + 1) for i in goal_direction]
 					adding_smaller_boundary_point = list(map(lambda x, y: x + y, boundary_point_position, adding_step))
+					
 					if not adding_smaller_boundary_point in self._smaller_grid_map_boundary:
 						# print('adding_smaller_boundary_point: ', adding_smaller_boundary_point)
 						self._smaller_grid_map_boundary.append(adding_smaller_boundary_point)
@@ -331,8 +334,6 @@ class Node_generator():
 
 		self._boundary_tree = spatial.KDTree(list(zip(self._map_boundary_x, self._map_boundary_y)))
 		self._map_boundary = copy.deepcopy(self._smaller_grid_map_boundary)
-		print('len(self._map_boundary): ', len(self._map_boundary))
-
 
 		# print(self._boundary_tree.query_ball_point(self._map_boundary[0], r=0.8 * self._grid_size))
 
@@ -464,6 +465,8 @@ class Node_generator():
 		map_boundary_x = []
 		map_boundary_y = []
 
+		print('self._smaller_grid_map_boundary: ', len(self._smaller_grid_map_boundary))
+
 		for point in self._smaller_grid_map_boundary:
 			map_boundary_x.append(point[0])
 			map_boundary_y.append(point[1])
@@ -479,9 +482,9 @@ class Node_generator():
 
 		for i in range(len(self._node_index_list)):
 			# if i == 3:
-			cir1 = Circle(xy = (self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1]), radius=self._node_radius, alpha=0.3)
+			# cir1 = Circle(xy = (self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1]), radius=self._node_radius, alpha=0.3)
 			plt.scatter(self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1], color='#00FFFF')
-			ax.add_patch(cir1)
+			# ax.add_patch(cir1)
 		print('len(self._node_index_list): ', len(self._node_index_list))
 
 
@@ -575,8 +578,8 @@ class Node_generator():
 			self._general_y = point['y']
 			self._reachable_position.append([point['z'], point['x']])
 
-		print('self._reachable_list: ', len(self._reachable_list))
-		print('self._reachable_position: ', len(self._reachable_position))
+		# print('self._reachable_list: ', len(self._reachable_list))
+		# print('self._reachable_position: ', len(self._reachable_position))
 
 		return
 
@@ -706,9 +709,6 @@ class Node_generator():
 		self._node_index_list = list(set(self._node_index_list))
 		print('self._node_index_list: ', self._node_index_list)
 		return
-
-def test_func():
-	print(11111)
 
 if __name__ == '__main__':
 	pass

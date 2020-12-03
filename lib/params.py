@@ -9,10 +9,10 @@ BAN_TYPE_LIST = ['Floor']   # Ignore non-informative objectType e.g. 'Floor
 SCENE_TYPES = ['Kitchen', 'Living room', 'Bedroom', 'Bathroom']
 SCENE_NUM_PER_TYPE = 30
 # ------------------------------------------------------------------------------
-THIRD_PARTY_PATH = dirname(dirname(abspath(__file__))) + '/3rdparty' # File path for 3rdparty info
-GLOVE_FILE_NAME = 'glove.42B.300d.txt' # file name of glove vector
-glove_embedding = np.load(THIRD_PARTY_PATH + '/' + 'glove_embedding.npy', allow_pickle='TRUE').item() # all Glove word Embedding vectors
-THOR_2_VEC = np.load(THIRD_PARTY_PATH + '/' + 'THOR_2_VEC.npy', allow_pickle='TRUE').item() # objectType embedding using GLoVe vectors
+# THIRD_PARTY_PATH = dirname(dirname(abspath(__file__))) + '/3rdparty' # File path for 3rdparty info
+# GLOVE_FILE_NAME = 'glove.42B.300d.txt' # file name of glove vector
+# glove_embedding = np.load(THIRD_PARTY_PATH + '/' + 'glove_embedding.npy', allow_pickle='TRUE').item() # all Glove word Embedding vectors
+# THOR_2_VEC = np.load(THIRD_PARTY_PATH + '/' + 'THOR_2_VEC.npy', allow_pickle='TRUE').item() # objectType embedding using GLoVe vectors
 
 INFO_FILE_PATH = dirname(dirname(abspath(__file__))) + '/AI2THOR_info' # File path for info of iTHOR Env.
 obj_2_idx_dic = np.load(INFO_FILE_PATH + '/' + 'obj_2_idx_dic.npy', allow_pickle='TRUE').item()
@@ -21,11 +21,11 @@ OBJ_TYPE_NUM = len(idx_2_obj_list) # Maximum numbers of objectType in iTHOR Env.
 # ------------------------------------------------------------------------------
 ITHOR_FLOOR_PLANS = np.load(INFO_FILE_PATH + '/' + 'iTHOR_FloorPlan.npy') # list of floorplan name for iTHOR
 ROBOTHOR_FLOOR_PLANS = np.load(INFO_FILE_PATH + '/' + 'RoboTHOR_FloorPlan.npy') # list of floorplan name for RoboTHOR
-# ------------------------------------------------------------------------------
-THIRD_PARTY_PATH = dirname(dirname(abspath(__file__))) + '/3rdparty' # File path for 3rdparty info
-GLOVE_FILE_NAME = 'glove.42B.300d.txt' # file name of glove vector
-glove_embedding = np.load(THIRD_PARTY_PATH + '/' + 'glove_embedding.npy', allow_pickle='TRUE').item() # all Glove word Embedding vectors
-THOR_2_VEC = np.load(THIRD_PARTY_PATH + '/' + 'THOR_2_VEC.npy', allow_pickle='TRUE').item() # objectType embedding using GLoVe vectors
+# # ------------------------------------------------------------------------------
+# THIRD_PARTY_PATH = dirname(dirname(abspath(__file__))) + '/3rdparty' # File path for 3rdparty info
+# GLOVE_FILE_NAME = 'glove.42B.300d.txt' # file name of glove vector
+# glove_embedding = np.load(THIRD_PARTY_PATH + '/' + 'glove_embedding.npy', allow_pickle='TRUE').item() # all Glove word Embedding vectors
+# THOR_2_VEC = np.load(THIRD_PARTY_PATH + '/' + 'THOR_2_VEC.npy', allow_pickle='TRUE').item() # objectType embedding using GLoVe vectors
 # ------------------------------------------------------------------------------
 PROXIMITY_THRESHOLD = 3 # distance ratio threshold for proximity determination
 CLUSTERING_RADIUS_RATIO = 1.0 # used to cluster drawers and cabinets, increase to allow larger tolerance

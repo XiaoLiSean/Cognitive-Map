@@ -888,7 +888,7 @@ class Dumb_Navigetion():
 		# 	print('self._point_list[nearest_point_index]: ', self._point_list[nearest_point_index])
 
 		if distance_min > 0.5 * self._grid_size:
-			logging.warning('Nowhere to go forward')
+			logging.error('Nowhere to go forward')
 			return (False, -1)
 		if do_move:
 			self._Agent_action.Teleport_agent(position=self._point_list[nearest_point_index], useful=True)

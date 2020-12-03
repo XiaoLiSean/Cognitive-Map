@@ -26,7 +26,7 @@ def is_localized_static(model, device, current_img, goal_img):
     goal_img = goal_img.to(device)
     similarity = COS(model.get_embedding(current_img), model.get_embedding(goal_img)).item()
 
-    return similarity >= 0.93
+    return similarity >= 0.97
 
 # if __name__ == '__main__':
 #     # Prepare model and load checkpoint
