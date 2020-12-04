@@ -185,10 +185,46 @@ def refine_object_info():
     np.save(INFO_FILE_PATH + '/' + 'idx_2_obj_list.npy', obj_list) # Save list as .npy
 
 # --------------------------------------------------------------------------
-# This function is used to check objectType info against official info
-# in ai2thor.allenai.org/ithor/documentation/objects/actionable-properties/#table-of-object-actionable-properties
-def check_object_type():
-    pass
+# This function is used to check if the smallest ithor object is in visibal range but not visible in pixel
+def get_volumn(obj):
+    size = obj['axisAlignedBoundingBox']['size']
+    return size['x']*size['y']*size['z']
+
+def get_smallest_obj_type_and_scene():
+    iTHOR, RoboTHOR = update_floor_plan()
+    controller = Controller()
+    smallest_obj = ''
+    smallest_v = 1e10
+    scene = ''
+    for floor_plan in iTHOR:
+        controller.reset(floor_plan)
+        event = controller.step(action='Pass')
+        # update obj_2_idx_dic.npy and idx_2_obj_list.npy
+        for obj in event.metadata['objects']:
+            volume = get_volumn(obj)
+            if volume < smallest_v:
+                smallest_v = volume
+                smallest_obj = obj
+
+    print(smallest_obj, scene)
+
+def navi_to_smallest_obj():
+    floor_plan = 'FloorPlan314'
+    controller = Controller()
+    controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)
+    controller.reset(floor_plan)
+    pose = {'x': -0.288491577, 'y': 0.9276533, 'z': -1.50499642}
+    controller.step(action='TeleportFull', x=pose['x']+VISBILITY_DISTANCE, y=1.01, z=pose['z'])
+    # time.sleep(5)
+    event = controller.step(action='RotateLeft', degrees=90.0)
+    time.sleep(5)
+    # event = controller.step(action='RotateLeft', degrees=90.0)
+    # time.sleep(5)
+    # event = controller.step(action='RotateLeft', degrees=90.0)
+    # time.sleep(5)
+    # event = controller.step(action='RotateLeft', degrees=90.0)
+    # Pencil FloorPlan314
+
 
 # --------------------------------------------------------------------------
 # Function used to count object numbers by their name
@@ -206,6 +242,7 @@ def update_object():
             if name not in obj_list:
                 obj_list.append(name)
     print(len(obj_list))
+
 
 # --------------------------------------------------------------------------
 # Function used to get moveable but not pickupable objects

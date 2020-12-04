@@ -33,6 +33,7 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
     # Intialize storage for best weights/model and accuracy
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
+    best_loss = 1.0
 
     # --------------------------------------------------------------------------
     # Traning start
@@ -89,13 +90,16 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
             epoch_loss = running_loss * BATCH_SIZE / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
             print('{} Loss: \t {:.4f} \t Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
-            # deep copy the model
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
-                best_model_wts = copy.deepcopy(model.state_dict())
+
+            # deep copy the model: based on minimum loss
+            if phase == 'val':
                 if checkpoints_prefix != None:
-                    FILE = checkpoints_prefix + 'best_fit_acc_' + str(best_acc.item()) + '_epoch_' + str(epoch) + '.pkl'
+                    FILE = checkpoints_prefix + '_loss_' + str(epoch_loss) + '_acc_' + str(epoch_acc.item()) + '_epoch_' + str(epoch) + '.pkl'
                     torch.save(model.state_dict(), FILE)
+                if epoch_acc > best_acc:
+                    best_acc = epoch_acc
+                    best_model_wts = copy.deepcopy(model.state_dict())
+
             # ------------------------------------------------------------------
     # --------------------------------------------------------------------------
     time_elapsed = time.time() - start_time

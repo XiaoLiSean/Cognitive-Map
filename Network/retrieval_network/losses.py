@@ -1,11 +1,11 @@
 import torch
 import torch.nn.functional as F
 from termcolor import colored
-from Network.retrieval_network.params import *
+from Network.retrieval_network.params import BATCH_SIZE
 from Network.retrieval_network.datasets import get_pose_from_name
-import sys
-from os.path import dirname, abspath
 from lib.similarity import view_similarity
+
+COS = torch.nn.CosineSimilarity(dim=1, eps=1e-10)
 
 # ------------------------------------------------------------------------------
 # This function is triplet loss with variable margin alpha defined by view cone overlaps

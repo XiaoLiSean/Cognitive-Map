@@ -286,11 +286,14 @@ class Agent_Sim():
 		img = Image.fromarray(frame, 'RGB')
 		return img
 
-	def save_current_fram(self, FILE_PATH, file_name):
+	def get_current_data(self):
 		img = self.get_current_fram()
-		img.save(FILE_PATH + '/' + file_name + '.png')
-		# Save SG data
 		SG_data = self._SG.get_SG_as_dict()
+		return img, SG_data
+
+	def save_current_fram(self, FILE_PATH, file_name):
+		img, SG_data = self.get_current_data()
+		img.save(FILE_PATH + '/' + file_name + '.png')
 		np.save(FILE_PATH + '/' + file_name + '.npy', SG_data)
 
 	def get_nodes_center(self, visualization=False):
