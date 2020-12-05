@@ -93,34 +93,43 @@ class Node_generator():
 		self._neighbor_nodes_facing = None
 
 		# self.Shuffle_scene()
+		# self.Update_event()
+
+		# self._get_reachable()
+		# self._build_tree()
+		# self._get_cluster_center()
+		# self._build_graph()
+		self.Init_node_generator()
+		# self._assign_obj_cluster()
+
+		# self._get_object()
+		# self._build_obj_tree()
+
+		# self._get_node_vs_obj()
+		# self.Build_node_map()
+
+		# self._node_index_list = [0, 1, 4, 5, 7, 8, 9, 10, 11, 17, 21, 23, 32, 44, 47, 48, 52, 56, 58, 59, 81, 83, 90]
+
+		# self.Get_navigatable_node_pair()
+
+		# self.Get_connected_orientaton_by_overlap_scene()
+
+	def Init_node_generator(self):
 		self.Update_event()
-		
+
 		self._get_reachable()
 		self._build_tree()
 		self._get_cluster_center()
 		self._build_graph()
-		# self._assign_obj_cluster()
-		self._get_object()
-		self._build_obj_tree()
-		self._get_node_vs_obj()
-		self.Build_node_map()
 
-		# self._node_index_list = [0, 1, 4, 5, 7, 8, 9, 10, 11, 17, 21, 23, 32, 44, 47, 48, 52, 56, 58, 59, 81, 83, 90]
-		
-		# self.Get_navigatable_node_pair()
-		
-		self.Get_connected_orientaton_by_overlap_scene()
-		
 	def Get_node_from_position(self, positions):
-		# print('self._reachable_list: ', self._reachable_list)
+
 		rand_reachable = self._reachable_list[0]
 		self._node_index_list = []
 		for position in positions:
 			position_temp = [position[0], rand_reachable[1], position[1]]
-			
+
 			self._node_index_list.append(self._reachable_list.index(position_temp))
-		print('self._node_index_list: ', self._node_index_list)
-		# exit()
 
 	def Get_all_objects_shuffle(self):
 		for _ in range(5):
@@ -130,7 +139,10 @@ class Node_generator():
 			self._get_node_vs_obj()
 
 	def Shuffle_scene(self):
-		shuffle_scene_layout(controller=self._controller, num_attempts=1)
+		shuffle_scene_layout(controller=self._controller)
+
+	def Get_node_list(self):
+		return self._node_index_list
 
 	def Get_neighbor_nodes(self):
 		return self._neighbor_nodes
@@ -139,7 +151,7 @@ class Node_generator():
 		return self._connected_subnodes
 
 	def Get_connected_orientaton_by_overlap_scene(self):
-
+		print('')
 		self.Get_boundary()
 		orientations = [[-60, 60], [30, 150], [120, -120], [-150, -30]]
 
@@ -155,8 +167,9 @@ class Node_generator():
 
 		for node_pos_index in self._node_index_list:
 			node_index = self._node_index_list.index(node_pos_index)
-			# if not node_pos_index == 5:# and not node_pos_index == 4 and not node_pos_index == 5:
+			# if not node_pos_index == 1:# and not node_pos_index == 4 and not node_pos_index == 5:
 			# 	continue
+			# print('node_pos_index: ', node_pos_index)
 
 			for orientation_index in range(len(orientations)):
 
@@ -180,13 +193,15 @@ class Node_generator():
 								if not beam_boundary_index in subnode_visible_boundary[node_index][orientation_index]:
 
 									subnode_visible_boundary[node_index][orientation_index].append(beam_boundary_index)
-									self._test_x.append(self._map_boundary[beam_boundary_index][0])
-									self._test_y.append(self._map_boundary[beam_boundary_index][1])
+									# self._test_x.append(self._map_boundary[beam_boundary_index][0])
+									# self._test_y.append(self._map_boundary[beam_boundary_index][1])
 							break
 				subnode_visible_boundary[node_index][orientation_index] = list(set(subnode_visible_boundary[node_index][orientation_index]))
 				# print('subnode_visible_boundary: ', node_pos_index, orientation_index, len(subnode_visible_boundary[node_index][orientation_index]))
 
 		self._connected_subnodes = []
+		self._neighbor_nodes = []
+		# print('self._neighbor_nodes: ', self._neighbor_nodes)
 		for orientation_index in range(len(orientations)):
 
 			for node_index in range(len(self._node_index_list)):
@@ -208,7 +223,7 @@ class Node_generator():
 					percent_common_view_first = boundary_pts_in_common_num / len(subnode_visible_boundary[node_index][orientation_index])
 					percent_common_view_second = boundary_pts_in_common_num / len(subnode_visible_boundary[other_node_index][orientation_index])
 
-					if percent_common_view_first > 0.6 or percent_common_view_second > 0.6:
+					if percent_common_view_first > 0.7 or percent_common_view_second > 0.7:
 
 						node_pair = [self._node_index_list[node_index], self._node_index_list[other_node_index]]
 						reverse_node_pair = [self._node_index_list[other_node_index], self._node_index_list[node_index]]
@@ -226,18 +241,20 @@ class Node_generator():
 							elif reverse_node_pair in self._neighbor_nodes:
 								if not orientation_index in self._connected_subnodes[self._neighbor_nodes.index(reverse_node_pair)]:
 									self._connected_subnodes[self._neighbor_nodes.index(reverse_node_pair)].append(orientation_index)
-
+		print('self._node_index_list: ', self._node_index_list)
 		print('self._neighbor_nodes: ', self._neighbor_nodes)
 		print('self._connected_subnodes: ', self._connected_subnodes)
 		return self._connected_subnodes
 
 	def Get_boundary(self):
 		all_neighbors_relative = [[0, self._grid_size], [0, -self._grid_size], [self._grid_size, 0], [-self._grid_size, 0]]
+		self._map_boundary = []
+		self._map_boundary_x = []
+		self._map_boundary_y = []
+
 		for index in range(len(self._reachable_position)):
 			all_neighbor_indexes = self._tree.query_ball_point(self._reachable_position[index], r=1.02 * self._grid_size)
-			# print(index)
-			# print(ineighbor_indexes)
-			# exit()
+
 			if len(all_neighbor_indexes) < 5:
 				# self._map_boundary.append(self._reachable_position[index])
 				# self._map_boundary_x.append(self._reachable_position[index][0])
@@ -280,13 +297,16 @@ class Node_generator():
 
 		self._smaller_grid_map_boundary = []
 		for boundary_point_position in self._map_boundary:
+
 			self._smaller_grid_map_boundary.append(boundary_point_position)
 			neighbot_boundary_indexes = self._boundary_tree.query_ball_point(boundary_point_position, r=1.02 * self._grid_size)
 			node_num_to_add = self._grid_size / self._boundary_grid_size - 1
-			# print('node_num_to_add: ', node_num_to_add)
+
 			for neighbor_boundary_index in neighbot_boundary_indexes:
+
 				goal_direction_errors = list(map(lambda x, y: x - y, self._map_boundary[neighbor_boundary_index], boundary_point_position))
 				goal_direction = []
+
 				for goal_direction_error in goal_direction_errors:
 					if goal_direction_error > 0:
 						goal_direction.append(self._boundary_grid_size)
@@ -296,8 +316,10 @@ class Node_generator():
 						goal_direction.append(0)
 
 				for adding_node_index in range(int(node_num_to_add)):
+
 					adding_step = [i * (adding_node_index + 1) for i in goal_direction]
 					adding_smaller_boundary_point = list(map(lambda x, y: x + y, boundary_point_position, adding_step))
+
 					if not adding_smaller_boundary_point in self._smaller_grid_map_boundary:
 						# print('adding_smaller_boundary_point: ', adding_smaller_boundary_point)
 						self._smaller_grid_map_boundary.append(adding_smaller_boundary_point)
@@ -312,8 +334,6 @@ class Node_generator():
 
 		self._boundary_tree = spatial.KDTree(list(zip(self._map_boundary_x, self._map_boundary_y)))
 		self._map_boundary = copy.deepcopy(self._smaller_grid_map_boundary)
-		print(len(self._map_boundary))
-
 
 		# print(self._boundary_tree.query_ball_point(self._map_boundary[0], r=0.8 * self._grid_size))
 
@@ -389,7 +409,7 @@ class Node_generator():
 		node_percent_common = {}
 		for node_index, pos_index in enumerate(node_list):
 			for second_node_index, second_pos_index in enumerate(node_list):
-				
+
 				num_obj_common = 0
 				for obj_index in self._node_vs_visible_obj[pos_index]:
 					if obj_index in self._node_vs_visible_obj[second_pos_index]:
@@ -445,6 +465,8 @@ class Node_generator():
 		map_boundary_x = []
 		map_boundary_y = []
 
+		print('self._smaller_grid_map_boundary: ', len(self._smaller_grid_map_boundary))
+
 		for point in self._smaller_grid_map_boundary:
 			map_boundary_x.append(point[0])
 			map_boundary_y.append(point[1])
@@ -460,9 +482,9 @@ class Node_generator():
 
 		for i in range(len(self._node_index_list)):
 			# if i == 3:
-			cir1 = Circle(xy = (self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1]), radius=self._node_radius, alpha=0.3)
+			# cir1 = Circle(xy = (self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1]), radius=self._node_radius, alpha=0.3)
 			plt.scatter(self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1], color='#00FFFF')
-			ax.add_patch(cir1)
+			# ax.add_patch(cir1)
 		print('len(self._node_index_list): ', len(self._node_index_list))
 
 
@@ -528,6 +550,10 @@ class Node_generator():
 	def _get_reachable(self):
 		self._event = self._controller.step(action='GetReachablePositions')
 		self._reachable = self._event.metadata['actionReturn']
+		self._reachable_list = []
+		self._reachable_position = []
+		self._reachable_x = []
+		self._reachable_y = []
 
 		self._x_max = -10
 		self._x_min = 10
@@ -551,6 +577,9 @@ class Node_generator():
 			self._reachable_y.append(point['x'])
 			self._general_y = point['y']
 			self._reachable_position.append([point['z'], point['x']])
+
+		# print('self._reachable_list: ', len(self._reachable_list))
+		# print('self._reachable_position: ', len(self._reachable_position))
 
 		return
 
@@ -681,15 +710,12 @@ class Node_generator():
 		print('self._node_index_list: ', self._node_index_list)
 		return
 
-def test_func():
-	print(11111)
-
 if __name__ == '__main__':
 	pass
 	# test = test_func
 	# test()
 	# exit()
-	
+
 
 	# node_generator = Node_generator(controller=Agent_action._controller)
 	# node_pair_list = node_generator.Get_neighbor_nodes()
