@@ -223,7 +223,7 @@ class Node_generator():
 					percent_common_view_first = boundary_pts_in_common_num / len(subnode_visible_boundary[node_index][orientation_index])
 					percent_common_view_second = boundary_pts_in_common_num / len(subnode_visible_boundary[other_node_index][orientation_index])
 
-					if percent_common_view_first > 0.7 or percent_common_view_second > 0.7:
+					if percent_common_view_first > 0.5 or percent_common_view_second > 0.5:
 
 						node_pair = [self._node_index_list[node_index], self._node_index_list[other_node_index]]
 						reverse_node_pair = [self._node_index_list[other_node_index], self._node_index_list[node_index]]

@@ -24,6 +24,7 @@ class Planner():
 	def Set_env_from_topo_map(self, topo_map):
 		self._grid_size = copy.deepcopy(topo_map._grid_size)
 		self._graph = topo_map.Export_graph()
+		self._dij_graph = dij.Graph()
 
 	def Set_planning_method(self, using_subnode=False):
 		self._subnode_plan = using_subnode
@@ -139,15 +140,10 @@ class Planner():
 
 		result = dij.find_path(self._dij_graph, current_dij_index, goal_dij_index)
 		path = result.nodes
-		print('Find_node_dij_path: ', 'Find_node_dij_path')
 		path_subnode = []
 		path_subnode.append(current_node_name)
-		print('path_subnode: ', path_subnode)
-
-		print('path: ', path)
 
 		for path_node in path:
-			print('path_node: ', path_node)
 			path_subnode = self._local_subnode_plan(path_subnode=path_subnode, goal_node=path_node)
 			# if path_node == 1:
 			# 	break
@@ -172,20 +168,15 @@ class Planner():
 		if not current_node_num == goal_node:
 
 			moving_orientations = self._find_optimal_orientation(current_node=current_node_num, goal_node=goal_node)
-			print('moving_orientations: ', moving_orientations)
+			# print('moving_orientations: ', moving_orientations)
 			for moving_orientation in moving_orientations:
 
 				attempting_current_node = self.Get_node_name(node_num=current_node_num, orientation=moving_orientation)
 				attempting_goal_node = self.Get_node_name(node_num=goal_node, orientation=moving_orientation)
 
 				if attempting_goal_node in list(self._graph.adj[attempting_current_node].keys()):
-					print('working moving_orientation: ', moving_orientation)
-					# print('path_subnode_temp: ', path_subnode_temp)
-
-					# print('attempting_current_node: ', attempting_current_node)
-					# print()
+					# print('working moving_orientation: ', moving_orientation)
 					path_subnode_temp.extend(self._rotation_planner(current_node_name=current_sunode_name, goal_orientation=moving_orientation))
-					# print('path_subnode_temp: ', path_subnode_temp)
 					path_subnode_temp.append(attempting_goal_node)
 					# print('path_subnode_temp: ', path_subnode_temp)
 					moved_node_name = attempting_goal_node

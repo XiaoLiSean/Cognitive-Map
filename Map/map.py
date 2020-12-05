@@ -240,7 +240,7 @@ class Topological_map():
 			weight_coeff = [0.5, 1, 1, 0.5]
 		weight = sum(node_position_diff)
 
-		if weight > 6 * self._grid_size:
+		if weight > 5 * self._grid_size:
 			weight *= 2
 
 		for orientation in orientations:

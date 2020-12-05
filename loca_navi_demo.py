@@ -12,6 +12,7 @@ import random
 import logging
 import os
 import sys
+import csv
 sys.path.append('./Network')
 sys.path.append('./experiment')
 from Map import *
@@ -43,6 +44,32 @@ class Navigation():
 		self.planner = Planner()
 		self._fail_case_tolerance = 3
 		self._valid_action_type = VALID_ACTION_TYPE
+		self._fail_type = {'translation': 0, 'rotation': 0}
+		self._action_case_num = 0
+		self._action_success_num = 0
+		self._nav_test_case_num = 0
+		self._nav_success_case_num = 0
+		self._node_list = None
+
+	def nav_test(self):
+		for scene_type in range(3, 4):
+			for scene_num in range(27, 28):
+				self.Switch_scene(scene_type=scene_type, scene_num=scene_num)
+				# self.Plotter.show_map(show_nodes=False)
+				for start in range(len(self._node_list)):
+					for goal in range(len(self._node_list)):
+						start_orien = random.choice([0, 90, 180, 270])
+						goal_orien = random.choice([0, 90, 180, 270])
+						# print('start: ', start)
+						# print('goal: ', goal)
+						self.Closed_loop_nav(current_node_index=start, current_orientation=start_orien, goal_node_index=goal, goal_orientation=goal_orien)
+		self.Write_csv()
+
+	def Write_csv(self):
+		nav_test = open('nav_test.csv','a')
+		nav_test_writer = csv.writer(nav_test)
+		nav_test_writer.writerow([self._nav_test_case_num, self._nav_success_case_num,
+								  self._action_case_num, self._action_success_num, self._fail_type['translation'], self._fail_type['rotation']])
 
 	def Update_node_generator(self):
 		self.node_generator.Init_node_generator()
@@ -50,21 +77,21 @@ class Navigation():
 		# self._node_list = [[2.50, -1.50], [2.50, 1.50], [2.00, 1.50]]
 		print('self._node_list: ', self._node_list)
 		self.node_generator.Get_node_from_position(self._node_list)
-		# self.node_generator.Get_connected_orientaton_by_overlap_scene()
-		# self._node_pair_list = self.node_generator.Get_neighbor_nodes()
-		# self._subnodes = self.node_generator.Get_connected_subnodes()
-		self._node_pair_list = [[71, 54], [71, 87], [71, 81], [71, 12], [54, 87], [54, 81], [54, 12], [40, 29], [40, 70], [40, 61],
-		[40, 87], [40, 81], [29, 70], [29, 61], [29, 87], [29, 81], [70, 61], [70, 87], [70, 81], [61, 87], [61, 81], [12, 14],
-		[9, 28], [9, 56], [28, 56], [14, 1], [71, 29], [71, 1], [54, 40], [54, 29], [54, 1], [40, 12], [40, 9], [40, 14], [40, 1],
-		[29, 12], [29, 1], [87, 81], [87, 74], [87, 63], [12, 1], [9, 1], [74, 63], [71, 40], [71, 70],
-		[71, 61], [54, 70], [54, 61], [9, 14], [28, 14], [28, 1], [56, 14], [29, 9], [87, 56], [81, 56], [12, 9], [56, 74], [56, 63]]
+		self.node_generator.Get_connected_orientaton_by_overlap_scene()
+		self._node_pair_list = self.node_generator.Get_neighbor_nodes()
+		self._subnodes = self.node_generator.Get_connected_subnodes()
+		# self._node_pair_list = [[71, 54], [71, 87], [71, 81], [71, 12], [54, 87], [54, 81], [54, 12], [40, 29], [40, 70], [40, 61],
+		# [40, 87], [40, 81], [29, 70], [29, 61], [29, 87], [29, 81], [70, 61], [70, 87], [70, 81], [61, 87], [61, 81], [12, 14],
+		# [9, 28], [9, 56], [28, 56], [14, 1], [71, 29], [71, 1], [54, 40], [54, 29], [54, 1], [40, 12], [40, 9], [40, 14], [40, 1],
+		# [29, 12], [29, 1], [87, 81], [87, 74], [87, 63], [12, 1], [9, 1], [74, 63], [71, 40], [71, 70],
+		# [71, 61], [54, 70], [54, 61], [9, 14], [28, 14], [28, 1], [56, 14], [29, 9], [87, 56], [81, 56], [12, 9], [56, 74], [56, 63]]
 
 		print('self._node_pair_list: ', len(self._node_pair_list))
 
-		self._subnodes = [[0, 1, 3], [0, 2], [0, 2], [0, 1, 2], [0, 2], [0, 2], [0, 1], [0, 1, 2, 3], [0, 2], [0, 1, 2, 3], [0], [0],
-		[0, 1, 2], [0, 1, 2], [0], [0], [0, 1, 2, 3], [0], [0, 1], [0, 3], [0], [0, 1, 2, 3], [0, 2], [0, 2], [0], [0, 2, 3], [1, 2],
-		[1], [1, 2, 3], [1, 2], [1], [1], [1, 3], [1], [1], [1], [1], [1, 2, 3],
-		[1], [1], [1, 2, 3], [1, 2, 3], [1, 3], [2], [2], [2], [2], [2], [2, 3], [2, 3], [2, 3], [2], [3], [3], [3], [3], [3], [3]]
+		# self._subnodes = [[0, 1, 3], [0, 2], [0, 2], [0, 1, 2], [0, 2], [0, 2], [0, 1], [0, 1, 2, 3], [0, 2], [0, 1, 2, 3], [0], [0],
+		# [0, 1, 2], [0, 1, 2], [0], [0], [0, 1, 2, 3], [0], [0, 1], [0, 3], [0], [0, 1, 2, 3], [0, 2], [0, 2], [0], [0, 2, 3], [1, 2],
+		# [1], [1, 2, 3], [1, 2], [1], [1], [1, 3], [1], [1], [1], [1], [1, 2, 3],
+		# [1], [1], [1, 2, 3], [1, 2, 3], [1, 3], [2], [2], [2], [2], [2], [2, 3], [2, 3], [2, 3], [2], [3], [3], [3], [3], [3], [3]]
 
 	def Update_topo_map_env(self):
 		self.topo_map.Set_env_from_Robot(Robot=self.Robot)
@@ -78,7 +105,7 @@ class Navigation():
 	def Switch_scene(self, scene_type, scene_num):
 
 		print('DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()]: ', DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()])
-		door_node_index, door_node_orien=DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()]
+		door_node_index, door_node_orien = DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()]
 		door_node_orien = int(door_node_orien)
 		door_node_name = self.topo_map.Get_node_name(node_num=door_node_index, orientation=door_node_orien)
 		match, current_node_name = self.Node_localize_BF(starting_node_name=door_node_name)
@@ -91,16 +118,19 @@ class Navigation():
 
 		self.Robot.Reset_scene(scene_type=scene_type, scene_num=scene_num)
 
+		self.Update_node_generator()
+		self.Update_topo_map_env()
+		self.Update_planner_env()
+
 		door_node_index_new, door_node_orien_new = DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()]
 		door_node_orien_new = int(door_node_orien_new)
 		door_node_name_new = self.topo_map.Get_node_name(node_num=door_node_index_new, orientation=door_node_orien_new)
 		door_node_position, _, _ = self.topo_map.Get_node_value_by_name(node_name=door_node_name_new)
+		# print('Teleport door_node_position: ', door_node_position)
 		self.Robot._AI2THOR_controller.Teleport_agent(door_node_position)
 		self.Robot._AI2THOR_controller.Rotate_to_degree(goal_degree=self.Robot._AI2THOR_controller.Wrap_to_degree(degree=(door_node_orien_new + 180)))
 
-		self.Update_node_generator()
-		self.Update_topo_map_env()
-		self.Update_planner_env()
+		
 
 	def Task_nav(self, task_objects):
 
@@ -151,12 +181,18 @@ class Navigation():
 
 		return match, node_matched_name
 
-	def Closed_loop_nav(self, current_node_index=0, current_orientation=270, goal_node_index=12, goal_orientation=270):
+	def Closed_loop_nav(self, current_node_index=0, current_orientation=270, goal_node_index=5, goal_orientation=270):
 		path = self.planner.Find_dij_path(current_node_index=current_node_index, current_orientation=current_orientation,
 										  goal_node_index=goal_node_index, goal_orientation=goal_orientation)
 		print('path: ', path)
 
 		nav_result = self.Navigate_by_path(path=path)
+
+		self._nav_test_case_num += 1
+		if nav_result is True:
+			self._nav_success_case_num += 1
+
+		return
 
 		print('nav_result: ', nav_result)
 		# exit()
@@ -200,13 +236,28 @@ class Navigation():
 			goal_frame = node_value['image']
 			goal_pose = {'position': node_value['position'], 'rotation': copy.deepcopy(rotation_standard)}
 			goal_pose['rotation'][1] = orientation
+			goal_action_type = 'translation'
+			if node_path_num > 0:
+				_, orientation_pre = self.topo_map.Get_node_index_orien(path[node_path_num - 1])
+				if not orientation_pre == orientation:
+					goal_action_type = 'rotation'
 
-			if self.Robot.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, max_steps=self.Robot._Navigation_max_try):
+			if goal_action_type == 'rotation':
+				rotation_degree = int(orientation - orientation_pre)
+			else:
+				rotation_degree = None
+
+			self._action_case_num += 1
+			if self.Robot.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, max_steps=self.Robot._Navigation_max_try, rotation_degree=rotation_degree):
 				failed_case = 0
+				
+				self._action_success_num += 1
 				print('reach node ', node_path)
-				time.sleep(1)
+				# time.sleep(1)
 			else:
 				failed_case += 1
+				
+				self._fail_type[goal_action_type] += 1
 				print('failed case: ', failed_case)
 				if failed_case >= self._fail_case_tolerance or node_path == path[-1]:
 					return node_path
@@ -255,8 +306,8 @@ if __name__ == '__main__':
 	navigation.Update_planner_env()
 
 	navigation.Plotter.Update_topo_map(topo_map=navigation.topo_map)
-	navigation.Plotter.show_map()
-
+	navigation.Plotter.show_map(show_edges=True)
+	navigation.nav_test()
 	# navigation.topo_map.show_map(show_nodes=True, show_edges=True)
 	# navigation.node_generator.Plot_map()
 

@@ -120,7 +120,7 @@ class Robot():
 
 		return localized
 
-	def Navigate_by_ActionNet(self, image_goal, goal_pose, max_steps):
+	def Navigate_by_ActionNet(self, image_goal, goal_pose, max_steps, rotation_degree=None):
 
 		goal_position = self._AI2THOR_controller.Get_list_form(pos_or_rot=goal_pose['position'])
 		goal_rotation = self._AI2THOR_controller.Get_list_form(pos_or_rot=goal_pose['rotation'])
@@ -134,6 +134,7 @@ class Robot():
 
 		nearest_index = self._AI2THOR_controller.Self_localize()
 		if nearest_index is False:
+			print('nearest_index is None')
 			return False
 		else:
 			self._AI2THOR_controller._agent_current_pos_index = nearest_index
@@ -146,6 +147,12 @@ class Robot():
 
 			image_current = self._AI2THOR_controller.Get_frame()
 			action_predict = self._action_network.predict(image_current=image_current, image_goal=image_goal)
+			
+			if not rotation_degree is None:
+				if rotation_degree > 0:
+					action_predict[0] = 1
+				else:
+					action_predict[0] = 2
 			
 			if loop_action[action_predict] == pre_action:
 				_, self._AI2THOR_controller._agent_current_pos_index = self._AI2THOR_controller.Random_move_w_weight()
@@ -225,6 +232,7 @@ class AI2THOR_controller():
 		return degree_wrap
 
 	def _get_reachable_list(self):
+		self._point_list = []
 		reachable_dict = self.Get_reachable_coordinate()
 		for reachable_dict_one in reachable_dict:
 			self._point_list.append(list(reachable_dict_one.values()))
@@ -232,6 +240,7 @@ class AI2THOR_controller():
 	def Reset_scene(self, scene_type, scene_num):
 		self._scene_name = self.Get_scene_name(scene_type=scene_type, scene_num=scene_num)
 		self._controller.reset(scene=self._scene_name)
+		self._get_reachable_list()
 
 	def Get_scene_name(self, scene_type=None, scene_num=None):
 
