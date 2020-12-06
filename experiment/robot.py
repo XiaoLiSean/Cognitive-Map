@@ -1,5 +1,6 @@
 from ai2thor.controller import Controller
 from matplotlib import pyplot as plt
+from matplotlib import cm
 from dijkstar import Graph, find_path
 from distutils.util import strtobool
 from sklearn.cluster import KMeans
@@ -44,7 +45,7 @@ logging.basicConfig(level=log_setting[args.log_level])
 
 
 class Robot():
-	def __init__(self, scene_type, scene_num, save_directory, overwrite_data=False, AI2THOR=False, grid_size=0.25, rotation_step=90, sleep_time=0.005, use_test_scene=False, debug=False):
+	def __init__(self, scene_type, scene_num, save_directory, overwrite_data=False, AI2THOR=False, grid_size=0.25, rotation_step=90, sleep_time=0.005, use_test_scene=False, debug=False, server=None, comfirmed=None):
 
 		self._grid_size = grid_size
 		self._sleep_time = sleep_time
@@ -55,6 +56,8 @@ class Robot():
 
 		self._total_action_num = 6
 		self._Navigation_max_try = 18
+
+		self.multithread_node = dict(server=server, comfirmed=comfirmed)
 
 		self.Set_navigation_network()
 		self.Set_localization_network()
@@ -124,6 +127,21 @@ class Robot():
 		current_frame = self._AI2THOR_controller.Get_frame()
 
 		while not self.Navigation_stop(image_goal=image_goal, image_current=current_frame, goal_pose=goal_pose, hardcode=True):
+			# ------------------------------------------------------------------
+			# Send information to plotter
+			# ------------------------------------------------------------------
+			if self.multithread_node['server'] != None:
+				cur_pos = self.Get_robot_position()
+				cur_rot = self.Get_robot_rotation()
+				info = dict(goal_pose=[goal_position[0], goal_position[2], goal_rotation[1]], goal_img=image_goal,
+							cur_pose=[cur_pos['x'], cur_pos['z'], cur_rot['y']], cur_img=current_frame, is_reached=False)
+				self.multithread_node['server'].send(info)
+				while True:
+					if self.multithread_node['comfirmed'].value:
+						self.multithread_node['comfirmed'].value = 0
+						break
+			# ------------------------------------------------------------------
+			# ------------------------------------------------------------------
 
 			image_current = self._AI2THOR_controller.Get_frame()
 			action_predict = self._action_network.predict(image_current=image_current, image_goal=image_goal)
@@ -155,6 +173,21 @@ class Robot():
 			if step >= max_steps:
 				return False
 
+		# ----------------------------------------------------------------------
+		# Send information to plotter
+		# ----------------------------------------------------------------------
+		if self.multithread_node['server'] != None:
+			cur_pos = self.Get_robot_position()
+			cur_rot = self.Get_robot_rotation()
+			info = dict(goal_pose=[goal_position[0], goal_position[2], goal_rotation[1]], goal_img=image_goal,
+						cur_pose=[cur_pos['x'], cur_pos['z'], cur_rot['y']], cur_img=current_frame, is_reached=True)
+			self.multithread_node['server'].send(info)
+			while True:
+				if self.multithread_node['comfirmed'].value:
+					self.multithread_node['comfirmed'].value = 0
+					break
+		# ----------------------------------------------------------------------
+		# ----------------------------------------------------------------------
 		return True
 
 	def Open_close_label_text(self):
@@ -177,12 +210,16 @@ class AI2THOR_controller():
 		self._AI2THOR = AI2THOR
 		self._use_test_scene = use_test_scene
 		self._scene_name = self.Get_scene_name()
+
+		# This code is used to store map in toggle view to visualize the task flow
+		self.store_toggled_map()
+
 		if self._AI2THOR:
 			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW, agentMode='bot')
 		else:
 			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW)
 
-		# self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)
+		self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)
 		self._save_directory = save_directory
 
 		self._overwrite_data = overwrite_data
@@ -195,6 +232,15 @@ class AI2THOR_controller():
 		self._point_list = []
 		self._agent_current_pos_index = None
 		self._get_reachable_list()
+
+	def store_toggled_map(self):
+		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size)
+		self._event = self._controller.step('Pass')
+		self._controller.step({"action": "ToggleMapView"})
+		self._controller.step({"action": "Initialize", "makeAgentsVisible": False,})
+		map = Image.fromarray(self.Get_frame(), 'RGB')
+		map.save('./icon/' + self._scene_name + '.png')
+		self._controller.stop()
 
 	def Wrap_to_degree(self, degree):
 		degree_wrap = copy.deepcopy(degree)
@@ -212,6 +258,26 @@ class AI2THOR_controller():
 	def Reset_scene(self, scene_type, scene_num):
 		self._scene_name = self.Get_scene_name(scene_type=scene_type, scene_num=scene_num)
 		self._controller.reset(scene=self._scene_name)
+
+	def get_scene_info(self):
+		scene_name = self.Get_scene_name()
+		scene_bbox = self.get_scene_bbox()
+		grid_size = self._grid_size
+		reachable_points = self.Get_reachable_coordinate()
+		return (scene_name, scene_bbox, grid_size, reachable_points)
+
+	def get_scene_bbox(self):
+		self.Update_event()
+		data = self._event.metadata['sceneBounds']
+		center_x = data['center']['x']
+		center_z = data['center']['z']
+		size_x = data['size']['x']
+		size_z = data['size']['z']
+
+		bbox_x = [center_x-size_x*0.5, center_x+size_x*0.5, center_x+size_x*0.5, center_x-size_x*0.5, center_x-size_x*0.5]
+		bbox_z = [center_z+size_z*0.5, center_z+size_z*0.5, center_z-size_z*0.5, center_z-size_z*0.5, center_z+size_z*0.5]
+
+		return (bbox_x, bbox_z)
 
 	def Get_scene_name(self, scene_type=None, scene_num=None):
 

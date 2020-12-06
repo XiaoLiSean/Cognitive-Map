@@ -1,166 +1,168 @@
-from ai2thor.controller import Controller
 from matplotlib import pyplot as plt
-from matplotlib.patches import Circle, Rectangle
-from distutils.util import strtobool
+from matplotlib.gridspec import GridSpec
+from matplotlib.patches import Circle, Rectangle, Wedge
+from lib.params import NODES, ADJACENT_NODES_SHIFT_GRID, VISBILITY_DISTANCE
+from termcolor import colored
+from PIL import Image
 import numpy as np
 import time
-import copy
-import random
-import logging
-import os
-import sys
-sys.path.append('../')
-from experiment import *
-from .map import Topological_map
-import networkx as nx
 
 class Plotter():
-	def __init__(self, topo_map=None):
-		self._map = topo_map
+	def __init__(self, scene_name, scene_bbox, grid_size, reachable_points, client=None, comfirmed=None):
+		fig = plt.figure(figsize=(12,8), constrained_layout=True)
+		gs = GridSpec(3, 3, figure=fig)
+		self.toggleMap = fig.add_subplot(gs[0:-1, :])
+		self.currentView = fig.add_subplot(gs[2, 0])
+		self.goalView = fig.add_subplot(gs[2, 1])
+		self.scene_name = scene_name
+		self.scene_bbox = scene_bbox
+		self.grid_size = grid_size
+		self.node_radius = VISBILITY_DISTANCE
+		self.reachable_points = reachable_points
+		self.multithread_node = dict(client=client, comfirmed=comfirmed)
 
-	def Update_topo_map(self, topo_map):
-		self._map = topo_map
+	def is_reachable(self, pi, pj):
+		map = self.reachable_points
+		diff = (np.array(pj) - np.array(pi)) / self.grid_size
+		sign = np.sign(diff)
+		diff = np.abs(diff.astype(int))
+		current_pose = dict(x=pi[0], y=map[0]['y'], z=pi[1])
+		count = 0
+		for i in range(1, diff[0]+1):
+			current_pose['x'] += sign[0]*self.grid_size
+			if current_pose in map:
+				count += 1
+		for j in range(1, diff[1]+1):
+			current_pose['z'] += sign[1]*self.grid_size
+			if current_pose in map:
+				count += 1
+		if count == (diff[0] + diff[1]):
+			return True
 
-	def get_scene_bbox(self):
-		self._map.Update_event()
-		data = self._map._event.metadata['sceneBounds']
-		center_x = data['center']['x']
-		center_z = data['center']['z']
-		size_x = data['size']['x']
-		size_z = data['size']['z']
 
-		bbox_x = [center_x-size_x*0.5, center_x+size_x*0.5, center_x+size_x*0.5, center_x-size_x*0.5, center_x-size_x*0.5]
-		bbox_z = [center_z+size_z*0.5, center_z+size_z*0.5, center_z-size_z*0.5, center_z-size_z*0.5, center_z+size_z*0.5]
+		current_pose = dict(x=pi[0], y=map[0]['y'], z=pi[1])
+		count = 0
+		for j in range(1, diff[1]+1):
+			current_pose['z'] += sign[1]*self.grid_size
+			if current_pose in map:
+				count += 1
+		for i in range(1, diff[0]+1):
+			current_pose['x'] += sign[0]*self.grid_size
+			if current_pose in map:
+				count += 1
+		if count == diff[0] + diff[1]:
+			return True
 
-		return (bbox_x, bbox_z)
+		return False
 
-	def show_map(self, show_nodes=True, show_edges=False, show_weight=False):
-		self._map.Update_event()
+
+	def add_edges(self, nodes):
+		edges = []
+		# Iterature through nodes to generate edges
+		for i in range(len(nodes)-1):
+			node_i = nodes[i]
+			for j in range(i+1, len(nodes)):
+				node_j = nodes[j]
+				diff = np.abs(np.array(node_i) - np.array(node_j))
+				is_edge = False
+
+				if diff[0] < self.node_radius:
+					if diff[1] <= ADJACENT_NODES_SHIFT_GRID * self.grid_size:
+						is_edge = self.is_reachable(node_i, node_j)
+						if is_edge:
+							cost = (diff[0] + diff[1]) / self.grid_size
+							edges.append((node_i, node_j, int(cost)))
+
+
+				if diff[1] < self.node_radius:
+					if diff[0] <= ADJACENT_NODES_SHIFT_GRID * self.grid_size:
+						is_edge = self.is_reachable(node_i, node_j)
+						if is_edge:
+							cost = (diff[0] + diff[1]) / self.grid_size
+							edges.append((node_i, node_j, int(cost)))
+
+
+				if is_edge:
+					self.toggleMap.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0)
+
+	def add_nodes(self):
+		nodes_x = []
+		nodes_y = []
+		points = NODES[self.scene_name]
+		for idx, p in enumerate(points):
+			circ = Circle(xy = (p[0], p[1]), radius=0.2*self.node_radius, alpha=0.3)
+			self.toggleMap.add_patch(circ)
+			nodes_x.append(p[0])
+			nodes_y.append(p[1])
+			self.toggleMap.text(p[0], p[1], str(idx))
+
+		return (nodes_x, nodes_y)
+
+	def show_map(self, show_nodes=True, show_edges=True):
 		# Plot reachable points
-		points = self._map.Get_reachable_coordinate()
+		points = self.reachable_points
 		X = [p['x'] for p in points]
 		Z = [p['z'] for p in points]
 
-		fig, ax = plt.subplots()
+		self.toggleMap.plot(X, Z, 'o', color='lightskyblue',
+			         markersize=5, linewidth=4,
+			         markerfacecolor='white',
+			         markeredgecolor='lightskyblue',
+			         markeredgewidth=2)
 
-		plt.plot(X, Z, 'o', color='lightskyblue',
-		         markersize=5, linewidth=4,
-		         markerfacecolor='white',
-		         markeredgecolor='lightskyblue',
-		         markeredgewidth=2)
-
-		# Plot rectangle bounding the entire scene
-		scene_bbox = self.get_scene_bbox()
-		plt.plot(scene_bbox[0], scene_bbox[1], '-', color='orangered', linewidth=4)
-
-		# Plot objects 2D boxs
-		for obj in self._map._event.metadata['objects']:
-			size = obj['axisAlignedBoundingBox']['size']
-			center = obj['axisAlignedBoundingBox']['center']
-			rect = Rectangle(xy=(center['x'] - size['x']*0.5, center['z'] - size['z']*0.5), width=size['x'], height=size['z'], fill=True, alpha=0.3, color='darkgray', hatch='//')
-			ax.add_patch(rect)
+		self.toggleMap.plot(self.scene_bbox[0], self.scene_bbox[1], '-', color='orangered', linewidth=4)
+		# Overlay map image
+		# self.toggleMap.imshow(plt.imread('icon/' + self.scene_name + '.png'), extent=[self.scene_bbox[0][0], self.scene_bbox[0][1], self.scene_bbox[1][3], self.scene_bbox[1][4]])
 
 		# Setup plot parameters
-		plt.xticks(np.arange(np.floor(min(scene_bbox[0])/self._map._grid_size), np.ceil(max(scene_bbox[0])/self._map._grid_size)+1, 1) * self._map._grid_size, rotation=90)
-		plt.yticks(np.arange(np.floor(min(scene_bbox[1])/self._map._grid_size), np.ceil(max(scene_bbox[1])/self._map._grid_size)+1, 1) * self._map._grid_size)
-		plt.xlabel("x coordnates, [m]")
-		plt.xlabel("z coordnates, [m]")
-		# plt.title("{}: Node radius {} [m]".format(self._scene_name, str(self._node_radius)))
-		plt.xlim(min(scene_bbox[0])-self._map._grid_size, max(scene_bbox[0])+self._map._grid_size)
-		plt.ylim(min(scene_bbox[1])-self._map._grid_size, max(scene_bbox[1])+self._map._grid_size)
-		plt.gca().set_aspect('equal', adjustable='box')
-		plt.grid(True)
-
-		subnodes_offset_x = [0, self._map._grid_size / 2.0, 0, -self._map._grid_size / 2.0]
-		subnodes_offset_y = [self._map._grid_size / 2.0, 0, -self._map._grid_size / 2.0, 0]
-
-		# subnodes_offset_x = [0, 0, 0, 0]
-		# subnodes_offset_y = [self._grid_size / 2.0, 0, -self._grid_size / 2.0, 0]
-
+		self.toggleMap.set_xticks(np.arange(np.floor(min(self.scene_bbox[0])/self.grid_size), np.ceil(max(self.scene_bbox[0])/self.grid_size)+1, 1) * self.grid_size)
+		self.toggleMap.set_yticks(np.arange(np.floor(min(self.scene_bbox[1])/self.grid_size), np.ceil(max(self.scene_bbox[1])/self.grid_size)+1, 1) * self.grid_size)
+		self.toggleMap.set_xticklabels(np.arange(np.floor(min(self.scene_bbox[0])/self.grid_size), np.ceil(max(self.scene_bbox[0])/self.grid_size)+1, 1) * self.grid_size, rotation=90)
+		self.toggleMap.set_xlabel("x coordnates, [m]")
+		self.toggleMap.set_ylabel("z coordnates, [m]")
+		self.toggleMap.set_xlim(min(self.scene_bbox[0])-self.grid_size, max(self.scene_bbox[0])+self.grid_size)
+		self.toggleMap.set_ylim(min(self.scene_bbox[1])-self.grid_size, max(self.scene_bbox[1])+self.grid_size)
+		self.toggleMap.set_aspect('equal', 'box')
+		# plt.gca().set_aspect('equal', adjustable='box')
 
 		# Plot nodes
-		if show_nodes:
-			nodes_x = []
-			nodes_y = []
-			subnodes_x = []
-			subnodes_y = []
+		if show_nodes and self.scene_name in NODES:
+			nodes = self.add_nodes()
+			self.toggleMap.plot(nodes[0], nodes[1], 'o', color="None",
+						        markersize=5, linewidth=4,
+						        markerfacecolor='red',
+						        markeredgecolor="None",
+						        markeredgewidth=2)
+			if show_edges:
+				self.add_edges(NODES[self.scene_name])
 
+		# plt.show(block=False)
+		# ----------------------------------------------------------------------
+		# Plot map and agent motion in real time
+		# ----------------------------------------------------------------------
+		is_initial_map = True
+		rob_icon = Image.open('icon/robot.png')
+		while True:
+			info = self.multithread_node['client'].recv()
+			if not is_initial_map:
+				rob.remove()
+				del rob
+				wedge_cur.remove()
+				del wedge_cur
 
-			for node_name in self._map._graph.nodes:
-				node_position = self._map._graph.nodes[node_name]['position']
-				cir = Circle(xy=(node_position[0], node_position[2]), radius=self._map._node_radius, alpha=0.05)
-				ax.add_patch(cir)
-				cir = Circle(xy=(node_position[0], node_position[2]), radius=self._map._grid_size / 2.0, color='red', alpha=0.3)
-				ax.add_patch(cir)
+			# plot robot icon
+			scale = 2*self.grid_size
+			pose_cur = info['cur_pose']
 
-				# print('node_position: ', node_position)
-				nodes_x.append(node_position[0])
-				nodes_y.append(node_position[2])
-				for i in range(len(subnodes_offset_x)):
-					subnodes_x.append(node_position[0] + subnodes_offset_x[i])
-					subnodes_y.append(node_position[2] + subnodes_offset_y[i])
-			# print('nodes_x: ', nodes_x)
-			# print('nodes_y: ', nodes_y)
-			plt.plot(nodes_x, nodes_y, 'o', color="None",
-			         markersize=5, linewidth=4,
-			         markerfacecolor='red',
-			         markeredgecolor="None",
-			         markeredgewidth=2)
-			plt.plot(subnodes_x, subnodes_y, 'o', color="None",
-			         markersize=3, linewidth=4,
-			         markerfacecolor='red',
-			         markeredgecolor="None",
-			         markeredgewidth=2)
-		if show_edges:
-			for node_name, nbrs in self._map._graph.adj.items():
-				# print('n: ', n)
-				node_position = copy.deepcopy(self._map._graph.nodes[node_name]['position'])
+			rob = self.toggleMap.imshow(rob_icon.rotate(-pose_cur[2]), extent=[pose_cur[0] - scale, pose_cur[0] + scale, pose_cur[1] - scale, pose_cur[1] + scale])
+			# plot current robot field of view
+			wedge_cur = Wedge((pose_cur[0], pose_cur[1]), 1.2*self.grid_size, - pose_cur[2] + 90 - 60, - pose_cur[2] + 90 + 60, width=self.grid_size, color='red')
+			self.toggleMap.add_patch(wedge_cur)
 
-				node_num, node_orien = self._map.Get_node_index_orien(node_name)
+			plt.show(block=False)
+			plt.pause(1)
 
+			self.multithread_node['comfirmed'].value = 1
+			is_initial_map = False
 
-				orientation_index = self._map._orientations.index(node_orien)
-				node_position[0] += subnodes_offset_x[orientation_index]
-				node_position[2] += subnodes_offset_y[orientation_index]
-				# print('------------------------------')
-				# print('node_name: ', node_name)
-				# print('node_orien: ', node_orien)
-				# print('node_offset: ', subnodes_offset_x[orientation_index], subnodes_offset_y[orientation_index])
-
-
-				for neighbor_node_name, weight_dict in nbrs.items():
-
-					neighbor_node_position = copy.deepcopy(self._map._graph.nodes[neighbor_node_name]['position'])
-
-					neighbor_node_num, neighbor_node_orien = self._map.Get_node_index_orien(neighbor_node_name)
-					# if not node_num == neighbor_node_num:
-					# 	continue
-
-					neighbor_orientation_index = self._map._orientations.index(neighbor_node_orien)
-					neighbor_node_position[0] += subnodes_offset_x[neighbor_orientation_index]
-					neighbor_node_position[2] += subnodes_offset_y[neighbor_orientation_index]
-					# print('neighbor_node_name: ', neighbor_node_name)
-					# print('neighbor_node_offset: ', subnodes_offset_x[neighbor_orientation_index], subnodes_offset_y[neighbor_orientation_index])
-					# print('node_position: ', node_position)
-					# print('neighbor_node_position: ', neighbor_node_position)
-					ax.plot([node_position[0], neighbor_node_position[0]], [node_position[2], neighbor_node_position[2]], 'r--', linewidth=2.0)
-					if show_weight:
-						ax.text((node_position[0]+neighbor_node_position[0]) / 2.0, (node_position[2]+neighbor_node_position[2]) / 2.0, weight_dict['weight'], size=6,
-					        ha="center", va="center",
-					        bbox=dict(boxstyle="round",
-					                  ec=(0.5, 0.25, 0.25),
-					                  fc=(0.5, 0.4, 0.4),
-					                  )
-					        )
-
-				# print('nbrs: ', nbrs)
-				# print('weight: ', nbrs[])
-		# ax.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0)
-		# ax.text((node_i[0]+node_j[0]) / 2.0, (node_i[1]+node_j[1]) / 2.0, int(cost), size=8,
-		#         ha="center", va="center",
-		#         bbox=dict(boxstyle="round",
-		#                   ec=(1., 0.5, 0.5),
-		#                   fc=(1., 0.8, 0.8),
-		#                   )
-		#         )
 		plt.show()
