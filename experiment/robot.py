@@ -132,27 +132,26 @@ class Robot():
 		move_action = [0, 3, 4, 5]
 		rotation_action = [1, 2]
 
-		nearest_index = self._AI2THOR_controller.Self_localize()
-		if nearest_index is False:
-			print('nearest_index is None')
-			return False
-		else:
-			self._AI2THOR_controller._agent_current_pos_index = nearest_index
+		self._AI2THOR_controller.Self_localize()
 
 		step = 0
 		self._AI2THOR_controller.Update_event()
 		current_frame = self._AI2THOR_controller.Get_frame()
+
+		if not rotation_degree is None:
+			rotation_move = False
 
 		while not self.Navigation_stop(image_goal=image_goal, image_current=current_frame, goal_pose=goal_pose, hardcode=True):
 
 			image_current = self._AI2THOR_controller.Get_frame()
 			action_predict = self._action_network.predict(image_current=image_current, image_goal=image_goal)
 			
-			if not rotation_degree is None:
+			if not rotation_degree is None and not rotation_move:
 				if rotation_degree > 0:
 					action_predict[0] = 1
 				else:
 					action_predict[0] = 2
+				rotation_move = True
 			
 			if loop_action[action_predict] == pre_action:
 				_, self._AI2THOR_controller._agent_current_pos_index = self._AI2THOR_controller.Random_move_w_weight()
@@ -190,7 +189,7 @@ class Robot():
 		return self._AI2THOR_controller.Get_agent_position()
 
 	def Get_robot_rotation(self):
-		return self._AI2THOR_controller.Get_agent_rotation()
+		return self._AI2THOR_controller.Get_agent_orientation()
 
 
 class AI2THOR_controller():
@@ -220,8 +219,18 @@ class AI2THOR_controller():
 		self._action_label_text_file = None
 		self._action_type = {'INVALID_ACTION': -1, 'MOVE_FORWARD': 0, 'TURN_RIGHT': 1, 'TURN_LEFT': 2, 'MOVE_BACKWARD': 3, 'MOVE_RIGHT': 4, 'MOVE_LEFT': 5}
 		self._point_list = []
+		
 		self._agent_current_pos_index = None
+		self._agent_current_orientation = None
+		
 		self._get_reachable_list()
+		self.Self_localize()
+
+	def Get_agent_current_pos_index(self):
+		return self._agent_current_pos_index
+
+	def Get_agent_current_orientation(self):
+		return self._agent_current_orientation
 
 	def Wrap_to_degree(self, degree):
 		degree_wrap = copy.deepcopy(degree)
@@ -241,6 +250,7 @@ class AI2THOR_controller():
 		self._scene_name = self.Get_scene_name(scene_type=scene_type, scene_num=scene_num)
 		self._controller.reset(scene=self._scene_name)
 		self._get_reachable_list()
+		self.Self_localize()
 
 	def Get_scene_name(self, scene_type=None, scene_num=None):
 
@@ -276,26 +286,24 @@ class AI2THOR_controller():
 		return success, self._agent_current_pos_index
 
 	def Move_navigation_specialized(self, starting_point_index, direction='forward', move=False):
-		current_orientation = self.Get_agent_rotation()['y']
+
 		current_position = self._point_list[starting_point_index]
 
 		if direction.lower() == 'forward':
-			moving_direction = {0: [0, 0, 1], 1: [1, 0, 0], 2: [0, 0, -1], 3: [-1, 0, 0]}
+			moving_direction = {0: [0, 0, 1], 90: [1, 0, 0], 180: [0, 0, -1], 270: [-1, 0, 0]}
 		if direction.lower() == 'backward':
-			moving_direction = {0: [0, 0, -1], 1: [-1, 0, 0], 2: [0, 0, 1], 3: [1, 0, 0]}
+			moving_direction = {0: [0, 0, -1], 90: [-1, 0, 0], 180: [0, 0, 1], 270: [1, 0, 0]}
 		if direction.lower() == 'right':
-			moving_direction = {0: [1, 0, 0], 1: [0, 0, -1], 2: [-1, 0, 0], 3: [0, 0, 1]}
+			moving_direction = {0: [1, 0, 0], 90: [0, 0, -1], 180: [-1, 0, 0], 270: [0, 0, 1]}
 		if direction.lower() == 'left':
-			moving_direction = {0: [-1, 0, 0], 1: [0, 0, 1], 2: [1, 0, 0], 3: [0, 0, -1]}
+			moving_direction = {0: [-1, 0, 0], 90: [0, 0, 1], 180: [1, 0, 0], 270: [0, 0, -1]}
 
 		moving_step = {}
 		for key in list(moving_direction.keys()):
 			moving_step[key] = map(lambda x: x * self._grid_size, moving_direction[key])
 
-		heading_direction_index = int(np.floor((current_orientation - 45) / 90) + 1)
-		if current_orientation < 45 or current_orientation > 315:
-			heading_direction_index = 0
-		moving_point = list(map(lambda x, y: x + y, current_position, moving_step[heading_direction_index]))
+		heading_direction = self.Get_current_direction()
+		moving_point = list(map(lambda x, y: x + y, current_position, moving_step[heading_direction]))
 		closest_point_index = self.Node_localize(node_position=moving_point)
 
 		if closest_point_index is False:
@@ -304,8 +312,21 @@ class AI2THOR_controller():
 			self.Teleport_agent(position=self._point_list[closest_point_index], save_image=False)
 		return (True, closest_point_index)
 
-	def Self_localize(self):
-		return self.Node_localize(node_position=self.Get_agent_position())
+	def Get_current_direction(self):
+
+		current_orientation = self.Get_agent_orientation()['y']
+		heading_direction_index = int(np.floor((current_orientation - 45) / 90) + 1)
+		if current_orientation < 45 or current_orientation > 315:
+			heading_direction_index = 0
+		return heading_direction_index * 90
+
+	def Self_localize(self, orientation_only=False, direction_correction=False):
+		self._agent_current_orientation = self.Get_current_direction()
+		if direction_correction:
+			self.Unit_rotate(degree=self._agent_current_orientation-self.Get_agent_orientation()['y'])
+		if orientation_only:
+			return
+		self._agent_current_pos_index = self.Node_localize(node_position=self.Get_agent_position())
 
 	def Node_localize(self, node_position):
 
@@ -322,6 +343,7 @@ class AI2THOR_controller():
 
 		if distance_search_min > 0.5 * self._grid_size:
 			logging.warning('Can not find starting point in point list')
+			# print('Can not localize')
 			return False
 		return nearest_index
 
@@ -366,7 +388,7 @@ class AI2THOR_controller():
 		self.Update_event()
 		return self._event.metadata['agent']['position']
 
-	def Get_agent_rotation(self):
+	def Get_agent_orientation(self):
 		self.Update_event()
 		return self._event.metadata['agent']['rotation']
 
@@ -390,15 +412,17 @@ class AI2THOR_controller():
 		return pos_or_rot_list
 
 	def Rotate_to_degree(self, goal_degree):
-		current_orientation = self.Get_agent_rotation()['y']
+		current_orientation = self.Get_agent_orientation()['y']
 		orientation_error = goal_degree - current_orientation
 		self.Unit_rotate(orientation_error)
 
-	def Teleport_agent(self, position, save_image=False):
+	def Teleport_agent(self, position, position_localize=False, save_image=False):
 		self.Update_event()
 
 		position_list = self.Get_list_form(pos_or_rot=position)
 		self._event = self._controller.step(action='Teleport', x=position_list[0], y=position_list[1], z=position_list[2])
+		if position_localize:
+			self.Self_localize()
 
 		if save_image:
 			self._Save_RGB_label(self._action_type['INVALID_ACTION'])
@@ -421,19 +445,21 @@ class AI2THOR_controller():
 		return 'MOVE_Right'
 
 	def Rotate_to_degree(self, goal_degree):
-		current_orientation = self.Get_agent_rotation()['y']
+		current_orientation = self.Get_agent_orientation()['y']
 		orientation_error = goal_degree - current_orientation
 		self.Unit_rotate(orientation_error)
 
 	def Unit_rotate(self, degree):
-		degree_corrected = degree
+		degree_corrected = copy.deepcopy(degree)
 		while degree_corrected > 180:
 			degree_corrected -= 360
 		while degree_corrected < -180:
 			degree_corrected += 360
 		if degree_corrected > 0:
 			self._event = self._controller.step(action='RotateRight', degrees=np.abs(degree_corrected))
+			self.Self_localize(orientation_only=True)
 			return 'TURN_RIGHT'
 		else:
 			self._event = self._controller.step(action='RotateLeft', degrees=np.abs(degree_corrected))
+			self.Self_localize(orientation_only=True)
 			return 'TURN_LEFT'

@@ -146,7 +146,7 @@ class Topological_map():
 		self._reachable = self._event.metadata['actionReturn']
 		return self._event.metadata['actionReturn']
 
-	def Get_agent_rotation(self):
+	def Get_agent_orientation(self):
 		self.Update_event()
 		return self._event.metadata['agent']['rotation']
 

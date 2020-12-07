@@ -127,7 +127,7 @@ class Navigation():
 		door_node_name_new = self.topo_map.Get_node_name(node_num=door_node_index_new, orientation=door_node_orien_new)
 		door_node_position, _, _ = self.topo_map.Get_node_value_by_name(node_name=door_node_name_new)
 		# print('Teleport door_node_position: ', door_node_position)
-		self.Robot._AI2THOR_controller.Teleport_agent(door_node_position)
+		self.Robot._AI2THOR_controller.Teleport_agent(door_node_position, position_localize=True)
 		self.Robot._AI2THOR_controller.Rotate_to_degree(goal_degree=self.Robot._AI2THOR_controller.Wrap_to_degree(degree=(door_node_orien_new + 180)))
 
 		
@@ -181,7 +181,11 @@ class Navigation():
 
 		return match, node_matched_name
 
-	def Closed_loop_nav(self, current_node_index=0, current_orientation=270, goal_node_index=5, goal_orientation=270):
+	def Closed_loop_nav(self, goal_node_index=5, goal_orientation=270, current_node_index=None, current_orientation=None):
+
+		if current_node_index is None and current_orientation is None:
+			current_node_index = self.Robot._AI2THOR_controller.Get_agent_current_pos_index()
+			current_orientation = self.Robot._AI2THOR_controller.Get_agent_current_orientation()
 		path = self.planner.Find_dij_path(current_node_index=current_node_index, current_orientation=current_orientation,
 										  goal_node_index=goal_node_index, goal_orientation=goal_orientation)
 		print('path: ', path)
@@ -221,7 +225,7 @@ class Navigation():
 		init_position = self.topo_map.Get_node_value_dict_by_name(path[0])['position']
 		_, orientation = self.topo_map.Get_node_index_orien(path[0])
 
-		self.Robot._AI2THOR_controller.Teleport_agent(init_position)
+		self.Robot._AI2THOR_controller.Teleport_agent(init_position, position_localize=True)
 		self.Robot._AI2THOR_controller.Rotate_to_degree(orientation)
 
 		rotation_standard = list(self.Robot.Get_robot_rotation().values())
