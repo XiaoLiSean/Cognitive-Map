@@ -104,6 +104,23 @@ class Robot():
 
 		return localized
 
+	# --------------------------------------------------------------------------
+	# Send information to plotter
+	# --------------------------------------------------------------------------
+	def send_msg_to_client(self, image_goal, goal_position, goal_rotation):
+		if self.multithread_node['server'] != None:
+			current_frame = self._AI2THOR_controller.Get_frame()
+			cur_pos = self.Get_robot_position()
+			cur_rot = self.Get_robot_rotation()
+			info = dict(goal_pose=[goal_position[0], goal_position[2], goal_rotation[1]], goal_img=image_goal,
+						cur_pose=[cur_pos['x'], cur_pos['z'], cur_rot['y']], cur_img=current_frame, is_reached=False)
+			self.multithread_node['server'].send(info)
+			while True:
+				if self.multithread_node['comfirmed'].value:
+					self.multithread_node['comfirmed'].value = 0
+					break
+	# --------------------------------------------------------------------------
+
 	def Navigate_by_ActionNet(self, image_goal, goal_pose, max_steps):
 
 		goal_position = self._AI2THOR_controller.Get_list_form(pos_or_rot=goal_pose['position'])
@@ -130,16 +147,7 @@ class Robot():
 			# ------------------------------------------------------------------
 			# Send information to plotter
 			# ------------------------------------------------------------------
-			if self.multithread_node['server'] != None:
-				cur_pos = self.Get_robot_position()
-				cur_rot = self.Get_robot_rotation()
-				info = dict(goal_pose=[goal_position[0], goal_position[2], goal_rotation[1]], goal_img=image_goal,
-							cur_pose=[cur_pos['x'], cur_pos['z'], cur_rot['y']], cur_img=current_frame, is_reached=False)
-				self.multithread_node['server'].send(info)
-				while True:
-					if self.multithread_node['comfirmed'].value:
-						self.multithread_node['comfirmed'].value = 0
-						break
+			self.send_msg_to_client(image_goal, goal_position, goal_rotation)
 			# ------------------------------------------------------------------
 			# ------------------------------------------------------------------
 
@@ -176,16 +184,7 @@ class Robot():
 		# ----------------------------------------------------------------------
 		# Send information to plotter
 		# ----------------------------------------------------------------------
-		if self.multithread_node['server'] != None:
-			cur_pos = self.Get_robot_position()
-			cur_rot = self.Get_robot_rotation()
-			info = dict(goal_pose=[goal_position[0], goal_position[2], goal_rotation[1]], goal_img=image_goal,
-						cur_pose=[cur_pos['x'], cur_pos['z'], cur_rot['y']], cur_img=current_frame, is_reached=True)
-			self.multithread_node['server'].send(info)
-			while True:
-				if self.multithread_node['comfirmed'].value:
-					self.multithread_node['comfirmed'].value = 0
-					break
+		self.send_msg_to_client(image_goal, goal_position, goal_rotation)
 		# ----------------------------------------------------------------------
 		# ----------------------------------------------------------------------
 		return True
