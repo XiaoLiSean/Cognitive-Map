@@ -425,5 +425,5 @@ class Scene_Graph:
     #---------------------------------------------------------------------------
     # get current scene graph as data
     def get_SG_as_dict(self):
-        data = deepcopy({'in':self._R_in, 'on': self._R_on, 'proximity': self._R_proximity, 'disjoint': self._R_disjoint})
+        data = deepcopy({'in':self._R_in, 'on': self._R_on, 'proximity': self._R_proximity, 'disjoint': self._R_disjoint, 'vec': self._obj_vec})
         return data

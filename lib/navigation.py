@@ -122,6 +122,7 @@ class Navigation():
 		return match, node_matched_name
 
 	def Closed_loop_nav(self, current_node_index=0, current_orientation=270, goal_node_index=5, goal_orientation=270):
+
 		path = self.planner.Find_dij_path(current_node_index=current_node_index, current_orientation=current_orientation,
 										  goal_node_index=goal_node_index, goal_orientation=goal_orientation)
 		print('path: ', path)
@@ -149,6 +150,8 @@ class Navigation():
 				print('repath: ', path)
 
 			nav_result = self.Navigate_by_path(path=path)
+
+		return nav_result
 
 	def Navigate_by_path(self, path):
 

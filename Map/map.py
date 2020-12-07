@@ -12,6 +12,7 @@ import random
 import logging
 import os
 import sys
+from lib.scene_graph_generation import Scene_Graph
 sys.path.append('../')
 from experiment import *
 import networkx as nx
@@ -23,6 +24,7 @@ class Topological_map():
 		self._data = []
 		self._orientations = [0, 90, 180, 270]
 		self._controller = controller
+		self._scene_knowledge_graph = self.get_scene_graph(visible_filter=False)
 		self._neighbor_nodes_pair = neighbor_nodes_pair
 		self._node_index_list = node_index_list
 		self._updated_needed = False
@@ -42,7 +44,7 @@ class Topological_map():
 
 		self._event = None
 
-		self._scene_graph_method = None
+		self._scene_graph_method = self.get_scene_graph
 		self._Unit_rotate_func = None
 		self._Rotate_to_degree_func = None
 		self._Teleport_agent_func = None
@@ -115,7 +117,17 @@ class Topological_map():
 		self._Teleport_agent_func = Teleport_agent
 
 	def Set_scene_graph_method(self, scene_graph_method):
-		self._scene_graph_method = scene_graph_method
+		self._scene_graph_method = self.get_scene_graph
+
+	def get_scene_graph(self, visible_filter=True):
+		SG = Scene_Graph()
+		self.Update_event()
+		if visible_filter:
+			objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
+		else:
+			objs = self._event.metadata['objects']
+		SG.update_from_data(objs)
+		return SG.get_SG_as_dict()
 
 	def Set_Unit_rotate_func(self, Unit_rotate):
 		self._Unit_rotate_func = Unit_rotate
