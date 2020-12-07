@@ -151,7 +151,7 @@ class Planner():
 			path_subnode = self._local_subnode_plan(path_subnode=path_subnode, goal_node=path_node)
 			# if path_node == 1:
 			# 	break
-		
+
 		path_subnode = self._local_subnode_plan(path_subnode=path_subnode, goal_node=goal_node_index, goal_orientation=goal_orientation)
 
 		print('path_subnode: ', path_subnode)

@@ -44,8 +44,8 @@ def iter_test_scene(is_xiao=False, is_yidong=False):
             test_idx_initial = test_idx_end - ( 5 - add_on[idx])
 
         for scene_num in range(test_idx_initial, test_idx_end):
-            robot.reset_scene(scene_type=scene_type, scene_num=scene_num, ToggleMapView=True, Show_doorway=False)
-            robot.show_map(show_nodes=True, show_edges=True)
+            robot.reset_scene(scene_type=scene_type, scene_num=scene_num, ToggleMapView=True, Show_doorway=False, shore_toggle_map=False)
+            robot.show_map(show_nodes=False, show_edges=False)
 
 
 # ------------------------------------------------------------------------------

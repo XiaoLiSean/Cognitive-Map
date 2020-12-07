@@ -60,7 +60,8 @@ class Agent_Sim():
 	def update_event(self):
 		self._event = self._controller.step('Pass')
 		self._SG.reset()
-		self._SG.update_from_data(self._event.metadata['objects'])
+		self._SG.update_from_data([obj for obj in self._event.metadata['objects'] if obj['visible']])
+		# self._SG.visualize_SG()
 
 	def get_agent_position(self):
 		self.update_event()
@@ -74,8 +75,11 @@ class Agent_Sim():
 		self._event = self._controller.step(action='GetReachablePositions')
 		return self._event.metadata['actionReturn']
 
-	def reset_scene(self, scene_type, scene_num, ToggleMapView=False, Show_doorway=False):
+	def reset_scene(self, scene_type, scene_num, ToggleMapView=False, Show_doorway=False, shore_toggle_map=False):
 		if scene_type == 'Kitchen':
+		# This code is used to store map in toggle view to visualize the task flow
+		# self.store_toggled_map()
+
 			add_on = 0
 		elif scene_type == 'Living room':
 			add_on = 200
@@ -102,7 +106,11 @@ class Agent_Sim():
 
 		if ToggleMapView:   # Top view of the map to see the objets layout. issue: no SG can be enerated
 			self._controller.step({"action": "ToggleMapView"})
-			self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)  # Change simulation window size
+			# self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)  # Change simulation window size
+			if shore_toggle_map:
+				self._controller.step({"action": "Initialize", "makeAgentsVisible": False,})
+				map = self.get_current_fram()
+				map.save('./icon/' + self._scene_name + '.png')
 
 		self.update_event()
 
@@ -112,6 +120,19 @@ class Agent_Sim():
 	manually topological map construction
 	'''
 	# --------------------------------------------------------------------------
+	def get_floor_bbox(self):
+		floor = [obj for obj in self._event.metadata['objects'] if obj['objectType'] == 'Floor'][0]
+		data = floor['axisAlignedBoundingBox']
+		center_x = data['center']['x']
+		center_z = data['center']['z']
+		size_x = data['size']['x']
+		size_z = data['size']['z']
+
+		bbox_x = [center_x-size_x*0.5, center_x+size_x*0.5, center_x+size_x*0.5, center_x-size_x*0.5, center_x-size_x*0.5]
+		bbox_z = [center_z+size_z*0.5, center_z+size_z*0.5, center_z-size_z*0.5, center_z-size_z*0.5, center_z+size_z*0.5]
+
+		return (bbox_x, bbox_z)
+
 	def get_scene_bbox(self):
 		data = self._event.metadata['sceneBounds']
 		center_x = data['center']['x']
@@ -239,7 +260,7 @@ class Agent_Sim():
 		         markeredgewidth=2)
 
 		# Plot rectangle bounding the entire scene
-		scene_bbox = self.get_scene_bbox()
+		scene_bbox = self.get_floor_bbox()
 		plt.plot(scene_bbox[0], scene_bbox[1], '-', color='orangered', linewidth=4)
 
 		# Plot objects 2D boxs
@@ -273,7 +294,6 @@ class Agent_Sim():
 
 		plt.show()
 
-
 	# --------------------------------------------------------------------------
 	'''
 	Following functions is used to collect data with and without dynamcis
@@ -286,11 +306,14 @@ class Agent_Sim():
 		img = Image.fromarray(frame, 'RGB')
 		return img
 
-	def save_current_fram(self, FILE_PATH, file_name):
+	def get_current_data(self):
 		img = self.get_current_fram()
-		img.save(FILE_PATH + '/' + file_name + '.png')
-		# Save SG data
 		SG_data = self._SG.get_SG_as_dict()
+		return img, SG_data
+
+	def save_current_fram(self, FILE_PATH, file_name):
+		img, SG_data = self.get_current_data()
+		img.save(FILE_PATH + '/' + file_name + '.png')
 		np.save(FILE_PATH + '/' + file_name + '.npy', SG_data)
 
 	def get_nodes_center(self, visualization=False):

@@ -7,8 +7,9 @@ Network/retrieval_network/datasets
 Network/retrieval_network/image_data_v1
 Network/retrieval_network/image_data_test
 Network/retrieval_network/image_model_best_fit.pkl
-!./Network/retrieval_network/checkpoints/image_siamese_nondynamics_best_fit.pkl
-!./Network/retrieval_network/checkpoints/image_siamese_dynamics_best_fit.pkl
+Network/retrieval_network/checkpoints/
+Network/retrieval_network/checkpoints/image_siamese_nondynamics_best_fit.pkl
+Network/retrieval_network/checkpoints/image_siamese_dynamics_best_fit.pkl
 3rdparty/
 mis/
 *.jpeg
@@ -23,6 +24,8 @@ experiment/data/images/
 .idea/
 .git/
 *.pkl
+*.pickle
+*.npy
 *.csv
 experiment/data/
 experiment/data_long/

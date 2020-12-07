@@ -8,6 +8,19 @@ from progress.bar import Bar
 from Network.retrieval_network.datasets import get_pose_from_name
 from Network.retrieval_network.params import *
 
+
+def to_sparse(x):
+    """ converts dense tensor x to sparse format """
+    x_typename = torch.typename(x).split('.')[-1]
+    sparse_tensortype = getattr(torch.sparse, x_typename)
+
+    indices = torch.nonzero(x)
+    if len(indices.shape) == 0:  # if all elements are zeros
+        return sparse_tensortype(*x.shape)
+    indices = indices.t()
+    values = x[tuple(indices[i] for i in range(indices.shape[0]))]
+    return sparse_tensortype(indices, values, x.size())
+
 # ------------------------------------------------------------------------------
 def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=None):
     """
@@ -20,6 +33,7 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
     # Intialize storage for best weights/model and accuracy
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
+    best_loss = 1.0
 
     # --------------------------------------------------------------------------
     # Traning start
@@ -43,10 +57,12 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
             # Iteration over train/validation dataset
             # ------------------------------------------------------------------
             # loading bar
+            print('----'*6)
             bar = Bar('Processing', max=math.ceil(dataset_sizes[phase]/BATCH_SIZE))
             for batch_idx, (inputs, alphas) in enumerate(data_loaders[phase]):
                 # zero the parameter gradients
                 optimizer.zero_grad()
+                # Case scene graph brach: for triplet data (A,N,P), each of A,N,P have 3 matrices for scene graphs
                 inputs = tuple(input.to(device) for input in inputs) # to GPU
                 alphas = tuple(alpha.to(device) for alpha in alphas) # to GPU
 
@@ -73,15 +89,17 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
             # Epoch loss calculation
             epoch_loss = running_loss * BATCH_SIZE / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
-            print('----'*6)
             print('{} Loss: \t {:.4f} \t Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
-            # deep copy the model
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
-                best_model_wts = copy.deepcopy(model.state_dict())
+
+            # deep copy the model: based on minimum loss
+            if phase == 'val':
                 if checkpoints_prefix != None:
-                    FILE = checkpoints_prefix + 'model_best_fit_acc_' + str(best_acc.item()) + '_epoch_' + str(epoch) + '.pkl'
+                    FILE = checkpoints_prefix + '_loss_' + str(epoch_loss) + '_acc_' + str(epoch_acc.item()) + '_epoch_' + str(epoch) + '.pkl'
                     torch.save(model.state_dict(), FILE)
+                if epoch_acc > best_acc:
+                    best_acc = epoch_acc
+                    best_model_wts = copy.deepcopy(model.state_dict())
+
             # ------------------------------------------------------------------
     # --------------------------------------------------------------------------
     time_elapsed = time.time() - start_time

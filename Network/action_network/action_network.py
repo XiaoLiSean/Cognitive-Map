@@ -79,7 +79,7 @@ class Action_dataset(torch.utils.data.Dataset):
 					shuffle_index_pair_label.append([starting_image_index, end_image_index, action_index])
 					action_num[action_index] += 1
 
-				
+
 				starting_image_index = None
 		# print(shuffle_index_pair_label)
 		return shuffle_index_pair_label
@@ -168,6 +168,8 @@ class Action_network():
 		image_goal_resize = np.resize(resize(image_goal, (300, 300, 3)), (300, 300, 3))
 
 		img = np.concatenate((image_current_resize, image_goal_resize), axis=1)
+		# img = np.concatenate((image_current, image_goal), axis=1)
+
 
 		img = transforms.ToTensor()(img)
 		img_shape = img.shape

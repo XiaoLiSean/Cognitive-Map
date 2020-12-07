@@ -2,6 +2,7 @@ from ai2thor.controller import Controller
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle, Rectangle
 import dijkstar as dij
+from termcolor import colored
 from distutils.util import strtobool
 import numpy as np
 from sklearn.cluster import KMeans
@@ -12,6 +13,7 @@ import random
 import logging
 import os
 import sys
+from lib.scene_graph_generation import Scene_Graph
 sys.path.append('../')
 from experiment import *
 import networkx as nx
@@ -23,6 +25,7 @@ class Topological_map():
 		self._data = []
 		self._orientations = [0, 90, 180, 270]
 		self._controller = controller
+		self._scene_knowledge_graph = self.get_scene_graph(visible_filter=False)
 		self._neighbor_nodes_pair = neighbor_nodes_pair
 		self._node_index_list = node_index_list
 		self._updated_needed = False
@@ -35,14 +38,13 @@ class Topological_map():
 		self._dij_graph = dij.Graph()
 		self._grid_size = 0.25
 		self._node_radius = 1.5
-
-		self._rotation_cost = 0.1
+		self._rotation_cost = 0.0001
 		self._action_direction = {'forward': 0, 'right': 1, 'left': 2, 'backward': 3}
 		self._action_direction_cost_coeff = [0.5, 1, 1, 0.7]
 
 		self._event = None
 
-		self._scene_graph_method = None
+		self._scene_graph_method = self.get_scene_graph
 		self._Unit_rotate_func = None
 		self._Rotate_to_degree_func = None
 		self._Teleport_agent_func = None
@@ -50,10 +52,10 @@ class Topological_map():
 			self.Get_reachable_coordinate()
 		self._subnode_plan = False
 
-	def Set_env_from_Dumb_Navigetion(self, dumb_navigetion):
-		self._controller = dumb_navigetion._Agent_action._controller
-		self.Set_Teleport_agent_func(dumb_navigetion._Agent_action.Teleport_agent)
-		self.Set_Rotate_to_degree_func(dumb_navigetion._Agent_action.Rotate_to_degree)
+	def Set_env_from_Robot(self, Robot):
+		self._controller = Robot._AI2THOR_controller._controller
+		self.Set_Teleport_agent_func(Robot._AI2THOR_controller.Teleport_agent)
+		self.Set_Rotate_to_degree_func(Robot._AI2THOR_controller.Rotate_to_degree)
 
 	def Clear_graph(self):
 		self._graph = nx.Graph()
@@ -115,7 +117,45 @@ class Topological_map():
 		self._Teleport_agent_func = Teleport_agent
 
 	def Set_scene_graph_method(self, scene_graph_method):
-		self._scene_graph_method = scene_graph_method
+		self._scene_graph_method = self.get_scene_graph
+
+	def get_scene_graph(self, visible_filter=True, scan_entire_corn=False):
+		SG = Scene_Graph()
+		self.Update_event()
+
+		if visible_filter:
+			if scan_entire_corn:
+				# Remain to be developed
+				print('----'*20)
+				print(colored('Remain to be developed','red'))
+				print('----'*20)
+				position = self._event.metadata['agent']['position']
+				rotation = self._event.metadata['agent']['rotation']
+				objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
+				objs_add_list = []
+				for _ in range(2):
+					self._controller.step(action='LookDown', degrees=30)
+					self.Update_event()
+					objs_add_list += [obj for obj in self._event.metadata['objects'] if obj['visible']]
+
+				self._controller.step(action='TeleportFull', x=position['x'], y=position['y'], z=position['z'], rotation=rotation, horizon=0.0)
+				for _ in range(2):
+					self._controller.step(action='LookUp', degrees=30)
+					self.Update_event()
+					objs_add_list += [obj for obj in self._event.metadata['objects'] if obj['visible']]
+
+				self._controller.step(action='TeleportFull', x=position['x'], y=position['y'], z=position['z'], rotation=rotation, horizon=0.0)
+				for obj in objs_add_list:
+					if obj not in objs:
+						objs.append(obj)
+			else:
+				objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
+		else:
+			objs = self._event.metadata['objects']
+
+		SG.update_from_data(objs)
+		# SG.visualize_SG()
+		return SG.get_SG_as_dict()
 
 	def Set_Unit_rotate_func(self, Unit_rotate):
 		self._Unit_rotate_func = Unit_rotate
@@ -159,7 +199,6 @@ class Topological_map():
 
 		if not node_index_list is None:
 			self.Set_node_index_list(node_index_list)
-		# print('self._node_index_list: ', self._node_index_list)
 
 		if self._node_index_list is None or len(self._node_index_list) == 0:
 			logging.error('There is no node in map')
@@ -168,13 +207,12 @@ class Topological_map():
 		self.Clear_graph()
 
 		for node_index in range(len(self._node_index_list)):
-			# print('node_index: ', node_index)
 			frames = []
 			scene_graphs = []
 			# print('self._node_index_list[node_index]: ', self._node_index_list[node_index])
 			node_position = list(self._reachable[self._node_index_list[node_index]].values())
 
-			self._Teleport_agent_func(position=node_position, useful=True)
+			self._Teleport_agent_func(position=node_position, save_image=False)
 
 			for orien_index, orientation in enumerate(self._orientations):
 
@@ -219,7 +257,6 @@ class Topological_map():
 		self._graph.add_nodes_from([
 		(self.Get_node_name(node_num, orientation), {'position': position, 'image': frame, 'scene_graph': scene_graph})
 		])
-		# print(self._graph.nodes[self.Get_node_name(node_num, orientation)])
 		return
 
 	def Add_all_edges(self, connected_subnodes=None):
@@ -236,7 +273,6 @@ class Topological_map():
 		second_node_position = list(self._reachable[self._neighbor_nodes_pair[node_pair_index][1]].values())
 
 		node_position_diff = list(map(lambda x, y: np.abs(x - y), first_node_position, second_node_position))
-		# print('node_position_diff: ',node_position_diff)
 		max_diff_index = node_position_diff.index(max(node_position_diff))
 
 		if max_diff_index == 0:
@@ -251,12 +287,11 @@ class Topological_map():
 		# print('self._neighbor_nodes_pair: ', self._neighbor_nodes_pair)
 
 		for orientation in orientations:
-			# print('orientation: ', orientation)
-			# print('weight * weight_coeff[self._orientations.index(orientation)]: ', weight * weight_coeff[orientation])
 
 			self.Add_edge(node_1=self._node_index_list.index(self._neighbor_nodes_pair[node_pair_index][0]), orientation_1=self._orientations[orientation],
-				node_2=self._node_index_list.index(self._neighbor_nodes_pair[node_pair_index][1]), orientation_2=self._orientations[orientation], weight=weight * weight_coeff[orientation])
-		
+						  node_2=self._node_index_list.index(self._neighbor_nodes_pair[node_pair_index][1]), orientation_2=self._orientations[orientation],
+						  weight=weight * weight_coeff[orientation])
+
 		return
 
 	def Get_object_closest_node(self):
@@ -295,190 +330,3 @@ class Topological_map():
 	def Get_node_value(self, node_num, orientation):
 		values = self._graph.nodes[self.Get_node_name(node_num, orientation)]
 		return values['position'], values['image'], values['scene_graph']
-
-	def get_scene_bbox(self):
-		self.Update_event()
-		data = self._event.metadata['sceneBounds']
-		center_x = data['center']['x']
-		center_z = data['center']['z']
-		size_x = data['size']['x']
-		size_z = data['size']['z']
-
-		bbox_x = [center_x-size_x*0.5, center_x+size_x*0.5, center_x+size_x*0.5, center_x-size_x*0.5, center_x-size_x*0.5]
-		bbox_z = [center_z+size_z*0.5, center_z+size_z*0.5, center_z-size_z*0.5, center_z-size_z*0.5, center_z+size_z*0.5]
-
-		return (bbox_x, bbox_z)
-
-	def show_map(self, show_nodes=False, show_edges=False, show_weight=False):
-		self.Update_event()
-		# Plot reachable points
-		points = self.Get_reachable_coordinate()
-		X = [p['x'] for p in points]
-		Z = [p['z'] for p in points]
-
-		fig, ax = plt.subplots()
-
-		plt.plot(X, Z, 'o', color='lightskyblue',
-		         markersize=5, linewidth=4,
-		         markerfacecolor='white',
-		         markeredgecolor='lightskyblue',
-		         markeredgewidth=2)
-
-		# Plot rectangle bounding the entire scene
-		scene_bbox = self.get_scene_bbox()
-		plt.plot(scene_bbox[0], scene_bbox[1], '-', color='orangered', linewidth=4)
-
-		# Plot objects 2D boxs
-		for obj in self._event.metadata['objects']:
-			size = obj['axisAlignedBoundingBox']['size']
-			center = obj['axisAlignedBoundingBox']['center']
-			rect = Rectangle(xy=(center['x'] - size['x']*0.5, center['z'] - size['z']*0.5), width=size['x'], height=size['z'], fill=True, alpha=0.3, color='darkgray', hatch='//')
-			ax.add_patch(rect)
-
-		# Setup plot parameters
-		plt.xticks(np.arange(np.floor(min(scene_bbox[0])/self._grid_size), np.ceil(max(scene_bbox[0])/self._grid_size)+1, 1) * self._grid_size, rotation=90)
-		plt.yticks(np.arange(np.floor(min(scene_bbox[1])/self._grid_size), np.ceil(max(scene_bbox[1])/self._grid_size)+1, 1) * self._grid_size)
-		plt.xlabel("x coordnates, [m]")
-		plt.xlabel("z coordnates, [m]")
-		# plt.title("{}: Node radius {} [m]".format(self._scene_name, str(self._node_radius)))
-		plt.xlim(min(scene_bbox[0])-self._grid_size, max(scene_bbox[0])+self._grid_size)
-		plt.ylim(min(scene_bbox[1])-self._grid_size, max(scene_bbox[1])+self._grid_size)
-		plt.gca().set_aspect('equal', adjustable='box')
-		plt.grid(True)
-
-		subnodes_offset_x = [0, self._grid_size / 2.0, 0, -self._grid_size / 2.0]
-		subnodes_offset_y = [self._grid_size / 2.0, 0, -self._grid_size / 2.0, 0]
-
-		# subnodes_offset_x = [0, 0, 0, 0]
-		# subnodes_offset_y = [self._grid_size / 2.0, 0, -self._grid_size / 2.0, 0]
-		
-
-		# Plot nodes
-		if show_nodes:
-			nodes_x = []
-			nodes_y = []
-			subnodes_x = []
-			subnodes_y = []
-			
-
-			for node_name in self._graph.nodes:
-				node_position = self._graph.nodes[node_name]['position']
-				cir = Circle(xy=(node_position[0], node_position[2]), radius=self._node_radius, alpha=0.05)
-				ax.add_patch(cir)
-				cir = Circle(xy=(node_position[0], node_position[2]), radius=self._grid_size / 2.0, color='red', alpha=0.3)
-				ax.add_patch(cir)
-
-				# print('node_position: ', node_position)
-				nodes_x.append(node_position[0])
-				nodes_y.append(node_position[2])
-				for i in range(len(subnodes_offset_x)):
-					subnodes_x.append(node_position[0] + subnodes_offset_x[i])
-					subnodes_y.append(node_position[2] + subnodes_offset_y[i])
-			print('nodes_x: ', nodes_x)
-			print('nodes_y: ', nodes_y)
-			plt.plot(nodes_x, nodes_y, 'o', color="None",
-			         markersize=5, linewidth=4,
-			         markerfacecolor='red',
-			         markeredgecolor="None",
-			         markeredgewidth=2)
-			plt.plot(subnodes_x, subnodes_y, 'o', color="None",
-			         markersize=3, linewidth=4,
-			         markerfacecolor='red',
-			         markeredgecolor="None",
-			         markeredgewidth=2)
-		if show_edges:
-			for node_name, nbrs in self._graph.adj.items():
-				# print('n: ', n)
-				node_position = copy.deepcopy(self._graph.nodes[node_name]['position'])
-
-				node_num, node_orien = self.Get_node_index_orien(node_name)
-
-
-				orientation_index = self._orientations.index(node_orien)
-				node_position[0] += subnodes_offset_x[orientation_index]
-				node_position[2] += subnodes_offset_y[orientation_index]
-				# print('------------------------------')
-				# print('node_name: ', node_name)
-				# print('node_orien: ', node_orien)
-				# print('node_offset: ', subnodes_offset_x[orientation_index], subnodes_offset_y[orientation_index])
-				
-
-				for neighbor_node_name, weight_dict in nbrs.items():
-
-					neighbor_node_position = copy.deepcopy(self._graph.nodes[neighbor_node_name]['position'])
-
-					neighbor_node_num, neighbor_node_orien = self.Get_node_index_orien(neighbor_node_name)
-					# if not node_num == neighbor_node_num:
-					# 	continue
-
-					neighbor_orientation_index = self._orientations.index(neighbor_node_orien)
-					neighbor_node_position[0] += subnodes_offset_x[neighbor_orientation_index]
-					neighbor_node_position[2] += subnodes_offset_y[neighbor_orientation_index]
-					# print('neighbor_node_name: ', neighbor_node_name)
-					# print('neighbor_node_offset: ', subnodes_offset_x[neighbor_orientation_index], subnodes_offset_y[neighbor_orientation_index])
-					# print('node_position: ', node_position)
-					# print('neighbor_node_position: ', neighbor_node_position)
-					ax.plot([node_position[0], neighbor_node_position[0]], [node_position[2], neighbor_node_position[2]], 'r--', linewidth=2.0)
-					if show_weight:
-						ax.text((node_position[0]+neighbor_node_position[0]) / 2.0, (node_position[2]+neighbor_node_position[2]) / 2.0, weight_dict['weight'], size=6,
-					        ha="center", va="center",
-					        bbox=dict(boxstyle="round",
-					                  ec=(0.5, 0.25, 0.25),
-					                  fc=(0.5, 0.4, 0.4),
-					                  )
-					        )
-
-				# print('nbrs: ', nbrs)
-				# print('weight: ', nbrs[])
-		# ax.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0)
-		# ax.text((node_i[0]+node_j[0]) / 2.0, (node_i[1]+node_j[1]) / 2.0, int(cost), size=8,
-		#         ha="center", va="center",
-		#         bbox=dict(boxstyle="round",
-		#                   ec=(1., 0.5, 0.5),
-		#                   fc=(1., 0.8, 0.8),
-		#                   )
-		#         )
-		plt.show()
-
-
-if __name__ == '__main__':
-
-	Agent_action = Agent_action(AI2THOR=True, scene_type=1, scene_num=1, grid_size=0.25, rotation_step=30, sleep_time=0.1,
-			save_directory='./data')
-
-	# node_generator = Node_generator(controller=Agent_action._controller)
-	# node_pair_list = node_generator.Get_neighbor_nodes()
-	# print('node_pair_list: ', node_pair_list)
-	# subnodes = node_generator.Get_connected_subnodes()
-
-	node_index_list = [0, 129, 1, 16, 18, 157, 42, 181, 196, 215, 90, 221, 95, 225, 232, 110, 114, 116, 246]
-	node_pair_list = [[0, 1], [0, 16], [0, 18], [129, 157], [1, 16], [1, 18], [16, 18], [18, 42], [181, 196], [90, 114], [221, 225], [95, 110], [95, 116], [110, 116],
-	[129, 110], [1, 42], [157, 110], [225, 232], [232, 246], [129, 95], [129, 116], [157, 95], [157, 116]]
-	subnodes = [[0, 1, 2, 3], [0, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [0, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3],
-	[0, 1], [0, 1, 2, 3], [0, 1, 2], [0, 1, 3], [0, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [1, 2, 3], [1], [1, 2, 3], [1, 2, 3], [1, 2, 3], [2, 3], [2, 3], [2], [3]]
-	# map = Topological_map(controller=node_generator._controller, node_index_list=node_generator._node_index_list, neighbor_nodes_pair=node_pair_list)
-	topo_map = Topological_map(controller=Agent_action._controller, node_index_list=node_index_list, neighbor_nodes_pair=node_pair_list)
-	# map.Set_Unit_rotate_func(Agent_action.Unit_rotate)
-	topo_map.init_data()
-	topo_map.Set_Teleport_agent_func(Agent_action.Teleport_agent)
-	topo_map.Set_Rotate_to_degree_func(Agent_action.Rotate_to_degree)
-	topo_map.Add_all_node()
-
-	topo_map.Add_all_edges(connected_subnodes=subnodes)
-
-	for n, nbrs in topo_map._graph.adj.items():
-		print('n: ', n)
-		print('nbrs: ', nbrs)
-		# print('weight: ', nbrs[])
-
-	topo_map.Build_dij_graph()
-
-	path = topo_map.Find_subnode_dij_path(current_node_index=13, current_orientation=0, goal_node_index=18, goal_orientation=90)
-	# print('path: ', path)
-	# print('topo_map._graph: ', topo_map._graph.nodes)
-
-	topo_map.show_map(show_nodes=True, show_edges=True)
-
-	exit()
-
-	
