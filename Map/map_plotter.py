@@ -1,6 +1,7 @@
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Circle, Rectangle, Wedge
+from matplotlib.lines import Line2D
 from lib.params import NODES, ADJACENT_NODES_SHIFT_GRID, VISBILITY_DISTANCE
 from termcolor import colored
 from PIL import Image
@@ -8,17 +9,18 @@ import numpy as np
 import time
 
 class Plotter():
-	def __init__(self, scene_name, scene_bbox, grid_size, reachable_points, client=None, comfirmed=None):
-		fig = plt.figure(figsize=(12,8), constrained_layout=True)
-		gs = GridSpec(3, 3, figure=fig)
-		self.toggleMap = fig.add_subplot(gs[0:-1, :])
-		self.currentView = fig.add_subplot(gs[2, 0])
-		self.goalView = fig.add_subplot(gs[2, 1])
+	def __init__(self, scene_name, scene_bbox, grid_size, reachable_points, objects, client=None, comfirmed=None):
+		self.fig = plt.figure(figsize=(17,8), constrained_layout=True)
+		gs = GridSpec(2, 3, figure=self.fig)
+		self.toggleMap = self.fig.add_subplot(gs[:, 0:-1])
+		self.currentView = self.fig.add_subplot(gs[0, -1])
+		self.goalView = self.fig.add_subplot(gs[1, -1])
 		self.scene_name = scene_name
 		self.scene_bbox = scene_bbox
 		self.grid_size = grid_size
 		self.node_radius = VISBILITY_DISTANCE
 		self.reachable_points = reachable_points
+		self.objects = objects
 		self.multithread_node = dict(client=client, comfirmed=comfirmed)
 
 	def is_reachable(self, pi, pj):
@@ -99,7 +101,9 @@ class Plotter():
 		return (nodes_x, nodes_y)
 
 	def show_map(self, show_nodes=True, show_edges=True):
+		# ----------------------------------------------------------------------
 		# Plot reachable points
+		# ----------------------------------------------------------------------
 		points = self.reachable_points
 		X = [p['x'] for p in points]
 		Z = [p['z'] for p in points]
@@ -113,8 +117,17 @@ class Plotter():
 		self.toggleMap.plot(self.scene_bbox[0], self.scene_bbox[1], '-', color='orangered', linewidth=4)
 		# Overlay map image
 		# self.toggleMap.imshow(plt.imread('icon/' + self.scene_name + '.png'), extent=[self.scene_bbox[0][0], self.scene_bbox[0][1], self.scene_bbox[1][3], self.scene_bbox[1][4]])
+		for obj in self.objects:
+			if obj['objectType'] == 'Floor':
+				continue
+			size = obj['axisAlignedBoundingBox']['size']
+			center = obj['axisAlignedBoundingBox']['center']
+			rect = Rectangle(xy = (center['x'] - size['x']*0.5, center['z'] - size['z']*0.5), width=size['x'], height=size['z'], fill=True, alpha=0.3, color='darkgray', hatch='//')
+			self.toggleMap.add_patch(rect)
 
+		# ----------------------------------------------------------------------
 		# Setup plot parameters
+		# ----------------------------------------------------------------------
 		self.toggleMap.set_xticks(np.arange(np.floor(min(self.scene_bbox[0])/self.grid_size), np.ceil(max(self.scene_bbox[0])/self.grid_size)+1, 1) * self.grid_size)
 		self.toggleMap.set_yticks(np.arange(np.floor(min(self.scene_bbox[1])/self.grid_size), np.ceil(max(self.scene_bbox[1])/self.grid_size)+1, 1) * self.grid_size)
 		self.toggleMap.set_xticklabels(np.arange(np.floor(min(self.scene_bbox[0])/self.grid_size), np.ceil(max(self.scene_bbox[0])/self.grid_size)+1, 1) * self.grid_size, rotation=90)
@@ -122,10 +135,25 @@ class Plotter():
 		self.toggleMap.set_ylabel("z coordnates, [m]")
 		self.toggleMap.set_xlim(min(self.scene_bbox[0])-self.grid_size, max(self.scene_bbox[0])+self.grid_size)
 		self.toggleMap.set_ylim(min(self.scene_bbox[1])-self.grid_size, max(self.scene_bbox[1])+self.grid_size)
+		self.toggleMap.set_title("{}: Node radius {} [m]\n\n\n".format(self.scene_name, str(self.node_radius)))
 		self.toggleMap.set_aspect('equal', 'box')
-		# plt.gca().set_aspect('equal', adjustable='box')
+		legend_elements = [Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='lightskyblue', alpha=0.3, label='Topological Nodes'),
+						   Line2D([0], [0], linestyle='--', color='red', lw=2, label='Topological Edges'),
+						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='red', alpha=0.5, label='Goal Subnodes'),
+						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='yellow', alpha=0.5, label='Robot Pose'),
+						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='green', alpha=0.5, label='Reached Goal Subnodes')]
 
+		self.toggleMap.legend(handles=legend_elements, loc='center', bbox_to_anchor=(0.5, 1.05), fancybox=True, shadow=True, ncol=5)
+		self.toggleMap.grid(True)
+
+		self.goalView.axis('off')
+		self.goalView.set_title('Goal View')
+		self.currentView.axis('off')
+		self.currentView.set_title('Current Robot View')
+
+		# ----------------------------------------------------------------------
 		# Plot nodes
+		# ----------------------------------------------------------------------
 		if show_nodes and self.scene_name in NODES:
 			nodes = self.add_nodes()
 			self.toggleMap.plot(nodes[0], nodes[1], 'o', color="None",
@@ -136,31 +164,78 @@ class Plotter():
 			if show_edges:
 				self.add_edges(NODES[self.scene_name])
 
-		# plt.show(block=False)
+		plt.show(block=False)
 		# ----------------------------------------------------------------------
 		# Plot map and agent motion in real time
 		# ----------------------------------------------------------------------
 		is_initial_map = True
 		rob_icon = Image.open('icon/robot.png')
 		while True:
-			info = self.multithread_node['client'].recv()
+			# ------------------------------------------------------------------
+			# Delect robot icon for new position plot
+			# ------------------------------------------------------------------
 			if not is_initial_map:
 				rob.remove()
 				del rob
 				wedge_cur.remove()
 				del wedge_cur
+				if info['is_reached']:
+					bbox_reached_robot.remove()
+					del bbox_reached_robot
+					bbox_reached_goal.remove()
+					del bbox_reached_goal
+				else:
+					wedge_goal.remove()
+					del wedge_goal
+					bbox_robot.remove()
+					del bbox_robot
+					bbox_goal.remove()
+					del bbox_goal
 
+			info = self.multithread_node['client'].recv()
+			# ------------------------------------------------------------------
 			# plot robot icon
+			# ------------------------------------------------------------------
 			scale = 2*self.grid_size
 			pose_cur = info['cur_pose']
-
 			rob = self.toggleMap.imshow(rob_icon.rotate(-pose_cur[2]), extent=[pose_cur[0] - scale, pose_cur[0] + scale, pose_cur[1] - scale, pose_cur[1] + scale])
 			# plot current robot field of view
-			wedge_cur = Wedge((pose_cur[0], pose_cur[1]), 1.2*self.grid_size, - pose_cur[2] + 90 - 60, - pose_cur[2] + 90 + 60, width=self.grid_size, color='red')
+			wedge_cur = Wedge((pose_cur[0], pose_cur[1]), 1.2*self.grid_size, - pose_cur[2] + 90 - 60, - pose_cur[2] + 90 + 60, width=self.grid_size, color='yellow', alpha=0.5)
 			self.toggleMap.add_patch(wedge_cur)
+			# ------------------------------------------------------------------
+			# Plot Robot goal pose
+			# ------------------------------------------------------------------
+			pose_goal = info['goal_pose']
+			# plot goal robot field of view
+			if info['is_reached']:
+				wedge_goal = Wedge((pose_goal[0], pose_goal[1]), 1.2*self.grid_size, - pose_goal[2] + 90 - 60, - pose_goal[2] + 90 + 60, width=self.grid_size, color='green', alpha=0.5)
+			else:
+				wedge_goal = Wedge((pose_goal[0], pose_goal[1]), 1.2*self.grid_size, - pose_goal[2] + 90 - 60, - pose_goal[2] + 90 + 60, width=self.grid_size, color='red', alpha=0.5)
+
+			self.toggleMap.add_patch(wedge_goal)
+			# ------------------------------------------------------------------
+			# Plot Images
+			# ------------------------------------------------------------------
+			cur_img = self.currentView.imshow(info['cur_img'])
+			goal_img = self.goalView.imshow(info['goal_img'])
+
+			width = info['cur_img'].shape[1]
+			height = info['cur_img'].shape[0]
+			bbox_reached_robot = Rectangle((0.0,0.0), width, height, ec='green', fill=False, linewidth=10)
+			bbox_reached_goal = Rectangle((0.0,0.0), width, height, ec='green', fill=False, linewidth=10)
+			bbox_robot = Rectangle((0.0,0.0), width, height, ec='yellow', fill=False, linewidth=10)
+			bbox_goal = Rectangle((0.0,0.0), width, height, ec='red',  fill=False, linewidth=10)
+
+			if info['is_reached']:
+				self.currentView.add_patch(bbox_reached_robot)
+				self.goalView.add_patch(bbox_reached_goal)
+			else:
+				self.currentView.add_patch(bbox_robot)
+				self.goalView.add_patch(bbox_goal)
+			# ------------------------------------------------------------------
 
 			plt.show(block=False)
-			plt.pause(1)
+			plt.pause(0.5)
 
 			self.multithread_node['comfirmed'].value = 1
 			is_initial_map = False

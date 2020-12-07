@@ -211,9 +211,6 @@ class AI2THOR_controller():
 		self._use_test_scene = use_test_scene
 		self._scene_name = self.Get_scene_name()
 
-		# This code is used to store map in toggle view to visualize the task flow
-		self.store_toggled_map()
-
 		if self._AI2THOR:
 			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW, agentMode='bot')
 		else:
@@ -261,14 +258,16 @@ class AI2THOR_controller():
 
 	def get_scene_info(self):
 		scene_name = self.Get_scene_name()
-		scene_bbox = self.get_scene_bbox()
+		scene_bbox = self.get_floor_bbox()
 		grid_size = self._grid_size
 		reachable_points = self.Get_reachable_coordinate()
-		return (scene_name, scene_bbox, grid_size, reachable_points)
+		objs = self._event.metadata['objects']
+		return (scene_name, scene_bbox, grid_size, reachable_points, objs)
 
-	def get_scene_bbox(self):
+	def get_floor_bbox(self):
 		self.Update_event()
-		data = self._event.metadata['sceneBounds']
+		floor = [obj for obj in self._event.metadata['objects'] if obj['objectType'] == 'Floor'][0]
+		data = floor['axisAlignedBoundingBox']
 		center_x = data['center']['x']
 		center_z = data['center']['z']
 		size_x = data['size']['x']
