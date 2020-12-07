@@ -5,10 +5,10 @@ controller = Controller(scene='FloorPlan28', gridSize=0.25)
 # change starting locations
 controller.step(action='Teleport', x=-2.5, y=0.900998235, z=-3.0)
 time.sleep(1)
-controller.step(action='LookDown')
-time.sleep(1)
-event = controller.step(action='Rotate', rotation=180)
-time.sleep(1)
+event = controller.step(action='Rotate', rotation=270)
+time.sleep(2)
+controller.step(action='LookDown', degrees=30)
+time.sleep(2)
 
 # in FloorPlan28, the agent should now be looking at a mug
 for o in event.metadata['objects']:
@@ -21,18 +21,16 @@ for o in event.metadata['objects']:
         mug_object_id = o['objectId']
         break
 
+controller.step('HideObject', objectId=mug_object_id)
 # the agent now has the Mug in its inventory
 # to put it into the Microwave, we need to open the microwave first
-
+time.sleep(1)
 # move to the microwave
-event = controller.step(action='LookUp')
+event = controller.step(action='LookUp', degrees=50)
 time.sleep(1)
-event = controller.step(action='RotateLeft')
-time.sleep(1)
-event = controller.step(action='MoveLeft', moveMagnitude=0.25 * 4)
-time.sleep(1)
-event = controller.step(action='MoveAhead', moveMagnitude=0.25 * 6)
-time.sleep(1)
+controller.step(action='Teleport', x=-1.0, y=0.900998235, z=-2.0)
+event = controller.step(action='Rotate', rotation=90)
+time.sleep(2)
 
 # the agent should now be looking at the microwave
 for o in event.metadata['objects']:
@@ -45,6 +43,8 @@ for o in event.metadata['objects']:
         receptacle_object_id = o['objectId']
         break
 
+controller.step('UnhideObject', objectId=mug_object_id)
+time.sleep(1)
 # put the object in the microwave
 event = controller.step(
     action='PutObject',

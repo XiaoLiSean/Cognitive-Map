@@ -2,6 +2,7 @@ from ai2thor.controller import Controller
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle, Rectangle
 import dijkstar as dij
+from termcolor import colored
 from distutils.util import strtobool
 import numpy as np
 from sklearn.cluster import KMeans
@@ -119,14 +120,42 @@ class Topological_map():
 	def Set_scene_graph_method(self, scene_graph_method):
 		self._scene_graph_method = self.get_scene_graph
 
-	def get_scene_graph(self, visible_filter=True):
+	def get_scene_graph(self, visible_filter=True, scan_entire_corn=False):
 		SG = Scene_Graph()
 		self.Update_event()
+
 		if visible_filter:
-			objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
+			if scan_entire_corn:
+				# Remain to be developed
+				print('----'*20)
+				print(colored('Remain to be developed','red'))
+				print('----'*20)
+				position = self._event.metadata['agent']['position']
+				rotation = self._event.metadata['agent']['rotation']
+				objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
+				objs_add_list = []
+				for _ in range(2):
+					self._controller.step(action='LookDown', degrees=30)
+					self.Update_event()
+					objs_add_list += [obj for obj in self._event.metadata['objects'] if obj['visible']]
+
+				self._controller.step(action='TeleportFull', x=position['x'], y=position['y'], z=position['z'], rotation=rotation, horizon=0.0)
+				for _ in range(2):
+					self._controller.step(action='LookUp', degrees=30)
+					self.Update_event()
+					objs_add_list += [obj for obj in self._event.metadata['objects'] if obj['visible']]
+
+				self._controller.step(action='TeleportFull', x=position['x'], y=position['y'], z=position['z'], rotation=rotation, horizon=0.0)
+				for obj in objs_add_list:
+					if obj not in objs:
+						objs.append(obj)
+			else:
+				objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
 		else:
 			objs = self._event.metadata['objects']
+
 		SG.update_from_data(objs)
+		# SG.visualize_SG()
 		return SG.get_SG_as_dict()
 
 	def Set_Unit_rotate_func(self, Unit_rotate):
