@@ -154,9 +154,8 @@ class Navigation():
 
 		if current_node_index is None and current_orientation is None:
 			current_node_index = self.Robot._AI2THOR_controller.Get_agent_current_pos_index()
+			current_node_index = self.topo_map._node_index_list.index(current_node_index)
 			current_orientation = self.Robot._AI2THOR_controller.Get_agent_current_orientation()
-			print('current_node_index: ', current_node_index)
-			print('current_orientation: ', current_orientation)
 		path = self.planner.Find_dij_path(current_node_index=current_node_index, current_orientation=current_orientation,
 										  goal_node_index=goal_node_index, goal_orientation=goal_orientation)
 		print('path: ', path)
