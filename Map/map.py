@@ -186,7 +186,7 @@ class Topological_map():
 		self._reachable = self._event.metadata['actionReturn']
 		return self._event.metadata['actionReturn']
 
-	def Get_agent_rotation(self):
+	def Get_agent_orientation(self):
 		self.Update_event()
 		return self._event.metadata['agent']['rotation']
 
@@ -281,7 +281,7 @@ class Topological_map():
 			weight_coeff = [0.5, 1, 1, 0.5]
 		weight = sum(node_position_diff)
 
-		if weight > 6 * self._grid_size:
+		if weight > 5 * self._grid_size:
 			weight *= 2
 
 		# print('self._neighbor_nodes_pair: ', self._neighbor_nodes_pair)

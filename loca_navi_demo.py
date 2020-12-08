@@ -2,6 +2,7 @@ import argparse, copy
 import multiprocessing, time
 from lib.navigation import Navigation
 from Map.map_plotter import Plotter
+from distutils.util import strtobool
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--scene_type", type=int, default=1,  help="Choose scene type for simulation, 1 for Kitchens, 2 for Living rooms, 3 for Bedrooms, 4 for Bathrooms")

@@ -22,6 +22,33 @@ class Navigation():
 		self.planner = Planner()
 		self._fail_case_tolerance = 3
 		self._valid_action_type = VALID_ACTION_TYPE
+		self._fail_type = {'translation': 0, 'rotation': 0}
+		self._action_case_num = 0
+		self._action_success_num = 0
+		self._nav_test_case_num = 0
+		self._nav_success_case_num = 0
+		self._node_list = None
+
+	def nav_test(self):
+		for scene_type in range(3, 4):
+			for scene_num in range(27, 28):
+				self.Switch_scene(scene_type=scene_type, scene_num=scene_num)
+				# self.Plotter.show_map(show_nodes=False)
+				for start in range(len(self._node_list)):
+					for goal in range(len(self._node_list)):
+						start_orien = random.choice([0, 90, 180, 270])
+						goal_orien = random.choice([0, 90, 180, 270])
+						# print('start: ', start)
+						# print('goal: ', goal)
+						self.Closed_loop_nav(current_node_index=start, current_orientation=start_orien, goal_node_index=goal, goal_orientation=goal_orien)
+		self.Write_csv()
+
+	def Write_csv(self):
+		nav_test = open('nav_test.csv','a')
+		nav_test_writer = csv.writer(nav_test)
+		nav_test_writer.writerow([self._nav_test_case_num, self._nav_success_case_num,
+								  self._action_case_num, self._action_success_num, self._fail_type['translation'], self._fail_type['rotation']])
+
 
 	def Update_node_generator(self):
 		self.node_generator.Init_node_generator()
@@ -48,7 +75,7 @@ class Navigation():
 	def Switch_scene(self, scene_type, scene_num):
 
 		print('DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()]: ', DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()])
-		door_node_index, door_node_orien=DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()]
+		door_node_index, door_node_orien = DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()]
 		door_node_orien = int(door_node_orien)
 		door_node_name = self.topo_map.Get_node_name(node_num=door_node_index, orientation=door_node_orien)
 		match, current_node_name = self.Node_localize_BF(starting_node_name=door_node_name)
@@ -61,6 +88,10 @@ class Navigation():
 
 		self.Robot.Reset_scene(scene_type=scene_type, scene_num=scene_num)
 
+		self.Update_node_generator()
+		self.Update_topo_map_env()
+		self.Update_planner_env()
+
 		door_node_index_new, door_node_orien_new = DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()]
 		door_node_orien_new = int(door_node_orien_new)
 		door_node_name_new = self.topo_map.Get_node_name(node_num=door_node_index_new, orientation=door_node_orien_new)
@@ -68,9 +99,7 @@ class Navigation():
 		self.Robot._AI2THOR_controller.Teleport_agent(door_node_position)
 		self.Robot._AI2THOR_controller.Rotate_to_degree(goal_degree=self.Robot._AI2THOR_controller.Wrap_to_degree(degree=(door_node_orien_new + 180)))
 
-		self.Update_node_generator()
-		self.Update_topo_map_env()
-		self.Update_planner_env()
+		
 
 	def Task_nav(self, task_objects):
 
@@ -121,13 +150,22 @@ class Navigation():
 
 		return match, node_matched_name
 
-	def Closed_loop_nav(self, current_node_index=0, current_orientation=270, goal_node_index=5, goal_orientation=270):
+	def Closed_loop_nav(self, goal_node_index=5, goal_orientation=270, current_node_index=None, current_orientation=None):
 
+		if current_node_index is None and current_orientation is None:
+			current_node_index = self.Robot._AI2THOR_controller.Get_agent_current_pos_index()
+			current_orientation = self.Robot._AI2THOR_controller.Get_agent_current_orientation()
 		path = self.planner.Find_dij_path(current_node_index=current_node_index, current_orientation=current_orientation,
 										  goal_node_index=goal_node_index, goal_orientation=goal_orientation)
 		print('path: ', path)
 
 		nav_result = self.Navigate_by_path(path=path)
+
+		self._nav_test_case_num += 1
+		if nav_result is True:
+			self._nav_success_case_num += 1
+
+		return
 
 		print('nav_result: ', nav_result)
 		# exit()
@@ -151,17 +189,15 @@ class Navigation():
 
 			nav_result = self.Navigate_by_path(path=path)
 
-		return nav_result
-
 	def Navigate_by_path(self, path):
 
 		init_position = self.topo_map.Get_node_value_dict_by_name(path[0])['position']
 		_, orientation = self.topo_map.Get_node_index_orien(path[0])
 
-		self.Robot._AI2THOR_controller.Teleport_agent(init_position)
+		self.Robot._AI2THOR_controller.Teleport_agent(init_position, position_localize=True)
 		self.Robot._AI2THOR_controller.Rotate_to_degree(orientation)
 
-		rotation_standard = list(self.Robot.Get_robot_rotation().values())
+		rotation_standard = list(self.Robot.Get_robot_orientation().values())
 
 		failed_case = 0
 
@@ -173,13 +209,28 @@ class Navigation():
 			goal_frame = node_value['image']
 			goal_pose = {'position': node_value['position'], 'rotation': copy.deepcopy(rotation_standard)}
 			goal_pose['rotation'][1] = orientation
+			goal_action_type = 'translation'
+			if node_path_num > 0:
+				_, orientation_pre = self.topo_map.Get_node_index_orien(path[node_path_num - 1])
+				if not orientation_pre == orientation:
+					goal_action_type = 'rotation'
 
-			if self.Robot.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, max_steps=self.Robot._Navigation_max_try):
+			if goal_action_type == 'rotation':
+				rotation_degree = int(orientation - orientation_pre)
+			else:
+				rotation_degree = None
+
+			self._action_case_num += 1
+			if self.Robot.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, max_steps=self.Robot._Navigation_max_try, rotation_degree=rotation_degree):
 				failed_case = 0
+				
+				self._action_success_num += 1
 				print('reach node ', node_path)
-				time.sleep(1)
+				# time.sleep(1)
 			else:
 				failed_case += 1
+				
+				self._fail_type[goal_action_type] += 1
 				print('failed case: ', failed_case)
 				if failed_case >= self._fail_case_tolerance or node_path == path[-1]:
 					return node_path

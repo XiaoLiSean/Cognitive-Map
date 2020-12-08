@@ -24,6 +24,7 @@ class Planner():
 	def Set_env_from_topo_map(self, topo_map):
 		self._grid_size = copy.deepcopy(topo_map._grid_size)
 		self._graph = topo_map.Export_graph()
+		self._dij_graph = dij.Graph()
 
 	def Set_planning_method(self, using_subnode=False):
 		self._subnode_plan = using_subnode
