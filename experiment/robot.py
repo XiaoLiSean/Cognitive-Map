@@ -155,9 +155,9 @@ class Robot():
 
 			if not rotation_degree is None and not rotation_move:
 				if rotation_degree > 0:
-					action_predict[0] = 2
-				else:
 					action_predict[0] = 1
+				else:
+					action_predict[0] = 2
 				rotation_move = True
 
 			if loop_action[action_predict] == pre_action:
@@ -489,6 +489,8 @@ class AI2THOR_controller():
 		self.Unit_rotate(orientation_error)
 
 	def Unit_rotate(self, degree):
+		if np.abs(degree) < 2:
+			return
 		degree_corrected = copy.deepcopy(degree)
 		while degree_corrected > 180:
 			degree_corrected -= 360
