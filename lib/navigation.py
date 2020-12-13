@@ -30,16 +30,14 @@ class Navigation():
 		self._node_list = None
 
 	def nav_test(self):
-		for scene_type in range(3, 4):
-			for scene_num in range(27, 28):
+		for scene_type in range(1, 4):
+			for scene_num in range(26, 28):
 				self.Switch_scene(scene_type=scene_type, scene_num=scene_num)
 				# self.Plotter.show_map(show_nodes=False)
 				for start in range(len(self._node_list)):
 					for goal in range(len(self._node_list)):
 						start_orien = random.choice([0, 90, 180, 270])
 						goal_orien = random.choice([0, 90, 180, 270])
-						# print('start: ', start)
-						# print('goal: ', goal)
 						self.Closed_loop_nav(current_node_index=start, current_orientation=start_orien, goal_node_index=goal, goal_orientation=goal_orien)
 		self.Write_csv()
 
