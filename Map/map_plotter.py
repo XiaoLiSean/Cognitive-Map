@@ -100,7 +100,7 @@ class Plotter():
 
 		return (nodes_x, nodes_y)
 
-	def show_map(self, show_nodes=True, show_edges=True):
+	def show_map(self, show_nodes=True, show_edges=True, show_toggle_map=True):
 		# ----------------------------------------------------------------------
 		# Plot reachable points
 		# ----------------------------------------------------------------------
@@ -116,14 +116,16 @@ class Plotter():
 
 		self.toggleMap.plot(self.scene_bbox[0], self.scene_bbox[1], '-', color='orangered', linewidth=4)
 		# Overlay map image
-		# self.toggleMap.imshow(plt.imread('icon/' + self.scene_name + '.png'), extent=[self.scene_bbox[0][0], self.scene_bbox[0][1], self.scene_bbox[1][3], self.scene_bbox[1][4]])
-		for obj in self.objects:
-			if obj['objectType'] == 'Floor':
-				continue
-			size = obj['axisAlignedBoundingBox']['size']
-			center = obj['axisAlignedBoundingBox']['center']
-			rect = Rectangle(xy = (center['x'] - size['x']*0.5, center['z'] - size['z']*0.5), width=size['x'], height=size['z'], fill=True, alpha=0.3, color='darkgray', hatch='//')
-			self.toggleMap.add_patch(rect)
+		if show_toggle_map:
+			self.toggleMap.imshow(plt.imread('icon/' + self.scene_name + '.png'), extent=[self.scene_bbox[0][0], self.scene_bbox[0][1], self.scene_bbox[1][3], self.scene_bbox[1][4]])
+		else:
+			for obj in self.objects:
+				if obj['objectType'] == 'Floor':
+					continue
+				size = obj['axisAlignedBoundingBox']['size']
+				center = obj['axisAlignedBoundingBox']['center']
+				rect = Rectangle(xy = (center['x'] - size['x']*0.5, center['z'] - size['z']*0.5), width=size['x'], height=size['z'], fill=True, alpha=0.3, color='darkgray', hatch='//')
+				self.toggleMap.add_patch(rect)
 
 		# ----------------------------------------------------------------------
 		# Setup plot parameters
@@ -144,7 +146,8 @@ class Plotter():
 						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='green', alpha=0.5, label='Reached Goal Subnodes')]
 
 		self.toggleMap.legend(handles=legend_elements, loc='center', bbox_to_anchor=(0.5, 1.05), fancybox=True, shadow=True, ncol=5)
-		self.toggleMap.grid(True)
+		if not show_toggle_map:
+			self.toggleMap.grid(True)
 
 		self.goalView.axis('off')
 		self.goalView.set_title('Goal View')

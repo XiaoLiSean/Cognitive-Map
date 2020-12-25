@@ -30,7 +30,8 @@ def navigation_fcn(server, comfirmed, initialized):
 	# Navigation task
 	while True:
 		if initialized.value:
-			navigation.Closed_loop_nav()
+			navigation.Closed_loop_nav(goal_node_index=4, goal_orientation=270)
+			navigation.Closed_loop_nav(goal_node_index=2, goal_orientation=270)
 			break
 
 def visualization_fcn(client, comfirmed, initialized):
