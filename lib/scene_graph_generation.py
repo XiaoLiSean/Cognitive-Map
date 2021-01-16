@@ -3,13 +3,14 @@ from scipy.sparse import lil_matrix, find
 from scipy.sparse import find as find_sparse_idx
 from mpl_toolkits.mplot3d import Axes3D
 from termcolor import colored
+from PIL import Image
 from copy import deepcopy
 from lib.params import *
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import networkx as nx
 import numpy as np
-import sys, time
+import sys, time, io
 
 #-------------------------------------------------------------------------------
 # Function to generate points for plot_surface a cuboid
@@ -256,7 +257,7 @@ class Scene_Graph:
 
     #---------------------------------------------------------------------------
     # Visualize Scene Graph
-    def visualize_SG(self, comfirmed=None):
+    def visualize_SG(self, comfirmed=None, axis=None):
         # comfirm is not none --> this function is used as a client node
         node_list = find_sparse_idx(self._obj_vec)[0]  # objectType/Node index list
         edges = []
@@ -272,17 +273,24 @@ class Scene_Graph:
             j_list = find_sparse_idx(R)[1] # index for obj_j
             for idx in range(len(i_list)):
                 edges.append([str(i_list[idx]), str(j_list[idx])])
-                edge_labels[(str(i_list[idx]), str(j_list[idx]))] = edge_type[k]
+                if i_list[idx] == j_list[idx]:
+                    edge_labels[(str(i_list[idx]), str(j_list[idx]))] = ''
+                else:
+                    edge_labels[(str(i_list[idx]), str(j_list[idx]))] = edge_type[k]
 
         # Construct Node-Edge graph
         G = nx.DiGraph(directed=True)
         G.add_edges_from(edges)
         pos = nx.spring_layout(G)
-        #fig = plt.figure()
-        nx.draw(G, pos, edge_color='black', width=2, linewidths=1,
-                node_size=1500, node_color='skyblue', alpha=0.9,
+
+        nx.draw(G, pos, edge_color='black',
+                node_color='skyblue', alpha=0.9, ax=axis,
                 labels={node:idx_2_obj_list[int(node)] for node in G.nodes()})
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='red')
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='red', ax=axis)
+
+        if axis != None:
+            return
+
         if comfirmed is None:
             plt.show() # plt.show() is a blocking function...
 
@@ -361,14 +369,30 @@ class Scene_Graph:
     #---------------------------------------------------------------------------
     # Input object data 'event.metadata['objects']'
     def update_from_data(self, objs, visualization_on=False, comfirmed=None):
+        #-----------------------------------------------------------------------
         # Group up objects and indexing instances
         objs = group_up(objs)
+        #-----------------------------------------------------------------------
+        # update the adjancency matrices at entity [i,i] which represents the occurence of object i
+        # update the self._obj_vec
+        for obj in objs:
+            if obj['objectType'] in BAN_TYPE_LIST or obj['objectType'] not in idx_2_obj_list:  # Ignore non-informative objectType e.g. 'Floor' and abnormal obj
+                continue
+            idx = self.get_obj_idx(obj)
+            self._obj_vec[idx, 0] = True
+            self._R_on[idx, idx] = True
+            self._R_in[idx, idx] = True
+            self._R_proximity[idx, idx] = True
+            self._R_disjoint[idx, idx] = True
+        #-----------------------------------------------------------------------
         # comfirm is not none --> this function is used as a client node
         # Loop through current observation and update SG
         for i in range(len(objs)-1):
             if objs[i]['objectType'] in BAN_TYPE_LIST or objs[i]['objectType'] not in idx_2_obj_list:  # Ignore non-informative objectType e.g. 'Floor' and abnormal obj
                 continue
+
             for j in range(i+1, len(objs)):
+                #---------------------------------------------------------------
                 # 1. Ignore non-informative objectType e.g. 'Floor'
                 # 2. Rule out the exceptions of two objects belonging to same Type
                 # 3. priority filter in case two object with same objectType have distinct R with another obj:
@@ -391,6 +415,7 @@ class Scene_Graph:
 
                 i_on_j = False
                 j_on_i = False
+                #---------------------------------------------------------------
                 # First exam the Receptacle Relationship 'on', high priority defined by the simulation system attributes setting
                 if objs[i]['parentReceptacles'] is not None: # This automatically rule out objs[i] in GROUP_UP_LIST
                     # Update normal receptacles

@@ -100,7 +100,7 @@ class Plotter():
 
 		return (nodes_x, nodes_y)
 
-	def show_map(self, show_nodes=True, show_edges=True, show_toggle_map=True):
+	def show_map(self, show_nodes=True, show_edges=True, show_toggle_map=False):
 		# ----------------------------------------------------------------------
 		# Plot reachable points
 		# ----------------------------------------------------------------------

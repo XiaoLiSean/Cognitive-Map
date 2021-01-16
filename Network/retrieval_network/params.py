@@ -11,16 +11,17 @@ from lib.params import *
 # ------------------------------------------------------------------------------
 IMAGE_SIZE = 224 # Input image size into siamese image branch
 PN_THRESHOLD = {'p': 0.6, 'n': 0.5} # triplet, anchor to positive and negative threshold
-TRIPLET_MAX_FRACTION_TO_IMAGES = 0.10
+TRIPLET_MAX_FRACTION_TO_IMAGES = 0.2
 TRIPLET_MAX_NUM_PER_ANCHOR = 40
 NEGATIVE_RAND_NUM = 1 # randomly chooses NEGTIVE_RAND_NUM of negative for each anchor-positive pair
 NUM_WORKERS = 4 # dataloader workers
 IMAGE_ENCODING_VEC_LENGTH = 2048 # encoding vector length of the image
-SG_ENCODING_VEC_LENGTH = 512 # encoding vector length of the sg
+SG_ENCODING_VEC_LENGTH = 256 # encoding vector length of the sg
+SCENE_ENCODING_VEC_LENGTH = 1024 # encoding vector length of current scene (image + sg)
 # ------------------------------------------------------------------------------
 # Traning parameters/setting
-BATCH_SIZE = 26 # common settings for networks {image=16, SG=120} 26
-NUM_EPOCHS = 140 # common settings for networks {image=50, SG=1000}
+BATCH_SIZE = 39 # common settings for networks {image=16, SG=120} 26
+NUM_EPOCHS = 60 # common settings for networks {image=50, SG=1000}
 # --------------------------------------------
 # Training hyper-parameter
 LEARNING_RATE = 0.001 # common settings for networks {image=0.001, SG=0.01}

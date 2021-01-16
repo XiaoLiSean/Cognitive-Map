@@ -313,6 +313,7 @@ class Agent_Sim():
 
 	def save_current_fram(self, FILE_PATH, file_name):
 		img, SG_data = self.get_current_data()
+		# self._SG.visualize_SG()
 		img.save(FILE_PATH + '/' + file_name + '.png')
 		np.save(FILE_PATH + '/' + file_name + '.npy', SG_data)
 

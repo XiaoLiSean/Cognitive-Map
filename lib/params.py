@@ -48,11 +48,11 @@ THOR_2_GLOVE = {'StoveBurner': 'cookstove', 'Drawer': 'drawer', 'CounterTop': 'c
 # These two lists are used to determine the extend of object dynamics based on intrinsic convention of human activity
 # ------------------------------------------------------------------------------
 HIGH_DYNAMICS = ['GarbageCan', 'Stool', 'Chair', 'GarbageBag',
-                 'DeskLamp', 'ArmChair', 'Toaster', 'SideTable',
-                 'LaundryHamper', 'Desktop', 'VacuumCleaner', 'RoomDecor',
+                 'LaundryHamper', 'Desktop', 'VacuumCleaner',
                  'Ottoman', 'DogBed']
 
 LOW_DYNAMICS = ['Microwave', 'CoffeeMachine', 'ShelvingUnit', 'DiningTable',
+                'DeskLamp', 'ArmChair', 'Toaster', 'SideTable', 'RoomDecor',
                 'CoffeeTable', 'TVStand', 'Sofa', 'Safe', 'Television',
                 'Desk', 'Dresser', 'Bed', 'HousePlant', 'FloorLamp']
 # ------------------------------------------------------------------------------
