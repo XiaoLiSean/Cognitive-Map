@@ -406,7 +406,11 @@ class Agent_Sim():
 			# store image and SG
 			for p in points:
 				for r in rotations:
-					self._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=r)
+					event = self._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=r)
+
+					if not event.metadata['lastActionSuccess']:
+						continue
+
 					file_name = 'round' + str(round) + '_' + str(p['x']) + '_' + str(p['z']) + '_' + str(r['y']) + '_' + 'end'
 					if saving_data:
 						self.save_current_fram(file_path, file_name)

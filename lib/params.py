@@ -56,7 +56,7 @@ LOW_DYNAMICS = ['Microwave', 'CoffeeMachine', 'ShelvingUnit', 'DiningTable',
                 'CoffeeTable', 'TVStand', 'Sofa', 'Safe', 'Television',
                 'Desk', 'Dresser', 'Bed', 'HousePlant', 'FloorLamp']
 # ------------------------------------------------------------------------------
-LOW_DYNAMICS_MOVING_RATIO = 0.5 # THreshold for object shuffling range
+LOW_DYNAMICS_MOVING_RATIO = 0.1 # THreshold for object shuffling range
 MASS_MIN = 0.0 # Minimum furniture mass
 MASS_MAX = 103.999992 # Maximum furniture mass
 ROTATE_MAX_DEG = 10 # Maximum furniture rotate angle in degree during random shuffling

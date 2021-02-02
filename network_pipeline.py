@@ -1,6 +1,6 @@
 # Import params and similarity from lib module
 import torch
-import argparse, os, copy, pickle
+import argparse, os, copy, pickle, time
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -103,8 +103,8 @@ def wrapToPi(angle):
 # ------------------------------------------------------------------------------
 # This function is used to save datapoint into failure-cases folder where the
 # localization evaluation is considered not a success at current pose_z
-def save_datapoint(scene_name, pose_z, gtSubnodeFeatures, mostSimilarSubnodeFeatures, currentFeatures, similarity):
-    file_name = '{}_at_({:.2},{:.2})_with_similarity_{:.2}'.format(scene_name, pose_z[0], pose_z[1], similarity)
+def save_datapoint(scene_name, pose_z, gtSubnodeFeatures, mostSimilarSubnodeFeatures, currentFeatures, similarity, info):
+    file_name = '{}_at_node_({},{})_({:.4},{:.4},{:.4})_with_similarity_{:.4}'.format(scene_name, info[1], info[2], pose_z[0], pose_z[1], pose_z[2], similarity)
 
     fig, axs = plt.subplots(2, 3, figsize=(17,10))
     plt.axis('off')
@@ -117,7 +117,7 @@ def save_datapoint(scene_name, pose_z, gtSubnodeFeatures, mostSimilarSubnodeFeat
     SG.visualize_SG(axis=axs[1,2])
     SG.reset()
 
-    data = [gtSubnodeFeatures, mostSimilarSubnodeFeatures]
+    data = [gtSubnodeFeatures[info[1]][info[2]], mostSimilarSubnodeFeatures]
     legend = ['GroundTrue subnode', 'most Similar Subnode']
     for i in range(2):
         axs[0,i].imshow(data[i]['img_original'])
@@ -199,7 +199,7 @@ def localization_eval(model, robot, device, success_and_trial, staticstics, topo
             success_and_trial['success'] += 1
         else:
             # memo down failure cases
-            save_datapoint(robot._scene_name, pose_z, topo_features[info[1]][info[2]], failureCaseFeatures, z, failureCaseSimilarity)
+            save_datapoint(robot._scene_name, pose_z, topo_features, failureCaseFeatures, z, failureCaseSimilarity, info)
 
 # ------------------------------------------------------------------------------
 # Visualize Test Staticstics
@@ -230,10 +230,6 @@ def plot_heatmap(staticstics):
             ax.set_yticks(np.arange(0, map_len+1, tick_step))
             ax.set_xticklabels(np.arange(0, map_len+1, tick_step) - int(map_len / 2.0))
             ax.set_yticklabels(np.arange(0, map_len+1, tick_step) - int(map_len / 2.0))
-            # for i in range(map_len):
-            #     for j in range(map_len):
-            #         if mean[i,j] >= 0.5:
-            #             text = ax.text(i, j, '{:.2f}'.format(int(data[i,j]*100)/100.0), ha="center", va="center", color="k")
 
         fig.suptitle('Heatmap for view angle difference of {} degree'.format(angles[k]))
 
@@ -307,14 +303,19 @@ def testing_pipeline(Network, checkpoint, image_branch=False, dynamcis_rounds=2)
 
             # Image store for every points and angles in map
             for p in map:
-                is_node, node_i = robot.is_node([p['x'], p['z']], threshold=1e-3)
+                is_node, node_i = robot.is_node([p['x'], p['z']], threshold=1e-7)
                 for subnode_i, subnode in enumerate(subnodes):
                     # Add Gaussian Noise to pose
                     rotation = copy.deepcopy(subnode)
                     rotation['y'] += np.random.randn()*2
                     p['x'] += np.random.randn()*robot._grid_size*0.25
                     p['z'] += np.random.randn()*robot._grid_size*0.25
-                    robot._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=rotation)
+                    event = robot._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=rotation)
+                    time.sleep(2)
+
+                    if not event.metadata['lastActionSuccess']:
+                        continue
+
                     if image_branch:
                         img_z = robot.get_current_fram()
                         z = copy.deepcopy(dict(img=img_z))
@@ -322,7 +323,7 @@ def testing_pipeline(Network, checkpoint, image_branch=False, dynamcis_rounds=2)
                         img_z, sg_z = robot.get_current_data()
                         z = copy.deepcopy(dict(img=img_z, sg=sg_z))
 
-                    observations.append(copy.deepcopy(([p['x'], p['z']], [is_node, node_i, subnode_i], z)))
+                    observations.append(copy.deepcopy(([p['x'], p['z'], subnode['y']], [is_node, node_i, subnode_i], z)))
 
             # ------------------------------------------------------------------
             # --------------------Start testing in new scene--------------------
@@ -361,11 +362,15 @@ def testing_pipeline(Network, checkpoint, image_branch=False, dynamcis_rounds=2)
 
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
-    # with open('success_and_trials.pickle', 'rb') as f:
-    #     success_and_trials = pickle.load(f)
-    #     success_and_trials = success_and_trials[0:20]
-    #     plot_success(success_and_trials)
-    # exit(0)
+    with open('staticstics.pickle', 'rb') as f:
+        staticstics = pickle.load(f)
+        plot_heatmap(staticstics)
+
+    with open('success_and_trials.pickle', 'rb') as f:
+        success_and_trials = pickle.load(f)
+        success_and_trials = success_and_trials[0:20]
+        plot_success(success_and_trials)
+    exit(0)
     # --------------------------------------------------------------------------
     # Get argument from CMD line
     parser = argparse.ArgumentParser()
