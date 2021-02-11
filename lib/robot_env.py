@@ -13,7 +13,9 @@ import time, copy, sys, random, os
 
 # Class for agent and nodes in simulation env
 class Agent_Sim():
-	def __init__(self, scene_type='Kitchen', scene_num=1, grid_size=0.25, node_radius=VISBILITY_DISTANCE, default_resol=True, ToggleMapView=False, applyActionNoise=False):
+	def __init__(self, scene_type='Kitchen', scene_num=1, grid_size=0.25,
+				 node_radius=VISBILITY_DISTANCE, default_resol=True, ToggleMapView=False,
+				 applyActionNoise=False, renderObjectImage=True):
 		self._scene_type = scene_type
 		self._scene_num = scene_num
 		self._grid_size = grid_size
@@ -45,7 +47,8 @@ class Agent_Sim():
 
 		self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
 
-		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW, applyActionNoise=applyActionNoise)
+		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE,
+									  fieldOfView=FIELD_OF_VIEW, applyActionNoise=applyActionNoise, renderObjectImage=renderObjectImage)
 
 		if not default_resol:
 			self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)  # Change simulation window size
@@ -261,6 +264,7 @@ class Agent_Sim():
 
 		# Plot rectangle bounding the entire scene
 		scene_bbox = self.get_floor_bbox()
+		print(scene_bbox)
 		plt.plot(scene_bbox[0], scene_bbox[1], '-', color='orangered', linewidth=4)
 
 		# Plot objects 2D boxs

@@ -147,7 +147,7 @@ def shuffle_scene_layout(controller, num_attempts=40, floor_obstacle_avoidance=F
                 # Add Gaussian oise to rotation date
                 rotation = obj['rotation']
                 sigma_angle = (MASS_MAX - obj['mass'])/(MASS_MAX - MASS_MIN)*ROTATE_MAX_DEG
-                rotation['y'] += np.random.normal(0, sigma_angle)
+                rotation['y'] += np.clip(np.random.normal(0, sigma_angle), a_min = -3*sigma_angle, a_max = 3*sigma_angle)
                 event = controller.step(action='PlaceObjectAtPoint', objectId=obj['objectId'], position=position, rotation=rotation)
                 if event.metadata['lastActionSuccess']:
                     successfully_placed[obj_sorted['name']] = True

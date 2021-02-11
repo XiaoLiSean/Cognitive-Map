@@ -6,6 +6,7 @@ from termcolor import colored
 from PIL import Image
 from copy import deepcopy
 from lib.params import *
+from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import networkx as nx
@@ -109,6 +110,11 @@ def get_cornerPoints(center, size):
 #-------------------------------------------------------------------------------
 # This function is used to preprocess the object data before update the SG
 # To group up the objectType 'Drawer' and 'Cabinet' based on their structure and position
+# Group up their 2d and 3d bounding boxs
+'''
+Used to group up massive numbers of receptacles or identical object in SG module
+Objects in these objectTypes are typically presented in array or regular spatial order.
+'''
 def group_up(objs, visualization_on=False, verbose=False):
     # iterate over all possible receptacles which needs to be grouped up
     for name in GROUP_UP_LIST:
@@ -177,10 +183,14 @@ def group_up(objs, visualization_on=False, verbose=False):
         #                       }
         for receptacle_group in receptacle_groups:
             XYZ = []
+            UV = []
             # This is used to generate new axisAlignedBoundingBox
             for receptacle in receptacle_group:
+                if '2DBoundingBox' in receptacle:
+                    UV.append(receptacle['2DBoundingBox'])
                 for point in receptacle['axisAlignedBoundingBox']['cornerPoints']:
                     XYZ.append(point)
+
             XYZ = np.asarray(XYZ)
             max_XYZ = np.max(XYZ,axis=0)
             min_XYZ = np.min(XYZ,axis=0)
@@ -190,9 +200,17 @@ def group_up(objs, visualization_on=False, verbose=False):
             axisAlignedBoundingBox = {'cornerPoints': cornerPoints,
                                       'center': {'x': center[0], 'y': center[1], 'z': center[2]},
                                       'size': {'x': size[0], 'y': size[1], 'z': size[2]}}
-            objs.append({'objectType': name, 'receptacle': True,
-                         'parentReceptacles': None, 'members': receptacle_group,
-                         'axisAlignedBoundingBox': axisAlignedBoundingBox})
+            if len(UV) >= 1:
+                UV = np.asarray(UV)
+                objectBoundingBox = [np.min(UV[:,0]), np.min(UV[:,1]), np.max(UV[:,2]), np.max(UV[:,3])]
+                objs.append({'objectType': name, 'receptacle': True,
+                             'parentReceptacles': None, 'members': receptacle_group,
+                             'axisAlignedBoundingBox': axisAlignedBoundingBox,
+                             '2DBoundingBox': objectBoundingBox})
+            else:
+                objs.append({'objectType': name, 'receptacle': True,
+                             'parentReceptacles': None, 'members': receptacle_group,
+                             'axisAlignedBoundingBox': axisAlignedBoundingBox})
 
     return add_index(objs)
 
@@ -208,6 +226,7 @@ class Scene_Graph:
         self._R_in = R_in
         self._R_proximity = R_proximity
         self._R_disjoint = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
+        self._bboxs = [None]*OBJ_TYPE_NUM
 
     #---------------------------------------------------------------------------
     # reset all values in SG instance
@@ -218,14 +237,30 @@ class Scene_Graph:
         self._R_in = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
         self._R_proximity = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
         self._R_disjoint = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
+        self._fractional_bboxs = [None]*OBJ_TYPE_NUM
+
+    def visibleFilter_by_2Dbbox(self, objs, objectsBboxsDict):
+        if objectsBboxsDict == None:
+            print(colored('visibleFilter_2Dbbox info: No object detection or renderObjectImage is default in initialization','blue'))
+            return []
+        tmp_objs = deepcopy(objs)
+
+        for obj in tmp_objs:
+            if obj['objectId'] not in objectsBboxsDict:
+                objs.remove(obj)
+        for idx in range(len(objs)):
+            objectId = objs[idx]['objectId']
+            objs[idx].update({'2DBoundingBox': objectsBboxsDict[objectId].tolist()})
+
+        return objs
 
     #---------------------------------------------------------------------------
     # Update Scene_Graph by object pair (obj_i, obj_j) and their Relationship r_ij.
     # r_ij = 'on', 'in', 'proximity' or 'disjoint'
     # eg: r_ij = 'on' implies obj_i on obj_j
     def update_SG(self, obj_i, obj_j, r_ij):
-        self._obj_vec[obj_i, 0] = True
-        self._obj_vec[obj_j, 0] = True
+        self._obj_vec[obj_i, 0] = True # Note the presence of i'th obj
+        self._obj_vec[obj_j, 0] = True # Note the presence of i'th obj
         if r_ij == 'on':
             self._R_on[obj_i, obj_j] = True
             self._R_on[obj_j, obj_i] = False     # The Relationship arrow in SG should be directional
@@ -234,18 +269,20 @@ class Scene_Graph:
             # This is also used to rguarantee unique i-j Relationship
             self._R_in[obj_i, obj_j] = False
             self._R_proximity[obj_i, obj_j] = False
+            self._R_proximity[obj_j, obj_i] = False
             self._R_disjoint[obj_i, obj_j] = False
         elif r_ij == 'in':
             self._R_in[obj_i, obj_j] = True
             self._R_in[obj_j, obj_i] = False     # The Relationship arrow in SG should be directional
             self._R_proximity[obj_i, obj_j] = False # priority filter
+            self._R_proximity[obj_j, obj_i] = False
             self._R_disjoint[obj_i, obj_j] = False # priority filter
 
         # 'proximity' and 'disjoint' belong to mutual Relationship
         # r_ij point from small to larger obj: chair proximity to table
         elif r_ij == 'proximity':
             self._R_proximity[obj_i, obj_j] = True
-            self._R_proximity[obj_j, obj_i] = False     # The Relationship arrow in SG should be directional
+            self._R_proximity[obj_j, obj_i] = True     # The Relationship arrow in SG should be directional
             self._R_disjoint[obj_i, obj_j] = False # priority filter
         elif r_ij == 'disjoint':
             self._R_disjoint[obj_i, obj_j] = True
@@ -299,6 +336,28 @@ class Scene_Graph:
             plt.show()
             print(colored('Client: ','green') + 'Receive Data from navigator')
             comfirmed.value = 1
+
+    #---------------------------------------------------------------------------
+    # Used to visualize SG and original Img with bounding boxs
+    def visualize_data_point(self, img):
+        fig, axs = plt.subplots(1, 2, figsize=(17,10))
+        plt.axis('off')
+
+        axs[0].axis('off')
+        axs[0].imshow(img)
+        image_size = img.size[0]
+        for idx, uv in enumerate(self._fractional_bboxs):
+            if np.any(uv == None):
+                continue
+            else:
+                uv = uv*image_size
+                bbox = Rectangle((uv[0],uv[1]), uv[2]-uv[0], uv[3]-uv[1], ec='green', fill=False, linewidth=2)
+                axs[0].add_patch(bbox)
+                axs[0].text(uv[0],uv[1], idx_2_obj_list[idx])
+
+        axs[1].axis('off')
+        self.visualize_SG(axis=axs[1])
+        plt.show()
 
     #---------------------------------------------------------------------------
     # This function is used to get object index
@@ -366,24 +425,40 @@ class Scene_Graph:
             elif not R_proximity_stored:  # priority filter
                 self.update_SG(idx_smaller, idx_larger, 'disjoint')
 
-    #---------------------------------------------------------------------------
-    # Input object data 'event.metadata['objects']'
-    def update_from_data(self, objs, visualization_on=False, comfirmed=None):
-        #-----------------------------------------------------------------------
-        # Group up objects and indexing instances
-        objs = group_up(objs)
-        #-----------------------------------------------------------------------
-        # update the adjancency matrices at entity [i,i] which represents the occurence of object i
-        # update the self._obj_vec
+    #-----------------------------------------------------------------------
+    # update the adjancency matrices at entity [i,i] which represents the occurence of object i
+    # update the self._obj_vec
+    def add_diagonal_entries(self):
+        for SG in [self._R_on, self._R_in, self._R_proximity]:
+            i_list = find_sparse_idx(SG)[0] # index for obj_i
+            j_list = find_sparse_idx(SG)[1] # index for obj_j
+            for i in i_list:
+                SG[i,i] = True
+            for j in j_list:
+                SG[j,j] = True
+
+        return
+
+    # Update self._frational_bboxs
+    def update_fractional_bboxs(self, objs, image_size):
         for obj in objs:
             if obj['objectType'] in BAN_TYPE_LIST or obj['objectType'] not in idx_2_obj_list:  # Ignore non-informative objectType e.g. 'Floor' and abnormal obj
                 continue
+            bboxs = obj['2DBoundingBox']
             idx = self.get_obj_idx(obj)
-            self._obj_vec[idx, 0] = True
-            self._R_on[idx, idx] = True
-            self._R_in[idx, idx] = True
-            self._R_proximity[idx, idx] = True
-            self._R_disjoint[idx, idx] = True
+            self._fractional_bboxs[idx] = np.asarray(bboxs)/image_size
+        return
+
+    #---------------------------------------------------------------------------
+    # Input object data 'event.metadata['objects']'
+    def update_from_data(self, objs, image_size=None, visualization_on=False, comfirmed=None):
+        #-----------------------------------------------------------------------
+        # Group up objects and indexing instances
+        objs = group_up(objs)
+        # Update self._frational_bboxs
+        if image_size != None:
+            self.update_fractional_bboxs(objs, image_size)
+
         #-----------------------------------------------------------------------
         # comfirm is not none --> this function is used as a client node
         # Loop through current observation and update SG
@@ -436,6 +511,7 @@ class Scene_Graph:
                         for receptacle in objs[i]['members']:
                             if objs[j]['parentReceptacles'][0] == receptacle['objectId']:
                                 j_on_i = True
+
                 # Update SG
                 if i_on_j:
                     self.update_SG(idx_i, idx_j, 'on')
@@ -443,12 +519,16 @@ class Scene_Graph:
                     self.update_SG(idx_j, idx_i, 'on')
                 else:
                     self.update_except_on(objs,i,j,R_on_stored,R_in_stored,R_proximity_stored)
-
+        #-----------------------------------------------------------------------
+        # update the adjancency matrices at entity [i,i] which represents the occurence of object i
+        # update the self._obj_vec
+        self.add_diagonal_entries()
+        #-----------------------------------------------------------------------
         # visualize Scene Graph
         if visualization_on:
             self.visualize_SG(comfirmed)
     #---------------------------------------------------------------------------
     # get current scene graph as data
     def get_SG_as_dict(self):
-        data = deepcopy({'in':self._R_in, 'on': self._R_on, 'proximity': self._R_proximity, 'disjoint': self._R_disjoint, 'vec': self._obj_vec})
+        data = deepcopy({'in':self._R_in, 'on': self._R_on, 'proximity': self._R_proximity, 'disjoint': self._R_disjoint, 'vec': self._obj_vec, 'fractional_bboxs':self._fractional_bboxs})
         return data

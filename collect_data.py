@@ -1,16 +1,16 @@
 import argparse
 from termcolor import colored
 from lib.robot_env import Agent_Sim
+from lib.simulation_agent import Robot
 from lib.params import VISBILITY_DISTANCE, SCENE_TYPES, SCENE_NUM_PER_TYPE
 from Network.retrieval_network.params import DYNAMICS_ROUNDS, LOCALIZATION_GRID_TOL, TRAIN_FRACTION, VAL_FRACTION, DATA_DIR
 
-# Initialize robot
-robot = Agent_Sim()
 
 # ------------------------------------------------------------------------------
 # collect train, validation and test data for network image branch
 def data_collection(is_train=True, is_test=True):
-
+    # Initialize robot
+    robot = Robot()
     # Iterate through all the scenes to collect data and separate them into train, val and test sets
     if is_train:
         grid_steps = LOCALIZATION_GRID_TOL + 1
@@ -22,18 +22,20 @@ def data_collection(is_train=True, is_test=True):
                     FILE_PATH = DATA_DIR + '/val'
 
                 robot.reset_scene(scene_type=scene_type, scene_num=scene_num)
-                robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=DYNAMICS_ROUNDS, grid_steps=grid_steps)
+                robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=DYNAMICS_ROUNDS, pertubation_round=5)
 
     if is_test:
         FILE_PATH = DATA_DIR + '/test'
         for scene_type in SCENE_TYPES:
             for scene_num in range(int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1, SCENE_NUM_PER_TYPE + 1):
                 robot.reset_scene(scene_type=scene_type, scene_num=scene_num)
-                robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=DYNAMICS_ROUNDS, is_test=True)
+                robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=DYNAMICS_ROUNDS, pertubation_round=5)
 
 # ------------------------------------------------------------------------------
 # manually update topological map info
 def iter_test_scene(is_xiao=False, is_yidong=False):
+    # Initialize robot
+    robot = Agent_Sim()
     test_idx_initial = int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1
     test_idx_end = SCENE_NUM_PER_TYPE + 1
     add_on = [2, 3, 2, 3]
