@@ -2,7 +2,9 @@
 from ai2thor.controller import Controller
 from termcolor import colored
 from PIL import Image
+from progress.bar import Bar
 from math import floor, ceil
+from scipy.sparse import lil_matrix
 from matplotlib.patches import Circle, Rectangle
 from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH, VISBILITY_DISTANCE, FIELD_OF_VIEW, DOOR_NODE, SUB_NODES_NUM
 from lib.scene_graph_generation import Scene_Graph
@@ -72,6 +74,8 @@ class Robot():
         self._SG.reset()
         objs = self._SG.visibleFilter_by_2Dbbox(objs, self._event.instance_detections2D)
         self._SG.update_from_data(objs, image_size=self._img.size[0])
+        is_empty = (len(objs) <= 0)
+        return is_empty
 
     def get_agent_position(self):
         self.update_event()
@@ -130,12 +134,14 @@ class Robot():
     '''
 	# --------------------------------------------------------------------------
 
-    def collect_data_point(self, FILE_PATH, nominal_i, nominal_j, array_map, nominal_theta):
-        self.update_event()
+    def collect_data_point(self, FILE_PATH, nominal_i, nominal_j, array_map, nominal_theta,  ignore_empty=False):
+        is_empty = self.update_event()
+        if ignore_empty and is_empty:
+            return array_map
         array_map[nominal_i, nominal_j] += 1
         file_name = str(nominal_theta) + '_' + str(nominal_i) + '_' + str(nominal_j) + '_' + str(array_map[nominal_i, nominal_j])
         sg_data = self._SG.get_SG_as_dict()
-        self._SG.visualize_data_point(self._img)
+        # self._SG.visualize_data_point(self._img) # used to visualize the date point
         self._img.save(FILE_PATH + '/' + file_name + '.png')
         np.save(FILE_PATH + '/' + file_name + '.npy', sg_data)
 
@@ -166,7 +172,7 @@ class Robot():
         size_z = data['size']['z']
         rows = round(size_x / self._grid_size)
         cols = round(size_z / self._grid_size)
-        array_map = np.zeros((rows, cols))
+        array_map = lil_matrix((rows, cols), dtype=np.int)
 
         return array_map
 
@@ -181,7 +187,7 @@ class Robot():
 
         return x+noise_x, z+noise_z, rotation
 
-    def coordnates_patroling(self, saving_data=False, file_path=None, dynamics_rounds=5, pertubation_round=5):
+    def coordnates_patroling(self, saving_data=False, file_path=None, dynamics_rounds=5, pertubation_round=3):
         rotations = [0.0, 90.0, 180.0, 270.0]
         array_maps = {'0.0':self.get_array_map(), '90.0':self.get_array_map(), '180.0':self.get_array_map(), '270.0':self.get_array_map()}
 
@@ -195,6 +201,7 @@ class Robot():
         	print('Skip: ', self._scene_name)
         	return
 
+        print('----'*5)
         for round in range(dynamics_rounds):
         	# change obj layout for the 2-end rounds
             if round != 0:
@@ -206,8 +213,9 @@ class Robot():
             reachable_points = self.get_reachable_coordinate()
             nodes = copy.deepcopy(reachable_points)
 
-
-            print('{}: {}/{} round, {} nodes'.format(self._scene_name, round+1, dynamics_rounds, len(nodes)))
+            # ------------------------------------------------------------------
+            # Start collecting data
+            bar = Bar('{}: {}/{} round'.format(self._scene_name, round+1, dynamics_rounds), max=len(reachable_points)*len(rotations)*pertubation_round)
         	# store image and SG
             for p in reachable_points:
                 nominal_x = p['x']
@@ -223,6 +231,10 @@ class Robot():
                             continue
 
                         if saving_data:
-                            array_maps[str(nominal_theta)] = self.collect_data_point(file_path, nominal_i, nominal_j, array_maps[str(nominal_theta)], nominal_theta)
+                            array_maps[str(nominal_theta)] = self.collect_data_point(file_path, nominal_i, nominal_j, array_maps[str(nominal_theta)], nominal_theta, ignore_empty=True)
+                            bar.next()
                         else:
                             self.update_event()
+            bar.finish()
+
+        np.save(file_path + '/' + 'array_maps.npy', array_maps)
