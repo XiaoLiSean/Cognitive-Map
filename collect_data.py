@@ -104,10 +104,16 @@ def get_AP_from_previous_tier_AN(prev_tier_APN):
 
     return next_tier_AP
 
+def cutoff_dataset(ith_tier_APN, dataset_size, fraction):
+    cutoff_idx = min([len(ith_tier_APN), round(dataset_size*fraction)])
+    random.shuffle(ith_tier_APN)
+    ith_tier_APN = ith_tier_APN[0:cutoff_idx]
+    return ith_tier_APN
+
 def generate_triplets(file_path):
     triplets_APN_idx = []
     triplets_APN_name = []
-    array_maps = {'0.0':lil_matrix([[2,1,0,1,1],[2,2,0,1,1],[1,1,1,1,1],[1,2,1,1,1]]), '90.0':lil_matrix([[2,1,0,1,1],[2,2,0,1,1],[1,1,1,1,1],[1,2,1,1,1]])} #np.load(file_path + '/' + 'array_maps.npy', allow_pickle='TRUE').item()
+    array_maps = np.load(file_path + '/' + 'array_maps.npy', allow_pickle='TRUE').item()
     for key in array_maps:
         # get array-like map for a specific robot heading [0.0, 90.0, 180.0, 270.0]
         array_map = array_maps[key]
@@ -118,38 +124,46 @@ def generate_triplets(file_path):
         #-----------------------------------------------------------------------
         first_tier_AP = get_first_tier_AP(idx_list, array_map, key)
         first_tier_APN = add_negative_data(first_tier_AP, array_map, key, distanceToAnchor=1)
-        dataset_size = round(len(first_tier_APN) / 0.35)
+        dataset_size = round(len(first_tier_APN) / 0.50)
         #-----------------------------------------------------------------------
         '''Get 2'nd tier data of (A,P,N) (20% of the entire dataset)'''
         #-----------------------------------------------------------------------
         second_tier_AP = get_AP_from_previous_tier_AN(first_tier_APN)
         second_tier_APN = add_negative_data(second_tier_AP, array_map, key, distanceToAnchor=2)
-        cutoff_idx = min([len(second_tier_APN), round(dataset_size*0.20)])
-        second_tier_APN = second_tier_APN[0:cutoff_idx]
+        second_tier_APN = cutoff_dataset(second_tier_APN, dataset_size, 0.20)
         #-----------------------------------------------------------------------
         '''Get 3'rd tier data of (A,P,N) (20% of the entire dataset)'''
         #-----------------------------------------------------------------------
         third_tier_AP = get_AP_from_previous_tier_AN(second_tier_APN)
-        third_tier_APN = add_negative_data(third_tier_AP, array_map, key, distanceToAnchor=3, fixed_Len=True)
+        third_tier_APN = add_negative_data(third_tier_AP, array_map, key, distanceToAnchor=3)
+        third_tier_APN = cutoff_dataset(third_tier_APN, dataset_size, 0.15)
         #-----------------------------------------------------------------------
         '''Get 4'th tier data of (A,P,N) (20% of the entire dataset)'''
         #-----------------------------------------------------------------------
         fourth_tier_AP = get_AP_from_previous_tier_AN(third_tier_APN)
-        fourth_tier_APN = add_negative_data(fourth_tier_AP, array_map, key, distanceToAnchor=4, fixed_Len=True)
+        fourth_tier_APN = add_negative_data(fourth_tier_AP, array_map, key, distanceToAnchor=4)
+        fourth_tier_APN = cutoff_dataset(fourth_tier_APN, dataset_size, 0.10)
         #-----------------------------------------------------------------------
         '''Get 5'th tier data of (A,P,N) (5% of the entire dataset)'''
         #-----------------------------------------------------------------------
         cutoff_idx = min([len(fourth_tier_APN), round(dataset_size*0.05)])
         last_APN_tmp = fourth_tier_APN[0:cutoff_idx]
-        fifrth_tier_AP = get_AP_from_previous_tier_AN(last_APN_tmp)
-        fifrth_tier_APN = add_negative_data_from_other_angle(fifrth_tier_AP, key, array_maps)
+        fifth_tier_AP = get_AP_from_previous_tier_AN(last_APN_tmp)
+        fifth_tier_APN = add_negative_data_from_other_angle(fifth_tier_AP, key, array_maps)
         #-----------------------------------------------------------------------
+        original_len = len(triplets_APN_idx)
         triplets_APN_idx.extend(first_tier_APN)
         triplets_APN_idx.extend(second_tier_APN)
         triplets_APN_idx.extend(third_tier_APN)
         triplets_APN_idx.extend(fourth_tier_APN)
-        triplets_APN_idx.extend(fifrth_tier_APN)
-
+        triplets_APN_idx.extend(fifth_tier_APN)
+        print('Finished Generate {} Triplets for {} degree: '.format(len(triplets_APN_idx)-original_len, key) +
+              '({0:.0%}, '.format(len(first_tier_APN)/(len(triplets_APN_idx)-original_len)) +
+              '{0:.0%}, '.format(len(second_tier_APN)/(len(triplets_APN_idx)-original_len)) +
+              '{0:.0%}, '.format(len(third_tier_APN)/(len(triplets_APN_idx)-original_len)) +
+              '{0:.0%}, '.format(len(fourth_tier_APN)/(len(triplets_APN_idx)-original_len)) +
+              '{0:.0%})'.format(len(fifth_tier_APN)/(len(triplets_APN_idx)-original_len)))
+    #---------------------------------------------------------------------------
     for APN in triplets_APN_idx:
         anchor = str(APN[0][3]) + '_' + str(APN[0][0]) + '_' + str(APN[0][1]) + '_' + str(APN[0][2])
         positive = str(APN[1][3]) + '_' + str(APN[1][0]) + '_' + str(APN[1][1]) + '_' + str(APN[1][2])
@@ -158,7 +172,7 @@ def generate_triplets(file_path):
 
     np.save(file_path + '/' + 'triplets_APN_name.npy', triplets_APN_name)
 
-    return
+    return len(triplets_APN_name)
 
 
 # ------------------------------------------------------------------------------
@@ -176,14 +190,18 @@ def data_collection(is_train=True, is_test=True):
                     FILE_PATH = DATA_DIR + '/val'
 
                 robot.reset_scene(scene_type=scene_type, scene_num=scene_num)
-                robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=5, pertubation_round=3)
+                robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=5, pertubation_round=2)
+                datanum = generate_triplets(FILE_PATH + '/' + robot._scene_name)
+                print('{}: {} triplets'.format(robot._scene_name, datanum))
 
     if is_test:
         FILE_PATH = DATA_DIR + '/test'
         for scene_type in SCENE_TYPES:
             for scene_num in range(int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1, SCENE_NUM_PER_TYPE + 1):
                 robot.reset_scene(scene_type=scene_type, scene_num=scene_num)
-                robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=5, pertubation_round=3)
+                robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=5, pertubation_round=2)
+                datanum = generate_triplets(FILE_PATH + '/' + robot._scene_name)
+                print('{}: {} triplets'.format(robot._scene_name, datanum))
 
 # ------------------------------------------------------------------------------
 # manually update topological map info

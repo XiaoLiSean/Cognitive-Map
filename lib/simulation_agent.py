@@ -187,6 +187,13 @@ class Robot():
 
         return x+noise_x, z+noise_z, rotation
 
+    def sparsify_reachable_points(self, reachable_points, reserved_fraction=0.5):
+        random.shuffle(reachable_points)
+        cufoff_idx = round(len(reachable_points)*reserved_fraction)
+        new_reachable_points = copy.deepcopy(reachable_points[0:cufoff_idx])
+        return new_reachable_points
+
+
     def coordnates_patroling(self, saving_data=False, file_path=None, dynamics_rounds=5, pertubation_round=3):
         rotations = [0.0, 90.0, 180.0, 270.0]
         array_maps = {'0.0':self.get_array_map(), '90.0':self.get_array_map(), '180.0':self.get_array_map(), '270.0':self.get_array_map()}
@@ -201,7 +208,7 @@ class Robot():
         	print('Skip: ', self._scene_name)
         	return
 
-        print('----'*5)
+        print('----'*10)
         for round in range(dynamics_rounds):
         	# change obj layout for the 2-end rounds
             if round != 0:
@@ -211,13 +218,13 @@ class Robot():
 
         	# random get fractional points as node in train and validation scene
             reachable_points = self.get_reachable_coordinate()
-            nodes = copy.deepcopy(reachable_points)
+            points = copy.deepcopy(self.sparsify_reachable_points(reachable_points))
 
             # ------------------------------------------------------------------
             # Start collecting data
-            bar = Bar('{}: {}/{} round'.format(self._scene_name, round+1, dynamics_rounds), max=len(reachable_points)*len(rotations)*pertubation_round)
+            bar = Bar('{}: {}/{} round'.format(self._scene_name, round+1, dynamics_rounds), max=len(points)*len(rotations)*pertubation_round)
         	# store image and SG
-            for p in reachable_points:
+            for p in points:
                 nominal_x = p['x']
                 nominal_z = p['z']
                 nominal_i, nominal_j = self.generate_index_in_array_map([nominal_x, nominal_z])
@@ -225,7 +232,6 @@ class Robot():
                     for _ in range(pertubation_round):
                         pose_x, pose_z, pose_r = self.get_noisy_target_pose(nominal_x, nominal_z, nominal_theta)
                         event = self._controller.step(action='TeleportFull', x=pose_x, y=p['y'], z=pose_z, rotation=pose_r)
-                        time.sleep(2)
 
                         if not event.metadata['lastActionSuccess']:
                             continue

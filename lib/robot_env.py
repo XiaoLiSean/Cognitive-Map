@@ -264,7 +264,6 @@ class Agent_Sim():
 
 		# Plot rectangle bounding the entire scene
 		scene_bbox = self.get_floor_bbox()
-		print(scene_bbox)
 		plt.plot(scene_bbox[0], scene_bbox[1], '-', color='orangered', linewidth=4)
 
 		# Plot objects 2D boxs
