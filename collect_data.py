@@ -1,6 +1,6 @@
 import argparse
 import numpy as np
-import random
+import random, math, os
 from copy import deepcopy
 from scipy.sparse import lil_matrix
 from termcolor import colored
@@ -111,6 +111,8 @@ def cutoff_dataset(ith_tier_APN, dataset_size, fraction):
     return ith_tier_APN
 
 def generate_triplets(file_path):
+    if os.path.exists(file_path + '/' + 'triplets_APN_name.npy'):
+        return
     triplets_APN_idx = []
     triplets_APN_name = []
     array_maps = np.load(file_path + '/' + 'array_maps.npy', allow_pickle='TRUE').item()
@@ -177,30 +179,29 @@ def generate_triplets(file_path):
 
 # ------------------------------------------------------------------------------
 # collect train, validation and test data for network image branch
-def data_collection(is_train=True, is_test=True):
+def data_collection(partition_num, partition_list):
     # Initialize robot
     robot = Robot()
+    scene_list = []
+    for i_partition in partition_list:
+        start_idx = math.ceil(SCENE_NUM_PER_TYPE/partition_num)*(int(i_partition) - 1) + 1
+        end_idx = min([SCENE_NUM_PER_TYPE, math.ceil(SCENE_NUM_PER_TYPE/partition_num)*int(i_partition)])
+        scene_list.extend([*range(start_idx, end_idx + 1)])
+
     # Iterate through all the scenes to collect data and separate them into train, val and test sets
-    if is_train:
-        for scene_type in SCENE_TYPES:
-            for scene_num in range(1, int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1):
-                if scene_num <= int(SCENE_NUM_PER_TYPE*TRAIN_FRACTION):
-                    FILE_PATH = DATA_DIR + '/train'
-                elif scene_num <= int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)):
-                    FILE_PATH = DATA_DIR + '/val'
+    for scene_type in SCENE_TYPES:
+        for scene_num in scene_list:
+            if scene_num <= int(SCENE_NUM_PER_TYPE*TRAIN_FRACTION):
+                FILE_PATH = DATA_DIR + '/train'
+            elif scene_num <= int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)):
+                FILE_PATH = DATA_DIR + '/val'
+            else:
+                FILE_PATH = DATA_DIR + '/test'
 
-                robot.reset_scene(scene_type=scene_type, scene_num=scene_num)
-                robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=5, pertubation_round=2)
-                datanum = generate_triplets(FILE_PATH + '/' + robot._scene_name)
-                print('{}: {} triplets'.format(robot._scene_name, datanum))
-
-    if is_test:
-        FILE_PATH = DATA_DIR + '/test'
-        for scene_type in SCENE_TYPES:
-            for scene_num in range(int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1, SCENE_NUM_PER_TYPE + 1):
-                robot.reset_scene(scene_type=scene_type, scene_num=scene_num)
-                robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=5, pertubation_round=2)
-                datanum = generate_triplets(FILE_PATH + '/' + robot._scene_name)
+            robot.reset_scene(scene_type=scene_type, scene_num=scene_num)
+            robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=5, pertubation_round=2)
+            datanum = generate_triplets(FILE_PATH + '/' + robot._scene_name)
+            if datanum != None:
                 print('{}: {} triplets'.format(robot._scene_name, datanum))
 
 # ------------------------------------------------------------------------------
@@ -228,18 +229,18 @@ if __name__ == '__main__':
     # Get argument from CMD line
     parser = argparse.ArgumentParser()
     parser.add_argument("--topo", help="manually update topological map info", action="store_true")
-    parser.add_argument("--train", help="collect train and validation data for network image branch", action="store_true")
-    parser.add_argument("--test", help="collect test data for network image branch", action="store_true")
+    parser.add_argument("--collect_partition", nargs="+", default=[])
     parser.add_argument("--yidong", help="manually collect topological map node for yidong", action="store_true")
     parser.add_argument("--xiao", help="manually collect topological map node for xiao", action="store_true")
     args = parser.parse_args()
 
-    generate_triplets(DATA_DIR + '/train' + '/FloorPlan1')
+    # generate_triplets(DATA_DIR + '/train' + '/FloorPlan1')
 
     # --------------------------------------------------------------------------
     # Used to collect data
-    if args.train or args.test:
-        data_collection(is_train=args.train, is_test=args.test)
+    if len(args.collect_partition) > 0:
+        partition_num = 4
+        data_collection(partition_num, args.collect_partition)
 
     # Used to see visualization of each test scene and record the topological node manually
     if args.topo:
