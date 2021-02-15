@@ -22,7 +22,7 @@ def to_sparse(x):
     return sparse_tensortype(indices, values, x.size())
 
 # ------------------------------------------------------------------------------
-def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=None):
+def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, best_acc_criteria, num_epochs=NUM_EPOCHS, checkpoints_prefix=None):
     """
     Loaders, model, loss function and metrics should work together for a given task,
     i.e. The model should be able to process data output of loaders,
@@ -33,7 +33,7 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
     # Intialize storage for best weights/model and accuracy
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
-    best_loss = 1.0
+    best_loss = 100.0
 
     # --------------------------------------------------------------------------
     # Traning start
@@ -96,15 +96,21 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
                 if checkpoints_prefix != None:
                     FILE = checkpoints_prefix + '_loss_' + str(epoch_loss) + '_acc_' + str(epoch_acc.item()) + '_epoch_' + str(epoch) + '.pkl'
                     torch.save(model.state_dict(), FILE)
-                if epoch_acc > best_acc:
-                    best_acc = epoch_acc
-                    best_model_wts = copy.deepcopy(model.state_dict())
+                if best_acc_criteria:
+                    if epoch_acc > best_acc:
+                        best_acc = epoch_acc
+                        best_model_wts = copy.deepcopy(model.state_dict())
+                else:
+                    if epoch_loss < best_loss:
+                        best_loss = epoch_loss
+                        best_model_wts = copy.deepcopy(model.state_dict())
 
             # ------------------------------------------------------------------
     # --------------------------------------------------------------------------
     time_elapsed = time.time() - start_time
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
     print('Best val accuracy: {:4f}'.format(best_acc))
+    print('Best val loss: {:4f}'.format(best_loss))
 
     # load best model weights
     model.load_state_dict(best_model_wts)

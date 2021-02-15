@@ -25,7 +25,7 @@ class Topological_map():
 		self._data = []
 		self._orientations = [0, 90, 180, 270]
 		self._controller = controller
-		self._scene_knowledge_graph = self.get_scene_graph(visible_filter=False)
+		self._scene_knowledge_graph = None #set up global knowledge graph: self.get_scene_graph(visible_filter=False)
 		self._neighbor_nodes_pair = neighbor_nodes_pair
 		self._node_index_list = node_index_list
 		self._updated_needed = False
@@ -51,6 +51,46 @@ class Topological_map():
 		if not self._controller is None:
 			self.Get_reachable_coordinate()
 		self._subnode_plan = False
+
+	def get_scene_graph(self, visible_filter=True, scan_entire_corn=False):
+		SG = Scene_Graph()
+		self.Update_event()
+
+		if visible_filter:
+			if scan_entire_corn:
+				# Remain to be developed
+				print('----'*20)
+				print(colored('Remain to be developed','red'))
+				print('----'*20)
+				position = self._event.metadata['agent']['position']
+				rotation = self._event.metadata['agent']['rotation']
+				objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
+				objs_add_list = []
+				for _ in range(2):
+					self._controller.step(action='LookDown', degrees=30)
+					self.Update_event()
+					objs_add_list += [obj for obj in self._event.metadata['objects'] if obj['visible']]
+
+				self._controller.step(action='TeleportFull', x=position['x'], y=position['y'], z=position['z'], rotation=rotation, horizon=0.0)
+				for _ in range(2):
+					self._controller.step(action='LookUp', degrees=30)
+					self.Update_event()
+					objs_add_list += [obj for obj in self._event.metadata['objects'] if obj['visible']]
+
+				self._controller.step(action='TeleportFull', x=position['x'], y=position['y'], z=position['z'], rotation=rotation, horizon=0.0)
+				for obj in objs_add_list:
+					if obj not in objs:
+						objs.append(obj)
+			else:
+				objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
+
+		else:
+			objs = self._event.metadata['objects']
+
+		SG.reset()
+		SG.update_from_data(objs)
+		# SG.visualize_SG()
+		return SG.get_SG_as_dict()
 
 	def Set_env_from_Robot(self, Robot):
 		self._controller = Robot._AI2THOR_controller._controller
@@ -118,44 +158,6 @@ class Topological_map():
 
 	def Set_scene_graph_method(self, scene_graph_method):
 		self._scene_graph_method = self.get_scene_graph
-
-	def get_scene_graph(self, visible_filter=True, scan_entire_corn=False):
-		SG = Scene_Graph()
-		self.Update_event()
-
-		if visible_filter:
-			if scan_entire_corn:
-				# Remain to be developed
-				print('----'*20)
-				print(colored('Remain to be developed','red'))
-				print('----'*20)
-				position = self._event.metadata['agent']['position']
-				rotation = self._event.metadata['agent']['rotation']
-				objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
-				objs_add_list = []
-				for _ in range(2):
-					self._controller.step(action='LookDown', degrees=30)
-					self.Update_event()
-					objs_add_list += [obj for obj in self._event.metadata['objects'] if obj['visible']]
-
-				self._controller.step(action='TeleportFull', x=position['x'], y=position['y'], z=position['z'], rotation=rotation, horizon=0.0)
-				for _ in range(2):
-					self._controller.step(action='LookUp', degrees=30)
-					self.Update_event()
-					objs_add_list += [obj for obj in self._event.metadata['objects'] if obj['visible']]
-
-				self._controller.step(action='TeleportFull', x=position['x'], y=position['y'], z=position['z'], rotation=rotation, horizon=0.0)
-				for obj in objs_add_list:
-					if obj not in objs:
-						objs.append(obj)
-			else:
-				objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
-		else:
-			objs = self._event.metadata['objects']
-
-		SG.update_from_data(objs)
-		# SG.visualize_SG()
-		return SG.get_SG_as_dict()
 
 	def Set_Unit_rotate_func(self, Unit_rotate):
 		self._Unit_rotate_func = Unit_rotate

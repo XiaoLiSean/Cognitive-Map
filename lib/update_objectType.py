@@ -21,7 +21,6 @@ def update_floor_plan():
     # Bathrooms: FloorPLan401 - FloorPlan430
     iTHOR_num = np.hstack([np.arange(1,31), np.arange(201,231), np.arange(301,331), np.arange(401,431)])
     iTHOR = ['FloorPlan'+str(num) for num in iTHOR_num]
-
     RoboTHOR = []
     # Load Train Scene
     for i in range(1,13):
@@ -39,6 +38,10 @@ def update_floor_plan():
 # --------------------------------------------------------------------------
 # Function used to show objectType numbers
 # Modified to augment receptacle objectType numbers i.e. CounterTop1 and CounterTop2
+'''
+2021 Feb 02: Modify the REC_MAX_DIC from receptacle to general objects
+since visual information is utilized in the Network implementation
+'''
 def show_object_type_max():
     iTHOR, RoboTHOR = update_floor_plan()
     controller = Controller()
@@ -48,12 +51,12 @@ def show_object_type_max():
         controller.reset(floor_plan)
         event = controller.step(action='Pass')
         # Iterate through the objectType and
-        # count their maximum numbers of appearance for same receptacle objectType in one scene/Env
+        # count their maximum numbers of appearance for same objectType in one scene/Env
         objs = group_up(event.metadata['objects'])# This is used to group up receptacles in GROUP_UP_LIST
         for obj in event.metadata['objects']:
             name = obj['objectType']
             # Ignore non-informative objectType e.g. 'Floor' and non receptacles
-            if name in BAN_TYPE_LIST or not obj['receptacle']:
+            if name in BAN_TYPE_LIST:
                 continue
             if name in tmp_rec_max:
                 tmp_rec_max[name] += 1
@@ -66,6 +69,11 @@ def show_object_type_max():
             elif name not in count_rec_max:
                 count_rec_max.update({name: tmp_rec_max[name]})
         tmp_rec_max = {}
+
+    tmp_rec_max = deepcopy(count_rec_max)
+    for key in tmp_rec_max:
+        if tmp_rec_max[key] == 1:
+            del count_rec_max[key]
 
     print(count_rec_max)
 

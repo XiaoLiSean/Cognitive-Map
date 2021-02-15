@@ -58,6 +58,9 @@ class Robot():
 		self._Navigation_max_try = 18
 
 		self.multithread_node = dict(server=server, comfirmed=comfirmed)
+		self.image_goal = None
+		self.goal_position = None
+		self.goal_rotation = None
 
 		self.Set_navigation_network()
 		self.Set_localization_network()
@@ -107,13 +110,13 @@ class Robot():
 	# --------------------------------------------------------------------------
 	# Send information to plotter
 	# --------------------------------------------------------------------------
-	def send_msg_to_client(self, image_goal, goal_position, goal_rotation):
+	def send_msg_to_client(self, is_reached=False):
 		if self.multithread_node['server'] != None:
 			current_frame = self._AI2THOR_controller.Get_frame()
 			cur_pos = self.Get_robot_position()
 			cur_rot = self.Get_robot_orientation()
-			info = dict(goal_pose=[goal_position[0], goal_position[2], goal_rotation[1]], goal_img=image_goal,
-						cur_pose=[cur_pos['x'], cur_pos['z'], cur_rot['y']], cur_img=current_frame, is_reached=False)
+			info = dict(goal_pose=[self.goal_position[0], self.goal_position[2], self.goal_rotation[1]], goal_img=self.image_goal,
+						cur_pose=[cur_pos['x'], cur_pos['z'], cur_rot['y']], cur_img=current_frame, is_reached=is_reached)
 			self.multithread_node['server'].send(info)
 			while True:
 				if self.multithread_node['comfirmed'].value:
@@ -146,7 +149,10 @@ class Robot():
 			# ------------------------------------------------------------------
 			# Send information to plotter
 			# ------------------------------------------------------------------
-			self.send_msg_to_client(image_goal, goal_position, goal_rotation)
+			self.image_goal = image_goal
+			self.goal_position = goal_position
+			self.goal_rotation = goal_rotation
+			self.send_msg_to_client(is_reached=False)
 			# ------------------------------------------------------------------
 			# ------------------------------------------------------------------
 
@@ -190,7 +196,10 @@ class Robot():
 		# ----------------------------------------------------------------------
 		# Send information to plotter
 		# ----------------------------------------------------------------------
-		self.send_msg_to_client(image_goal, goal_position, goal_rotation)
+		self.image_goal = image_goal
+		self.goal_position = goal_position
+		self.goal_rotation = goal_rotation
+		self.send_msg_to_client(is_reached=True)
 		# ----------------------------------------------------------------------
 		# ----------------------------------------------------------------------
 		return True

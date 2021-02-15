@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torchvision import models
-from Network.retrieval_network.params import SG_ENCODING_VEC_LENGTH, CHECKPOINTS_DIR
+from Network.retrieval_network.params import SG_ENCODING_VEC_LENGTH, IMAGE_ENCODING_VEC_LENGTH, SCENE_ENCODING_VEC_LENGTH, CHECKPOINTS_DIR
 import math
 import numpy as np
 
@@ -12,10 +12,20 @@ import numpy as np
 # ------------------------------------------------------------------------------
 
 class RetrievalSiamese(torch.nn.Module):
-    def __init__(self, GCN_layers=3, GCN_bias=True):
+    def __init__(self, GCN_layers=3, GCN_bias=True, pretrained_image=False):
         super(RetrievalSiamese, self).__init__()
         self.image_branch = SiameseNetImage()
+
+        if pretrained_image:
+            self.image_branch.load_state_dict(torch.load(CHECKPOINTS_DIR + 'image_best_fit.pkl'))
+
         self.SG_branch = SiameseNetSG(num_layers=GCN_layers, bias=GCN_bias)
+        self.fcn = torch.nn.Sequential(
+                                torch.nn.Linear(IMAGE_ENCODING_VEC_LENGTH + SG_ENCODING_VEC_LENGTH, 2048),
+                                torch.nn.ReLU(),
+                                torch.nn.Linear(2048, SCENE_ENCODING_VEC_LENGTH),
+                                torch.nn.ReLU()
+                                      )
 
     def forward(self, anchor_img, input_img, anchor_on, input_on, anchor_in, input_in, anchor_prox, input_prox):
 
@@ -29,9 +39,11 @@ class RetrievalSiamese(torch.nn.Module):
         sg_embedding = self.SG_branch.get_embedding(A_on, A_in, A_prox)
 
         if eval:
-            embedding = torch.cat((img_embedding, sg_embedding), 0)
+            concacenated = torch.cat((img_embedding, sg_embedding), 0)
         else:
-            embedding = torch.cat((img_embedding, sg_embedding), 1)
+            concacenated = torch.cat((img_embedding, sg_embedding), 1)
+
+        embedding = self.fcn(concacenated)
 
         return embedding
 
@@ -46,6 +58,13 @@ class RetrievalTriplet(torch.nn.Module):
             self.image_branch.load_state_dict(torch.load(CHECKPOINTS_DIR + 'image_best_fit.pkl'))
 
         self.SG_branch = TripletNetSG(num_layers=GCN_layers, bias=GCN_bias)
+
+        self.fcn = torch.nn.Sequential(
+                                torch.nn.Linear(IMAGE_ENCODING_VEC_LENGTH + SG_ENCODING_VEC_LENGTH, 2048),
+                                torch.nn.ReLU(),
+                                torch.nn.Linear(2048, SCENE_ENCODING_VEC_LENGTH),
+                                torch.nn.ReLU()
+                                      )
 
     def forward(self, anchor_img, positive_img, negative_img,
                 anchor_on, positive_on, negative_on,
@@ -64,9 +83,11 @@ class RetrievalTriplet(torch.nn.Module):
         embedding = torch.cat((img_embedding, sg_embedding), 1)
 
         if eval:
-            embedding = torch.cat((img_embedding, sg_embedding), 0)
+            concacenated = torch.cat((img_embedding, sg_embedding), 0)
         else:
-            embedding = torch.cat((img_embedding, sg_embedding), 1)
+            concacenated = torch.cat((img_embedding, sg_embedding), 1)
+
+        embedding = self.fcn(concacenated)
 
         return embedding
 
@@ -123,7 +144,10 @@ class SiameseNetSG(torch.nn.Module):
         self.GCNs_on = torch.nn.ModuleList()
         self.GCNs_in = torch.nn.ModuleList()
         self.GCNs_prox = torch.nn.ModuleList()
-        self.fcn = torch.nn.Linear(node_num * 3, SG_ENCODING_VEC_LENGTH)
+        self.fcn = torch.nn.Sequential(
+                                torch.nn.Linear(node_num * 3, SG_ENCODING_VEC_LENGTH),
+                                torch.nn.ReLU()
+                                      )
 
         for i in range(self.layers):
             in_features = vector_d
@@ -177,7 +201,10 @@ class TripletNetSG(torch.nn.Module):
         self.GCNs_on = torch.nn.ModuleList()
         self.GCNs_in = torch.nn.ModuleList()
         self.GCNs_prox = torch.nn.ModuleList()
-        self.fcn = torch.nn.Linear(node_num * 3, SG_ENCODING_VEC_LENGTH)
+        self.fcn = torch.nn.Sequential(
+                                torch.nn.Linear(node_num * 3, SG_ENCODING_VEC_LENGTH),
+                                torch.nn.ReLU()
+                                      )
 
         for i in range(self.layers):
             in_features = vector_d
@@ -218,6 +245,7 @@ class TripletNetSG(torch.nn.Module):
         embedding = self.fcn(concacenated)
 
         return embedding
+
 # ------------------------------------------------------------------------------
 # 3rd party code from git@github.com:tkipf/pygcn.git
 # ------------------------------------------------------------------------------

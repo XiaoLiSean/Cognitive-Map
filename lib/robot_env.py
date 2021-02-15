@@ -13,7 +13,9 @@ import time, copy, sys, random, os
 
 # Class for agent and nodes in simulation env
 class Agent_Sim():
-	def __init__(self, scene_type='Kitchen', scene_num=1, grid_size=0.25, node_radius=VISBILITY_DISTANCE, default_resol=True, ToggleMapView=False, applyActionNoise=False):
+	def __init__(self, scene_type='Kitchen', scene_num=1, grid_size=0.25,
+				 node_radius=VISBILITY_DISTANCE, default_resol=True, ToggleMapView=False,
+				 applyActionNoise=False, renderObjectImage=True):
 		self._scene_type = scene_type
 		self._scene_num = scene_num
 		self._grid_size = grid_size
@@ -45,7 +47,8 @@ class Agent_Sim():
 
 		self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
 
-		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW, applyActionNoise=applyActionNoise)
+		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE,
+									  fieldOfView=FIELD_OF_VIEW, applyActionNoise=applyActionNoise, renderObjectImage=renderObjectImage)
 
 		if not default_resol:
 			self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)  # Change simulation window size
@@ -313,6 +316,7 @@ class Agent_Sim():
 
 	def save_current_fram(self, FILE_PATH, file_name):
 		img, SG_data = self.get_current_data()
+		# self._SG.visualize_SG()
 		img.save(FILE_PATH + '/' + file_name + '.png')
 		np.save(FILE_PATH + '/' + file_name + '.npy', SG_data)
 
@@ -405,7 +409,11 @@ class Agent_Sim():
 			# store image and SG
 			for p in points:
 				for r in rotations:
-					self._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=r)
+					event = self._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=r)
+
+					if not event.metadata['lastActionSuccess']:
+						continue
+
 					file_name = 'round' + str(round) + '_' + str(p['x']) + '_' + str(p['z']) + '_' + str(r['y']) + '_' + 'end'
 					if saving_data:
 						self.save_current_fram(file_path, file_name)

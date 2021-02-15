@@ -1,9 +1,10 @@
 # Import params and similarity from lib module
 import torch
-import argparse, os, copy, pickle
+import argparse, os, copy, pickle, time
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
+from progress.bar import Bar
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from torchsummary import summary
@@ -11,10 +12,11 @@ from termcolor import colored
 from lib.robot_env import Agent_Sim
 from lib.object_dynamics import shuffle_scene_layout
 from lib.params import SCENE_TYPES, SCENE_NUM_PER_TYPE, NODES
+from lib.scene_graph_generation import Scene_Graph
 from Network.retrieval_network.params import *
-from Network.retrieval_network.datasets import TripletImagesDataset, TripletDataset, update_triplet_info, get_adj_matrix
+from Network.retrieval_network.datasets import TripletImagesDataset, TripletDataset, SiameseDataset, update_triplet_info, get_adj_matrix
 from Network.retrieval_network.networks import TripletNetImage, SiameseNetImage, TripletNetSG, RetrievalTriplet, RetrievalSiamese
-from Network.retrieval_network.losses import TripletLoss
+from Network.retrieval_network.losses import TripletLoss, MSELoss
 from Network.retrieval_network.trainer import Training
 from os.path import dirname, abspath
 
@@ -54,11 +56,13 @@ def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix):
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
     # Decay LR by a factor of 0.1 every 7 epochs
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=STEP_SIZE, gamma=GAMMA)
+    # Use best accuracy to determine the best fit if and only if using TripletLoss
+    best_acc_criteria = (LossFcn.__class__.__name__ == 'TripletLoss')
 
     # --------------------------------Training--------------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Training with dataset size --> ', dataset_sizes)
     data_loaders = {'train': train_loader, 'val': val_loader}
-    model_best_fit = Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=checkpoints_prefix)
+    model_best_fit = Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, best_acc_criteria, num_epochs=NUM_EPOCHS, checkpoints_prefix=checkpoints_prefix)
 
     # ------------------------------------------------------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Done... Best Fit Model Saved')
@@ -83,7 +87,7 @@ def get_topo_map_features(robot, data_dir, map_round=0):
             img = feature_transforms(Image.open(path_prefix + '.png')).unsqueeze(dim=0)
             sg = np.load(path_prefix + '.npy', allow_pickle='TRUE').item()
             sg = (get_adj_matrix(sg['on']), get_adj_matrix(sg['in']), get_adj_matrix(sg['proximity']))
-            node_feature.append(dict(img=img,sg=sg))
+            node_feature.append(copy.deepcopy(dict(img=img, sg=sg, img_original=Image.open(path_prefix + '.png'))))
 
         features.append(copy.deepcopy(node_feature))
     return features
@@ -96,6 +100,39 @@ def wrapToPi(angle):
         angle -= 180
     return angle
 
+# ------------------------------------------------------------------------------
+# This function is used to save datapoint into failure-cases folder where the
+# localization evaluation is considered not a success at current pose_z
+def save_datapoint(scene_name, pose_z, gtSubnodeFeatures, mostSimilarSubnodeFeatures, currentFeatures, similarity, info):
+    file_name = '{}_at_node_({},{})_({:.4},{:.4},{:.4})_with_similarity_{:.4}'.format(scene_name, info[1], info[2], pose_z[0], pose_z[1], pose_z[2], similarity)
+
+    fig, axs = plt.subplots(2, 3, figsize=(17,10))
+    plt.axis('off')
+
+    axs[0,2].imshow(currentFeatures['img'])
+    axs[0,2].set_title('Current observation')
+    axs[0,2].axis('off')
+    sg_data = currentFeatures['sg']
+    SG = Scene_Graph(R_on=sg_data['on'], R_in=sg_data['in'], R_proximity=sg_data['proximity'])
+    SG.visualize_SG(axis=axs[1,2])
+    SG.reset()
+
+    data = [gtSubnodeFeatures[info[1]][info[2]], mostSimilarSubnodeFeatures]
+    legend = ['GroundTrue subnode', 'most Similar Subnode']
+    for i in range(2):
+        axs[0,i].imshow(data[i]['img_original'])
+        axs[0,i].set_title(legend[i])
+        axs[0,i].axis('off')
+        sg_data = [tensor.numpy().transpose() for tensor in data[i]['sg']]
+        SG = Scene_Graph(R_on=sg_data[0], R_in=sg_data[1], R_proximity=sg_data[2])
+        SG.visualize_SG(axis=axs[1,i])
+        SG.reset()
+        axs[1,i].axis('off')
+
+    plt.savefig('./Network/retrieval_network/failure-Cases/' + file_name + '.png')
+    plt.close(fig)
+
+# ------------------------------------------------------------------------------
 # pose_z = [p['x'], p['z'], subnode]
 # info = [is_node, node_i, subnode_i]
 def localization_eval(model, robot, device, success_and_trial, staticstics, topo_features, z, pose_z, info):
@@ -153,10 +190,16 @@ def localization_eval(model, robot, device, success_and_trial, staticstics, topo
             if info[0] and node_i != info[1] and subnode_i != info[2]:
                 if benchmark <= score:
                     is_success = False
+                    failureCaseSimilarity = score
+                    failureCaseFeatures = copy.deepcopy(subnode_feature)
+
 
     if info[0]:
         if is_success:
             success_and_trial['success'] += 1
+        else:
+            # memo down failure cases
+            save_datapoint(robot._scene_name, pose_z, topo_features, failureCaseFeatures, z, failureCaseSimilarity, info)
 
 # ------------------------------------------------------------------------------
 # Visualize Test Staticstics
@@ -187,10 +230,6 @@ def plot_heatmap(staticstics):
             ax.set_yticks(np.arange(0, map_len+1, tick_step))
             ax.set_xticklabels(np.arange(0, map_len+1, tick_step) - int(map_len / 2.0))
             ax.set_yticklabels(np.arange(0, map_len+1, tick_step) - int(map_len / 2.0))
-            # for i in range(map_len):
-            #     for j in range(map_len):
-            #         if mean[i,j] >= 0.5:
-            #             text = ax.text(i, j, '{:.2f}'.format(int(data[i,j]*100)/100.0), ha="center", va="center", color="k")
 
         fig.suptitle('Heatmap for view angle difference of {} degree'.format(angles[k]))
 
@@ -264,26 +303,33 @@ def testing_pipeline(Network, checkpoint, image_branch=False, dynamcis_rounds=2)
 
             # Image store for every points and angles in map
             for p in map:
-                is_node, node_i = robot.is_node([p['x'], p['z']], threshold=1e-8)
+                is_node, node_i = robot.is_node([p['x'], p['z']], threshold=1e-7)
                 for subnode_i, subnode in enumerate(subnodes):
                     # Add Gaussian Noise to pose
                     rotation = copy.deepcopy(subnode)
                     rotation['y'] += np.random.randn()*2
                     p['x'] += np.random.randn()*robot._grid_size*0.25
                     p['z'] += np.random.randn()*robot._grid_size*0.25
-                    robot._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=rotation)
+                    event = robot._controller.step(action='TeleportFull', x=p['x'], y=p['y'], z=p['z'], rotation=rotation)
+                    time.sleep(2)
+
+                    if not event.metadata['lastActionSuccess']:
+                        continue
+
                     if image_branch:
                         img_z = robot.get_current_fram()
-                        z = dict(img=img_z)
+                        z = copy.deepcopy(dict(img=img_z))
                     else:
                         img_z, sg_z = robot.get_current_data()
-                        z = dict(img=img_z, sg=sg_z)
-                    observations.append(([p['x'], p['z']], [is_node, node_i, subnode_i], z))
+                        z = copy.deepcopy(dict(img=img_z, sg=sg_z))
 
-            print('----'*20 + '\n' + colored('Testing Info: ','blue') + 'Testing in scene' + robot._scene_name)
+                    observations.append(copy.deepcopy(([p['x'], p['z'], subnode['y']], [is_node, node_i, subnode_i], z)))
+
             # ------------------------------------------------------------------
             # --------------------Start testing in new scene--------------------
             # ------------------------------------------------------------------
+            print('----'*20 + '\n' + colored('Testing Info: ','blue') + 'Testing in scene' + robot._scene_name)
+            bar = Bar('Processing', max=dynamcis_rounds*len(observations))
             for round in range(dynamcis_rounds):
                 # --------------------------------------------------------------
                 # get diffrerent info with dynamcis in topological map
@@ -296,6 +342,8 @@ def testing_pipeline(Network, checkpoint, image_branch=False, dynamcis_rounds=2)
                 # Iterate testing through map
                 for pose_z, info, z in observations:
                     localization_eval(model, robot, device, success_and_trials[metric_idx], staticstics, topo_features, z, pose_z, info)
+                    bar.next()
+            bar.finish()
             # ------------------------------------------------------------------
             scene_trials = success_and_trials[metric_idx]['trials']
             scene_success = success_and_trials[metric_idx]['success']
@@ -314,6 +362,15 @@ def testing_pipeline(Network, checkpoint, image_branch=False, dynamcis_rounds=2)
 
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
+    with open('staticstics.pickle', 'rb') as f:
+        staticstics = pickle.load(f)
+        plot_heatmap(staticstics)
+
+    with open('success_and_trials.pickle', 'rb') as f:
+        success_and_trials = pickle.load(f)
+        success_and_trials = success_and_trials[0:20]
+        plot_success(success_and_trials)
+    exit(0)
     # --------------------------------------------------------------------------
     # Get argument from CMD line
     parser = argparse.ArgumentParser()
@@ -325,6 +382,7 @@ if __name__ == '__main__':
     parser.add_argument("--all", help="entire network", action="store_true")
     args = parser.parse_args()
 
+    torch.cuda.empty_cache()
     # --------------------------------------------------------------------------
     # Use to load triplet infomation which is used to collect ground truth
     # when you have new incoming dataset/data
@@ -337,14 +395,16 @@ if __name__ == '__main__':
         if args.image and not args.all:
             Dataset = TripletImagesDataset
             Network = TripletNetImage
+            LossFcn = TripletLoss(constant_margin=False)
             checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
         elif args.all and not args.image:
-            Dataset = TripletDataset
-            Network = RetrievalTriplet
+            Dataset = SiameseDataset
+            Network = RetrievalSiamese
+            LossFcn = MSELoss()
             checkpoints_prefix = CHECKPOINTS_DIR
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
-        LossFcn = TripletLoss(constant_margin=False)
+
         TraningFcn = Training
         model_best_fit = training_pipeline(Dataset, Network, LossFcn, TraningFcn, checkpoints_prefix)
         torch.save(model_best_fit.state_dict(), checkpoints_prefix + 'best_fit.pkl')
@@ -361,5 +421,5 @@ if __name__ == '__main__':
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
-        Checkpoint = checkpoints_prefix + 'best_fit.pkl'
+        Checkpoint = checkpoints_prefix + 'best_fit_MSELoss.pkl'
         testing_pipeline(Network, Checkpoint, image_branch=args.image)

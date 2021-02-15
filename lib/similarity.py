@@ -42,7 +42,7 @@ def view_similarity(pose1, pose2, visualization_on=False):
     # special case/ hard coding filter
     angle_diff = abs(pose1['theta']-pose2['theta'])
     distance = ((pose1['x']-pose2['x'])**2 + (pose1['z']-pose2['z'])**2)**0.5
-    if angle_diff > 360 / (SUB_NODES_NUM * 2) or distance >= VISBILITY_DISTANCE:
+    if (angle_diff - 360 / SUB_NODES_NUM) >= 0 or distance >= VISBILITY_DISTANCE:
         return 0
 
     grid_size = VISBILITY_DISTANCE * 2 / 10**SIMILARITY_GRID_ORDER # distance between two dots

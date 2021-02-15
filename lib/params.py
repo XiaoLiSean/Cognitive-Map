@@ -3,8 +3,9 @@ from os.path import dirname, abspath
 import numpy as np
 
 # ------------------------------------------------------------------------------
-SIM_WINDOW_HEIGHT = 700
-SIM_WINDOW_WIDTH = 900
+DEFAULT_IMG_SIZE = 300
+SIM_WINDOW_HEIGHT = DEFAULT_IMG_SIZE
+SIM_WINDOW_WIDTH = DEFAULT_IMG_SIZE
 BAN_TYPE_LIST = ['Floor']   # Ignore non-informative objectType e.g. 'Floor
 SCENE_TYPES = ['Kitchen', 'Living room', 'Bedroom', 'Bathroom']
 SCENE_NUM_PER_TYPE = 30
@@ -31,14 +32,32 @@ SIMILARITY_GRID_ORDER = 2 # Approx Grid Size of 10^SIMILARITY_GRID_ORDER for sim
 # ------------------------------------------------------------------------------
 # This is after group up
 # ------------------------------------------------------------------------------
-GROUP_UP_LIST = ['Drawer', 'Cabinet', 'Shelf'] # Used to group up massive numbers of receptacles in SG module
+'''
+Used to group up massive numbers of receptacles or identical object in SG module
+Objects in these objectTypes are typically presented in array or regular spatial order.
+'''
+
+GROUP_UP_LIST = ['Drawer', 'Cabinet', 'Shelf', 'StoveBurner', 'StoveKnob', 'Window', 'Book',
+                 'Fork', 'Plate', 'Vase', 'ButterKnife', 'Statue', 'Faucet',
+                 'Ladle', 'Pencil', 'Blinds', 'Mirror', 'Painting', 'Pillow', 'Newspaper',
+                 'Candle', 'RoomDecor', 'CD', 'TennisRacket', 'Poster', 'Cloth', 'TowelHolder',
+                 'ToiletPaper', 'HandTowelHolder']
 # ------------------------------------------------------------------------------
 # Maximum numbers of receptacles appeared in one scene after group_up()
 # ------------------------------------------------------------------------------
-REC_MAX_DIC = {'Drawer': 6, 'CounterTop': 4, 'Cabinet': 8, 'Shelf': 6, 'Pot': 2,
-               'SinkBasin': 2, 'Stool': 2, 'Chair': 8, 'Sink': 2, 'SideTable': 8,
-               'DiningTable': 3, 'Box': 4, 'ArmChair': 4, 'CoffeeTable': 4,
-               'TVStand': 2, 'Sofa': 2, 'Desk': 5, 'Dresser': 4, 'Bed': 2, 'Footstool': 2}
+'''
+2021 Feb 02: Modify the REC_MAX_DIC from receptacle to general objects
+since visual information is utilized in the Network implementation.
+Cases of multiple general objects in FoV (e.g. two statues) need to be considered
+'''
+REC_MAX_DIC = {'CounterTop': 4, 'Sink': 2, 'HousePlant': 2, 'Pot': 2, 'Cup': 3, 'SinkBasin': 2, 'ShelvingUnit': 2,
+               'Stool': 2, 'Drawer': 6, 'Cabinet': 8, 'Shelf': 6, 'StoveBurner': 2, 'StoveKnob': 4, 'Window': 4,
+               'Book': 3, 'Fork': 6, 'Plate': 6, 'Vase': 7, 'ButterKnife': 5, 'Statue': 7, 'Faucet': 3, 'CellPhone': 2,
+               'Chair': 8, 'Ladle': 2, 'SideTable': 8, 'DiningTable': 3, 'Curtains': 3, 'Pencil': 3, 'Blinds': 4,
+               'AluminumFoil': 3, 'Box': 4, 'FloorLamp': 3, 'DeskLamp': 2, 'ArmChair': 4, 'CoffeeTable': 4, 'TVStand': 2,
+               'Sofa': 2, 'Painting': 4, 'Pillow': 2, 'Newspaper': 2, 'Desk': 5, 'Dresser': 4, 'Candle': 3, 'RoomDecor': 5,
+               'Bed': 2, 'BaseballBat': 2, 'CD': 3, 'TennisRacket': 2, 'Dumbbell': 2, 'Poster': 2, 'Cloth': 2, 'Footstool': 2,
+               'ShowerHead': 2, 'TowelHolder': 2, 'ToiletPaper': 2, 'HandTowelHolder': 4}
 
 # ------------------------------------------------------------------------------
 # This is a keys dictionary pairing keys in idx_2_obj_list and glove_embedding
@@ -48,15 +67,15 @@ THOR_2_GLOVE = {'StoveBurner': 'cookstove', 'Drawer': 'drawer', 'CounterTop': 'c
 # These two lists are used to determine the extend of object dynamics based on intrinsic convention of human activity
 # ------------------------------------------------------------------------------
 HIGH_DYNAMICS = ['GarbageCan', 'Stool', 'Chair', 'GarbageBag',
-                 'DeskLamp', 'ArmChair', 'Toaster', 'SideTable',
-                 'LaundryHamper', 'Desktop', 'VacuumCleaner', 'RoomDecor',
+                 'LaundryHamper', 'Desktop', 'VacuumCleaner',
                  'Ottoman', 'DogBed']
 
 LOW_DYNAMICS = ['Microwave', 'CoffeeMachine', 'ShelvingUnit', 'DiningTable',
+                'DeskLamp', 'ArmChair', 'Toaster', 'SideTable', 'RoomDecor',
                 'CoffeeTable', 'TVStand', 'Sofa', 'Safe', 'Television',
                 'Desk', 'Dresser', 'Bed', 'HousePlant', 'FloorLamp']
 # ------------------------------------------------------------------------------
-LOW_DYNAMICS_MOVING_RATIO = 0.5 # THreshold for object shuffling range
+LOW_DYNAMICS_MOVING_RATIO = 0.1 # THreshold for object shuffling range
 MASS_MIN = 0.0 # Minimum furniture mass
 MASS_MAX = 103.999992 # Maximum furniture mass
 ROTATE_MAX_DEG = 10 # Maximum furniture rotate angle in degree during random shuffling
@@ -104,8 +123,8 @@ NODES = {'FloorPlan26': [[-2.00, 4.00], [-1.00, 4.00], [-2.00, 3.00], [-1.25, 3.
                          [1.5, -0.25], [1.5, -0.75], [-1.25, 1.00]],
          'FloorPlan30': [[2.50, -1.50], [1.75, -1.50], [2.50, -0.50], [2.00, -0.50],
                          [2.50, 0.50], [2.00, 0.50], [2.50, 1.50], [2.00, 1.50],
-                         [1.00, -0.50], [-0.25, -0.50], [-0.25, 0.50], [-0.25, 1.50],
-                         [1.00, 1.50], [0.50, -1.00], [0.50, -0.50], [0.50, 1.50]],
+                         [1.25, -0.50], [0.00, -0.50], [0.00, 0.50], [0.00, 1.50],
+                         [1.25, 1.50], [0.50, -1.00], [0.50, -0.50], [0.50, 1.50]],
 
           'FloorPlan229': [[-0.25, 3.00], [-0.25, 2.25], [-1.00, 3.00], [-1.00, 2.25],
                            [-1.00, 1.25], [-1.50, 1.25], [-1.00, 0.25], [-1.50, 0.25],
