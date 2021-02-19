@@ -10,45 +10,6 @@ import numpy as np
 # ------------------------------------------------------------------------------
 # -----------------------------retrieval_network--------------------------------
 # ------------------------------------------------------------------------------
-
-class RetrievalSiamese(torch.nn.Module):
-    def __init__(self, GCN_layers=3, GCN_bias=True, pretrained_image=False):
-        super(RetrievalSiamese, self).__init__()
-        self.image_branch = SiameseNetImage()
-
-        if pretrained_image:
-            self.image_branch.load_state_dict(torch.load(CHECKPOINTS_DIR + 'image_best_fit.pkl'))
-
-        self.SG_branch = SiameseNetSG(num_layers=GCN_layers, bias=GCN_bias)
-        self.fcn = torch.nn.Sequential(
-                                torch.nn.Linear(IMAGE_ENCODING_VEC_LENGTH + SG_ENCODING_VEC_LENGTH, 2048),
-                                torch.nn.ReLU(),
-                                torch.nn.Linear(2048, SCENE_ENCODING_VEC_LENGTH),
-                                torch.nn.ReLU()
-                                      )
-
-    def forward(self, anchor_img, input_img, anchor_on, input_on, anchor_in, input_in, anchor_prox, input_prox):
-
-        anchor = self.get_embedding(anchor_img, anchor_on, anchor_in, anchor_prox)
-        input = self.get_embedding(input_img, input_on, input_in, input_prox)
-
-        return anchor, input
-
-    def get_embedding(self, img, A_on, A_in, A_prox, eval=False):
-        img_embedding = self.image_branch.get_embedding(img)
-        sg_embedding = self.SG_branch.get_embedding(A_on, A_in, A_prox)
-
-        if eval:
-            concacenated = torch.cat((img_embedding, sg_embedding), 0)
-        else:
-            concacenated = torch.cat((img_embedding, sg_embedding), 1)
-
-        embedding = self.fcn(concacenated)
-
-        return embedding
-
-
-# ------------------------------------------------------------------------------
 class RetrievalTriplet(torch.nn.Module):
     def __init__(self, GCN_layers=3, GCN_bias=True, pretrained_image=True):
         super(RetrievalTriplet, self).__init__()
@@ -94,27 +55,14 @@ class RetrievalTriplet(torch.nn.Module):
 # ------------------------------------------------------------------------------
 # -------------------------------Image Branch-----------------------------------
 # ------------------------------------------------------------------------------
-class SiameseNetImage(torch.nn.Module):
-    def __init__(self):
-        super(SiameseNetImage, self).__init__()
-        model = models.resnet50(pretrained=True)
-        # Strip final fc layer: self.embedding output 2048d
-        self.embedding = torch.nn.Sequential(*(list(model.children())[:-1]))
-
-    def forward(self, img1, img2):
-        embedding1 = self.get_embedding(img1)
-        embedding2 = self.get_embedding(img2)
-        return embedding1, embedding2
-
-    def get_embedding(self, img):
-        return torch.squeeze(self.embedding(img))
-# ------------------------------------------------------------------------------
 class TripletNetImage(torch.nn.Module):
     def __init__(self):
         super(TripletNetImage, self).__init__()
         model = models.resnet50(pretrained=True)
-        # Strip final fc layer: self.embedding output 512d
-        self.embedding = torch.nn.Sequential(*(list(model.children())[:-1]))
+        # The ResNet50-C4 Backbone
+        self.backbone = torch.nn.Sequential(*(list(model.children())[:-3]))
+        # ResNet Stage 5
+        self.head = torch.nn.Sequential(*(list(model.children())[-3:]))
 
     def forward(self, anchor_img, positive_img, negative_img):
         anchor = self.get_embedding(anchor_img)
@@ -130,64 +78,6 @@ class TripletNetImage(torch.nn.Module):
 # ------------------------------------------------------------------------------
 # Import vector embeding related parameters
 from lib.params import idx_2_obj_list, THOR_2_VEC
-# ------------------------------------------------------------------------------
-
-class SiameseNetSG(torch.nn.Module):
-    def __init__(self, num_layers=3, bias=True):
-        super(SiameseNetSG, self).__init__()
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.layers = num_layers
-        self.feature_matrix = self.get_features_matrix()
-        vector_d = list(self.feature_matrix.size())[1]
-        node_num = list(self.feature_matrix.size())[0]
-
-        self.GCNs_on = torch.nn.ModuleList()
-        self.GCNs_in = torch.nn.ModuleList()
-        self.GCNs_prox = torch.nn.ModuleList()
-        self.fcn = torch.nn.Sequential(
-                                torch.nn.Linear(node_num * 3, SG_ENCODING_VEC_LENGTH),
-                                torch.nn.ReLU()
-                                      )
-
-        for i in range(self.layers):
-            in_features = vector_d
-            out_features = vector_d
-            # Case Last layer: output scala for each node
-            if i == self.layers - 1:
-                out_features = 1
-            # Three braches of GCN for three object relationships
-            self.GCNs_on.append(GraphConvolution(in_features, out_features, bias=bias))
-            self.GCNs_in.append(GraphConvolution(in_features, out_features, bias=bias))
-            self.GCNs_prox.append(GraphConvolution(in_features, out_features, bias=bias))
-
-    def get_features_matrix(self):
-        features = []
-        # Normalize feature vectors to unit vector
-        for obj_name in idx_2_obj_list:
-            features.append(np.true_divide(THOR_2_VEC[obj_name], np.linalg.norm(THOR_2_VEC[obj_name])))
-
-        return torch.FloatTensor(np.asarray(features))
-
-    def forward(self, anchor_on, input_on, anchor_in, input_in, anchor_prox, input_prox):
-        anchor = self.get_embedding(anchor_on, anchor_in, anchor_prox)
-        input = self.get_embedding(input_on, input_in, input_prox)
-
-        return anchor, input
-
-    def get_embedding(self, A_on, A_in, A_prox):
-        X_on = self.feature_matrix.clone().detach().to(self.device)
-        X_in = self.feature_matrix.clone().detach().to(self.device)
-        X_prox = self.feature_matrix.clone().detach().to(self.device)
-        for i in range(self.layers):
-            X_on = F.relu(self.GCNs_on[i](X_on, A_on))
-            X_in = F.relu(self.GCNs_in[i](X_in, A_in))
-            X_prox = F.relu(self.GCNs_prox[i](X_prox, A_prox))
-
-        concacenated = torch.squeeze(torch.cat((X_on, X_in, X_prox), 1))
-        embedding = self.fcn(concacenated)
-
-        return embedding
-
 # ------------------------------------------------------------------------------
 class TripletNetSG(torch.nn.Module):
     def __init__(self, num_layers=3, bias=True):

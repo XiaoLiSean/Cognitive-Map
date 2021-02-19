@@ -180,9 +180,9 @@ class Robot():
         sigma_x = self._grid_size / 12
         sigma_z = self._grid_size / 12
         sigma_theta = 360 / (30*SUB_NODES_NUM)
-        noise_x = np.clip(np.random.normal(0.0, sigma_x), a_min = -3*sigma_x, a_max = 3*sigma_x)
-        noise_z = np.clip(np.random.normal(0.0, sigma_z), a_min = -3*sigma_z, a_max = 3*sigma_z)
-        noise_theta = np.clip(np.random.normal(0.0, sigma_theta), a_min = -3*sigma_theta, a_max = 3*sigma_theta)
+        noise_x = np.clip(np.random.normal(0.0, sigma_x), a_min = -1*sigma_x, a_max = 1*sigma_x)
+        noise_z = np.clip(np.random.normal(0.0, sigma_z), a_min = -1*sigma_z, a_max = 1*sigma_z)
+        noise_theta = np.clip(np.random.normal(0.0, sigma_theta), a_min = -1*sigma_theta, a_max = 1*sigma_theta)
         rotation = dict(x=0.0, y=theta+noise_theta, z=0.0)
 
         return x+noise_x, z+noise_z, rotation

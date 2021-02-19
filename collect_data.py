@@ -15,10 +15,11 @@ def get_index_as_tuple_list(array_map):
     tuple_list = []
     # Filter out array entries with only one data
     idx_lists = array_map.nonzero()
-    for i in range(len(idx_lists[0])):
+    reachable_points_num = len(idx_lists[0])
+    for i in range(reachable_points_num):
         if array_map[idx_lists[0][i],idx_lists[1][i]] > 1:
             tuple_list.append((idx_lists[0][i],idx_lists[1][i]))
-    return tuple_list
+    return tuple_list, reachable_points_num
 
 def manhattan_distance(x, y):
     return np.abs(x[0]-y[0]) + np.abs(x[1]-y[1])
@@ -110,23 +111,33 @@ def cutoff_dataset(ith_tier_APN, dataset_size, fraction):
     ith_tier_APN = ith_tier_APN[0:cutoff_idx]
     return ith_tier_APN
 
-def generate_triplets(file_path):
-    if os.path.exists(file_path + '/' + 'triplets_APN_name.npy'):
+def generate_triplets(file_path, magnitude=None):
+    if magnitude == None:
+        file_name = 'triplets_APN_name.npy'
+    else:
+        file_name = 'triplets_APN_name_magnitude_' + str(magnitude) + '.npy'
+
+    if os.path.exists(file_path + '/' + file_name):
         return
+
     triplets_APN_idx = []
     triplets_APN_name = []
     array_maps = np.load(file_path + '/' + 'array_maps.npy', allow_pickle='TRUE').item()
     for key in array_maps:
         # get array-like map for a specific robot heading [0.0, 90.0, 180.0, 270.0]
         array_map = array_maps[key]
-        idx_list = get_index_as_tuple_list(array_map)
+        idx_list, reachable_points_num = get_index_as_tuple_list(array_map)
         #-----------------------------------------------------------------------
-        '''Get 1'st tier data of (A,P,N) (35% of the entire dataset)'''
+        '''Get 1'st tier data of (A,P,N) (50% of the entire dataset)'''
         # (A,P,N) A = (i,j,idx) where idx \in array_map[i,j]
         #-----------------------------------------------------------------------
         first_tier_AP = get_first_tier_AP(idx_list, array_map, key)
         first_tier_APN = add_negative_data(first_tier_AP, array_map, key, distanceToAnchor=1)
-        dataset_size = round(len(first_tier_APN) / 0.50)
+        if magnitude == None:
+            dataset_size = round(len(first_tier_APN) / 0.50)
+        else:
+            dataset_size = reachable_points_num * magnitude
+            first_tier_APN = cutoff_dataset(first_tier_APN, dataset_size, 0.50)
         #-----------------------------------------------------------------------
         '''Get 2'nd tier data of (A,P,N) (20% of the entire dataset)'''
         #-----------------------------------------------------------------------
@@ -134,13 +145,13 @@ def generate_triplets(file_path):
         second_tier_APN = add_negative_data(second_tier_AP, array_map, key, distanceToAnchor=2)
         second_tier_APN = cutoff_dataset(second_tier_APN, dataset_size, 0.20)
         #-----------------------------------------------------------------------
-        '''Get 3'rd tier data of (A,P,N) (20% of the entire dataset)'''
+        '''Get 3'rd tier data of (A,P,N) (15% of the entire dataset)'''
         #-----------------------------------------------------------------------
         third_tier_AP = get_AP_from_previous_tier_AN(second_tier_APN)
         third_tier_APN = add_negative_data(third_tier_AP, array_map, key, distanceToAnchor=3)
         third_tier_APN = cutoff_dataset(third_tier_APN, dataset_size, 0.15)
         #-----------------------------------------------------------------------
-        '''Get 4'th tier data of (A,P,N) (20% of the entire dataset)'''
+        '''Get 4'th tier data of (A,P,N) (10% of the entire dataset)'''
         #-----------------------------------------------------------------------
         fourth_tier_AP = get_AP_from_previous_tier_AN(third_tier_APN)
         fourth_tier_APN = add_negative_data(fourth_tier_AP, array_map, key, distanceToAnchor=4)
@@ -172,7 +183,7 @@ def generate_triplets(file_path):
         negative = str(APN[2][3]) + '_' + str(APN[2][0]) + '_' + str(APN[2][1]) + '_' + str(APN[2][2])
         triplets_APN_name.append(deepcopy((anchor, positive, negative)))
 
-    np.save(file_path + '/' + 'triplets_APN_name.npy', triplets_APN_name)
+    np.save(file_path + '/' + file_name, triplets_APN_name)
 
     return len(triplets_APN_name)
 
@@ -200,9 +211,37 @@ def data_collection(partition_num, partition_list):
 
             robot.reset_scene(scene_type=scene_type, scene_num=scene_num)
             robot.coordnates_patroling(saving_data=True, file_path=FILE_PATH, dynamics_rounds=5, pertubation_round=2)
-            datanum = generate_triplets(FILE_PATH + '/' + robot._scene_name)
+            datanum = generate_triplets(FILE_PATH + '/' + robot._scene_name, magnitude=5)
             if datanum != None:
                 print('{}: {} triplets'.format(robot._scene_name, datanum))
+
+# ------------------------------------------------------------------------------
+# generate triplets train, validation and test data for network image branch
+def regenerate_triplets(magnitude):
+    total_data_num = 0
+    # Iterate through all the scenes to collect data and separate them into train, val and test sets
+    for scene_type in SCENE_TYPES:
+        for scene_num in range(1, SCENE_NUM_PER_TYPE + 1):
+            if scene_num <= int(SCENE_NUM_PER_TYPE*TRAIN_FRACTION):
+                FILE_PATH = DATA_DIR + '/train'
+            elif scene_num <= int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)):
+                FILE_PATH = DATA_DIR + '/val'
+            else:
+                FILE_PATH = DATA_DIR + '/test'
+
+            if scene_type == 'Kitchen':
+            	add_on = 0
+            elif scene_type == 'Living room':
+            	add_on = 200
+            elif scene_type == 'Bedroom':
+            	add_on = 300
+            elif scene_type == 'Bathroom':
+            	add_on = 400
+            scene_name = 'FloorPlan' + str(add_on + scene_num)
+            print('----'*20)
+            datanum = generate_triplets(FILE_PATH + '/' + scene_name, magnitude=magnitude)
+            total_data_num += datanum
+            print('{}: {} triplets, {} in total'.format(scene_name, datanum, total_data_num))
 
 # ------------------------------------------------------------------------------
 # manually update topological map info
@@ -229,17 +268,22 @@ if __name__ == '__main__':
     # Get argument from CMD line
     parser = argparse.ArgumentParser()
     parser.add_argument("--topo", help="manually update topological map info", action="store_true")
+    parser.add_argument("--regenerate", help="regenerate_triplets", action="store_true")
     parser.add_argument("--collect_partition", nargs="+", default=[])
     parser.add_argument("--yidong", help="manually collect topological map node for yidong", action="store_true")
     parser.add_argument("--xiao", help="manually collect topological map node for xiao", action="store_true")
     args = parser.parse_args()
 
-    # generate_triplets(DATA_DIR + '/train' + '/FloorPlan1')
+    if args.regenerate:
+        # 5: 330674 triples in total
+        # 10: 661320 triples in total
+        # 20: 1322640 triples in total
+        regenerate_triplets(20)
 
     # --------------------------------------------------------------------------
     # Used to collect data
     if len(args.collect_partition) > 0:
-        partition_num = 4
+        partition_num = 30
         data_collection(partition_num, args.collect_partition)
 
     # Used to see visualization of each test scene and record the topological node manually
