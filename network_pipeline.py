@@ -9,23 +9,13 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 from torchsummary import summary
 from termcolor import colored
-from lib.params import SCENE_TYPES, SCENE_NUM_PER_TYPE, NODES
 from lib.scene_graph_generation import Scene_Graph
 from Network.retrieval_network.params import *
 from Network.retrieval_network.datasets import TripletDataset
-from Network.retrieval_network.networks import RetrievalTriplet, TripletNetImage
+from Network.retrieval_network.networks import RetrievalTriplet
 from Network.retrieval_network.losses import TripletLoss
 from Network.retrieval_network.trainer import Training
 from os.path import dirname, abspath
-
-i = TripletNetImage()
-exit(0)
-
-train_dataset = TripletDataset(is_train=True)
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-for batch_idx, inputs in enumerate(train_loader):
-    print(len(inputs[14]))
-    print(inputs[14])
 
 # ------------------------------------------------------------------------------
 # -------------------------------Training Pipeline------------------------------
@@ -40,20 +30,20 @@ def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix):
 
     # --------------------------Loading validation dataset--------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading validation dataset...')
-    val_dataset = Dataset(DATA_DIR, is_train=False)
+    val_dataset = Dataset(DATA_DIR, is_val=True)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     dataset_sizes.update({'val': len(val_dataset)})
 
     # ------------------------------Initialize model--------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
-    model = Network()
+    model = Network(self_pretrained_image=False)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Model training on: ", device)
     print("Cuda is_available: ", torch.cuda.is_available())
     model.to(device)
 
     # Uncomment to see the summary of the model structure
-    # summary(model, [(3, IMAGE_SIZE, IMAGE_SIZE), (3, IMAGE_SIZE, IMAGE_SIZE)])
+    # summary(model, input_size=[(3, IMAGE_SIZE, IMAGE_SIZE), (3, IMAGE_SIZE, IMAGE_SIZE)])
 
     # ----------------------------Set Training Critera------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Set Training Critera...')
@@ -63,13 +53,11 @@ def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix):
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
     # Decay LR by a factor of 0.1 every 7 epochs
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=STEP_SIZE, gamma=GAMMA)
-    # Use best accuracy to determine the best fit if and only if using TripletLoss
-    best_acc_criteria = (LossFcn.__class__.__name__ == 'TripletLoss')
 
     # --------------------------------Training--------------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Training with dataset size --> ', dataset_sizes)
     data_loaders = {'train': train_loader, 'val': val_loader}
-    model_best_fit = Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, best_acc_criteria, num_epochs=NUM_EPOCHS, checkpoints_prefix=checkpoints_prefix)
+    model_best_fit = Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=checkpoints_prefix)
 
     # ------------------------------------------------------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Done... Best Fit Model Saved')
@@ -104,10 +92,10 @@ if __name__ == '__main__':
             LossFcn = TripletLoss(constant_margin=False)
             checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
         elif args.all and not args.image:
-            Dataset = SiameseDataset
-            Network = RetrievalSiamese
-            LossFcn = MSELoss()
-            checkpoints_prefix = CHECKPOINTS_DIR
+            Dataset = TripletDataset
+            Network = RetrievalTriplet
+            LossFcn = TripletLoss()
+            checkpoints_prefix = None
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
@@ -117,15 +105,3 @@ if __name__ == '__main__':
 
     # --------------------------------------------------------------------------
     # Testing corresponding networks
-    if args.test:
-        if args.image and not args.all:
-            Network = SiameseNetImage
-            checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
-        elif args.all and not args.image:
-            Network = RetrievalSiamese
-            checkpoints_prefix = CHECKPOINTS_DIR
-        else:
-            print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
-
-        Checkpoint = checkpoints_prefix + 'best_fit_MSELoss.pkl'
-        testing_pipeline(Network, Checkpoint, image_branch=args.image)

@@ -143,11 +143,18 @@ class TripletDataset(torch.utils.data.Dataset):
         adj_on = (get_adj_matrix(anchor_SG['on']), get_adj_matrix(positive_SG['on']), get_adj_matrix(negative_SG['on']))
         adj_in = (get_adj_matrix(anchor_SG['in']), get_adj_matrix(positive_SG['in']), get_adj_matrix(negative_SG['in']))
         adj_proximity = (get_adj_matrix(anchor_SG['proximity']), get_adj_matrix(positive_SG['proximity']), get_adj_matrix(negative_SG['proximity']))
-        fractional_bboxs = (anchor_SG['fractional_bboxs'], positive_SG['fractional_bboxs'], negative_SG['fractional_bboxs'])
+
+        fractional_bboxs = (np.asarray(anchor_SG['fractional_bboxs'], dtype=np.float32),
+                            np.asarray(positive_SG['fractional_bboxs'], dtype=np.float32),
+                            np.asarray(negative_SG['fractional_bboxs'], dtype=np.float32))
+
+        obj_occurence_vecs = (np.asarray(anchor_SG['vec'].todense(), dtype=np.float32),
+                              np.asarray(positive_SG['vec'].todense(), dtype=np.float32),
+                              np.asarray(negative_SG['vec'].todense(), dtype=np.float32))
 
         # self.show_data_points((Image.open(paths[0]+'.png'), Image.open(paths[1]+'.png'), Image.open(paths[2]+'.png')), adj_on, adj_in, adj_proximity, fractional_bboxs, paths)
 
-        return triplet_imgs + adj_on + adj_in + adj_proximity + fractional_bboxs
+        return triplet_imgs + adj_on + adj_in + adj_proximity + fractional_bboxs + obj_occurence_vecs
 
     def __len__(self):
         return len(self.triplets)

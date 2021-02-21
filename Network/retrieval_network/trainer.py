@@ -8,18 +8,18 @@ from progress.bar import Bar
 from Network.retrieval_network.params import *
 
 # ------------------------------------------------------------------------------
-def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, best_acc_criteria, num_epochs=NUM_EPOCHS, checkpoints_prefix=None):
+def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=None):
     """
     Loaders, model, loss function and metrics should work together for a given task,
     i.e. The model should be able to process data output of loaders,
     loss function should process target output of loaders and outputs from the model
     """
     start_time = time.time() # Traning starting time_elapsed
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Intialize storage for best weights/model and accuracy
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
-    best_loss = 100.0
 
     # --------------------------------------------------------------------------
     # Traning start
@@ -45,18 +45,17 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
             # loading bar
             print('----'*6)
             bar = Bar('Processing', max=math.ceil(dataset_sizes[phase]/BATCH_SIZE))
-            for batch_idx, (inputs, alphas) in enumerate(data_loaders[phase]):
+            for batch_idx, inputs in enumerate(data_loaders[phase]):
                 # zero the parameter gradients
                 optimizer.zero_grad()
                 # Case scene graph brach: for triplet data (A,N,P), each of A,N,P have 3 matrices for scene graphs
                 inputs = tuple(input.to(device) for input in inputs) # to GPU
-                alphas = tuple(alpha.to(device) for alpha in alphas) # to GPU
 
                 # Forward propagation
                 # Track history if only in trainer
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(*inputs)
-                    loss, correct_num = loss_fcn(*outputs, alphas, device, batch_average_loss=True)
+                    loss, correct_num = loss_fcn(*outputs, batch_average_loss=True)
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
@@ -82,14 +81,10 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
                 if checkpoints_prefix != None:
                     FILE = checkpoints_prefix + '_loss_' + str(epoch_loss) + '_acc_' + str(epoch_acc.item()) + '_epoch_' + str(epoch) + '.pkl'
                     torch.save(model.state_dict(), FILE)
-                if best_acc_criteria:
-                    if epoch_acc > best_acc:
-                        best_acc = epoch_acc
-                        best_model_wts = copy.deepcopy(model.state_dict())
-                else:
-                    if epoch_loss < best_loss:
-                        best_loss = epoch_loss
-                        best_model_wts = copy.deepcopy(model.state_dict())
+
+                if epoch_acc > best_acc:
+                    best_acc = epoch_acc
+                    best_model_wts = copy.deepcopy(model.state_dict())
 
             # ------------------------------------------------------------------
     # --------------------------------------------------------------------------
@@ -100,4 +95,5 @@ def Training(device, data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr
 
     # load best model weights
     model.load_state_dict(best_model_wts)
+
     return model
