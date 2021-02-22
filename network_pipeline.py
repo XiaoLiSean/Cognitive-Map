@@ -12,7 +12,7 @@ from termcolor import colored
 from lib.scene_graph_generation import Scene_Graph
 from Network.retrieval_network.params import *
 from Network.retrieval_network.datasets import TripletDataset
-from Network.retrieval_network.networks import RetrievalTriplet
+from Network.retrieval_network.networks import RetrievalTriplet, TripletNetImage
 from Network.retrieval_network.losses import TripletLoss
 from Network.retrieval_network.trainer import Training
 from os.path import dirname, abspath
@@ -20,23 +20,26 @@ from os.path import dirname, abspath
 # ------------------------------------------------------------------------------
 # -------------------------------Training Pipeline------------------------------
 # ------------------------------------------------------------------------------
-def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix):
+def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix, is_only_image_branch=False):
     dataset_sizes = {}
     # ---------------------------Loading training dataset---------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading training dataset...')
-    train_dataset = Dataset(DATA_DIR, is_train=True)
+    train_dataset = Dataset(DATA_DIR, is_train=True, load_only_image_data=is_only_image_branch)
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     dataset_sizes.update({'train': len(train_dataset)})
 
     # --------------------------Loading validation dataset--------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading validation dataset...')
-    val_dataset = Dataset(DATA_DIR, is_val=True)
+    val_dataset = Dataset(DATA_DIR, is_val=True, load_only_image_data=is_only_image_branch)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     dataset_sizes.update({'val': len(val_dataset)})
 
     # ------------------------------Initialize model--------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
-    model = Network(self_pretrained_image=False)
+    if is_only_image_branch:
+        model = Network(enableRoIBridge=False) # Train Image Branch
+    else:
+        model = Network(self_pretrained_image=True) # freeze image branch and train SG
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Model training on: ", device)
     print("Cuda is_available: ", torch.cuda.is_available())
@@ -87,9 +90,9 @@ if __name__ == '__main__':
     # Train corresponding networks
     if args.train:
         if args.image and not args.all:
-            Dataset = TripletImagesDataset
+            Dataset = TripletDataset
             Network = TripletNetImage
-            LossFcn = TripletLoss(constant_margin=False)
+            LossFcn = TripletLoss()
             checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
         elif args.all and not args.image:
             Dataset = TripletDataset
@@ -100,8 +103,10 @@ if __name__ == '__main__':
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
         TraningFcn = Training
-        model_best_fit = training_pipeline(Dataset, Network, LossFcn, TraningFcn, checkpoints_prefix)
+        model_best_fit = training_pipeline(Dataset, Network, LossFcn, TraningFcn, checkpoints_prefix, is_only_image_branch=args.image)
         torch.save(model_best_fit.state_dict(), checkpoints_prefix + 'best_fit.pkl')
 
     # --------------------------------------------------------------------------
     # Testing corresponding networks
+    if args.test:
+        pass

@@ -23,12 +23,10 @@ GLOVE_FILE_NAME = 'glove.42B.300d.txt' # file name of glove vector
 glove_embedding = np.load(THIRD_PARTY_PATH + '/' + 'glove_embedding.npy', allow_pickle='TRUE').item() # all Glove word Embedding vectors
 THOR_2_VEC = np.load(THIRD_PARTY_PATH + '/' + 'THOR_2_VEC.npy', allow_pickle='TRUE').item() # objectType embedding using GLoVe vectors
 # ------------------------------------------------------------------------------
-PROXIMITY_THRESHOLD = 3 # distance ratio threshold for proximity determination
 CLUSTERING_RADIUS_RATIO = 1.0 # used to cluster drawers and cabinets, increase to allow larger tolerance
 VISBILITY_DISTANCE = 1.5 # default 1.5 meter, object within the radius of a cylinder centered about the y-axis of the agent is visible
 FIELD_OF_VIEW = 120 # default 90 degree, 120 degree is binocular FoV
 SUB_NODES_NUM = 4
-SIMILARITY_GRID_ORDER = 2 # Approx Grid Size of 10^SIMILARITY_GRID_ORDER for similarity score between views
 # ------------------------------------------------------------------------------
 # This is after group up
 # ------------------------------------------------------------------------------

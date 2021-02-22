@@ -17,15 +17,16 @@ SCENE_ENCODING_VEC_LENGTH = 1024 # encoding vector length of current scene (imag
 # ------------------------------------------------------------------------------
 # Traning parameters/setting
 BATCH_SIZE = 10 # common settings for networks {image=16, SG=120} 26
-NUM_EPOCHS = 60 # common settings for networks {image=50, SG=1000}
+NUM_EPOCHS = 200 # common settings for networks {image=50, SG=1000}
 # --------------------------------------------
 # Training hyper-parameter
-LEARNING_RATE = 0.001 # common settings for networks {image=0.001, SG=0.01}
-MOMENTUM = 0.9 # common settings for networks {image=0.9, SG=5e-4}
+LEARNING_RATE = 0.01 # common settings for networks {image=0.001, SG=0.01}
+MOMENTUM = 0.9 # common settings for networks {image=0.9}
 ALPHA_MARGIN = 0.15 # margin used in triplet loss
+DROPOUT_RATE = 0.2 # rate of dropout a certain neuron {20% = 0.2}
 # --------------------------------------------
-# Decay LR by a factor of GAMMA every STEP_SIZE epochs
-STEP_SIZE = 7 # common settings for networks {image=7, SG=10}
+# Decay LR by a factor of GAMMA (LR*=GAMMA) every STEP_SIZE epochs
+STEP_SIZE = 10 # common settings for networks {image=7, SG=10}
 GAMMA = 0.1 # common settings for networks {image=0.1, SG=0.01}
 # ------------------------------------------------------------------------------
 TRAIN_FRACTION = 0.7

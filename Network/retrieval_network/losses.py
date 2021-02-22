@@ -18,7 +18,6 @@ class TripletLoss(torch.nn.Module):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     def forward(self, anchors, positives, negatives, batch_average_loss=True):
-
         alphas = self.margin*torch.ones(BATCH_SIZE)
         alphas = alphas.to(self.device)
         # Using ReLU instead of max since max is not differentiable

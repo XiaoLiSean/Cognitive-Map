@@ -26,7 +26,6 @@ def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_schedul
     # --------------------------------------------------------------------------
     for epoch in range(num_epochs):
         print('----'*10 + '\n' + colored('Traning Info: ','blue') + 'Epoch {}/{}'.format(epoch + 1, num_epochs))
-
         # ----------------------------------------------------------------------
         # Each epoch has a training and validation phase
         # ----------------------------------------------------------------------

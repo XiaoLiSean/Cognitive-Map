@@ -6,7 +6,7 @@ from torchvision import models, ops
 from lib.params import OBJ_TYPE_NUM
 from Network.retrieval_network.params import BBOX_EMDEDDING_VEC_LENGTH, ROI_EMDEDDING_VEC_LENGTH, WORD_EMDEDDING_VEC_LENGTH, OBJ_FEATURE_VEC_LENGTH
 from Network.retrieval_network.params import SG_ENCODING_VEC_LENGTH, IMAGE_ENCODING_VEC_LENGTH, SCENE_ENCODING_VEC_LENGTH
-from Network.retrieval_network.params import CHECKPOINTS_DIR, BATCH_SIZE, IMAGE_SIZE, GCN_TIER
+from Network.retrieval_network.params import CHECKPOINTS_DIR, BATCH_SIZE, IMAGE_SIZE, GCN_TIER, DROPOUT_RATE
 import math
 import numpy as np
 
@@ -14,8 +14,9 @@ import numpy as np
 # -----------------------------retrieval_network--------------------------------
 # ------------------------------------------------------------------------------
 class RetrievalTriplet(torch.nn.Module):
-    def __init__(self, GCN_layers=GCN_TIER, GCN_bias=True, self_pretrained_image=True):
+    def __init__(self, GCN_dropout_rate=DROPOUT_RATE, GCN_layers=GCN_TIER, GCN_bias=True, self_pretrained_image=True):
         super(RetrievalTriplet, self).__init__()
+        self.ModelName = 'RetrievalTriplet'
         '''
         Default: load pre-trained (on self generated triplets dataset) parameters for image branch,
         then, freeze the image branch (both backbone and head) which means we will rely on pretrained
@@ -30,7 +31,7 @@ class RetrievalTriplet(torch.nn.Module):
             for parameter in self.image_branch.head.parameters():
                 parameter.requires_grad = False
 
-        self.SG_branch = TripletNetSG(layer_structure=GCN_layers, bias=GCN_bias)
+        self.SG_branch = TripletNetSG(dropout_rate=GCN_dropout_rate, layer_structure=GCN_layers, bias=GCN_bias)
         self.fcn = torch.nn.Sequential(
                                 torch.nn.Linear(IMAGE_ENCODING_VEC_LENGTH + SG_ENCODING_VEC_LENGTH, 2048, bias=True),
                                 torch.nn.ReLU(inplace=True),
@@ -176,7 +177,7 @@ class RoIBridge(torch.nn.Module):
                 idx = j + OBJ_TYPE_NUM*i
                 if batch_obj_vecs[i][j] == 1:
                     bbox_embedding = [self.position_embedding_matrix[int(torch.clamp(frac*IMAGE_SIZE, 0, IMAGE_SIZE)),:] for frac in batch_fractional_bboxs[i][j]]
-                    PoE_features[idx,:] = torch.flatten(torch.DoubleTensor(bbox_embedding))
+                    PoE_features[idx,:] = torch.flatten(torch.FloatTensor(bbox_embedding))
                 else:
                     pass
         PoE_features = PoE_features.to(self.device)
@@ -191,6 +192,7 @@ class RoIBridge(torch.nn.Module):
 class TripletNetImage(torch.nn.Module):
     def __init__(self, enableRoIBridge=False):
         super(TripletNetImage, self).__init__()
+        self.ModelName = 'TripletNetImage'
         # Initialize weight using ImageNet pretrained weights
         model = models.resnet50(pretrained=True)
         # The ResNet50-C4 Backbone
@@ -227,7 +229,7 @@ class TripletNetImage(torch.nn.Module):
         RoI_features = self.RoIBridge.fill_Empty_RoI_features(NonEmpty_RoI_Vec_features, batch_obj_vecs)
         return RoI_features
 
-    def get_embedding(self, batch_imgs, batch_fractional_bboxs, batch_obj_vecs):
+    def get_embedding(self, batch_imgs, batch_fractional_bboxs=None, batch_obj_vecs=None):
 
         batch_conv_features = self.get_conv_features(batch_imgs)
         batch_img_vector_embeddings = self.conv_to_vec_feature(batch_conv_features)
@@ -246,20 +248,22 @@ class TripletNetImage(torch.nn.Module):
 
             return batch_img_vector_embeddings, batch_feature_matrices
         else:
-            return batch_img_vector_embeddings, []
+            return batch_img_vector_embeddings
 
     # --------------------------------------------------------------------------
     def forward(self, A_imgs, P_imgs, N_imgs,
-                A_fractional_bboxs, P_fractional_bboxs, N_fractional_bboxs,
-                A_vecs, P_vecs, N_vecs):
-
-        A_vec, A_X = self.get_embedding(A_imgs, A_fractional_bboxs, A_vecs)
-        P_vec, P_X = self.get_embedding(P_imgs, P_fractional_bboxs, P_vecs)
-        N_vec, N_X = self.get_embedding(N_imgs, N_fractional_bboxs, N_vecs)
+                A_fractional_bboxs=None, P_fractional_bboxs=None, N_fractional_bboxs=None,
+                A_vecs=None, P_vecs=None, N_vecs=None):
 
         if self.enableRoIBridge:
+            A_vec, A_X = self.get_embedding(A_imgs, A_fractional_bboxs, A_vecs)
+            P_vec, P_X = self.get_embedding(P_imgs, P_fractional_bboxs, P_vecs)
+            N_vec, N_X = self.get_embedding(N_imgs, N_fractional_bboxs, N_vecs)
             return A_vec, N_vec, P_vec, A_X, P_X, N_X
         else:
+            A_vec = self.get_embedding(A_imgs)
+            P_vec = self.get_embedding(P_imgs)
+            N_vec = self.get_embedding(N_imgs)
             return A_vec, N_vec, P_vec
 
 
@@ -268,10 +272,11 @@ class TripletNetImage(torch.nn.Module):
 # ------------------------------------------------------------------------------
 
 class TripletNetSG(torch.nn.Module):
-    def __init__(self, layer_structure=GCN_TIER, bias=True):
+    def __init__(self, dropout_rate=DROPOUT_RATE, layer_structure=GCN_TIER, bias=True):
         super(TripletNetSG, self).__init__()
         self.layer_structure = layer_structure
         self.num_layers = len(layer_structure) - 1
+        self.dropout_rate = dropout_rate
 
         # Build up three pathway gcns
         self.gcn_on = torch.nn.ModuleList()
@@ -313,6 +318,7 @@ class TripletNetSG(torch.nn.Module):
             for i in range(self.num_layers):
                 X = self.gcn_paths[path][i](X, R)
                 X = F.relu(X, inplace=True)
+                X = F.dropout(X, self.dropout_rate, training=self.training)
             return X
         else:
             print('Please specify the GCN path')

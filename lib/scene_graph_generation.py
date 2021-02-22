@@ -435,13 +435,18 @@ class Scene_Graph:
         if is_in and not R_on_stored:   # priority filter
             self.update_SG(idx_smaller, idx_larger, 'in')
         else:
-        # Exam the 'proximity' Relationship
+            '''
+            Take the two objects as two balls
+            Objects proximity to each other if and only if balls are intercept with each other
+            '''
+            # Exam the 'proximity' Relationship
             distance_ij = np.linalg.norm(np.array([center_ij[0]['x'], center_ij[0]['y'], center_ij[0]['z']])
                                          - np.array([center_ij[1]['x'], center_ij[1]['y'], center_ij[1]['z']]))
             # Note: z is the forward axis, x is the horizon axis and y is the upward axis
-            is_proximity = (distance_ij < (PROXIMITY_THRESHOLD * np.linalg.norm([size_ij[smaller_obj]['x'],
-                                                                                 size_ij[smaller_obj]['y'],
-                                                                                 size_ij[smaller_obj]['z']])))
+            small_r = np.linalg.norm([size_ij[smaller_obj]['x'], size_ij[smaller_obj]['y'], size_ij[smaller_obj]['z']]) / 2.0
+            large_r = np.linalg.norm([size_ij[larger_obj]['x'], size_ij[larger_obj]['y'], size_ij[larger_obj]['z']]) / 2.0
+
+            is_proximity = (distance_ij < (small_r + large_r))
 
             if is_proximity and not R_in_stored:   # priority filter
                 self.update_SG(idx_smaller, idx_larger, 'proximity')

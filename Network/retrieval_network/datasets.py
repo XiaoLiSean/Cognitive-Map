@@ -80,7 +80,7 @@ class TripletDataset(torch.utils.data.Dataset):
     Train: For each sample (anchor) randomly chooses a positive and negative samples
     """
 
-    def __init__(self, data_dir=DATA_DIR, triplet_file_name=TRIPLET_FILE_NAME, image_size=IMAGE_SIZE, is_train=False, is_val=False, is_test=False):
+    def __init__(self, data_dir=DATA_DIR, triplet_file_name=TRIPLET_FILE_NAME, image_size=IMAGE_SIZE, is_train=False, is_val=False, is_test=False, load_only_image_data=False):
         super(TripletDataset, self).__init__()
         self.data_dir = data_dir
         self.triplet_file_name = triplet_file_name
@@ -90,6 +90,7 @@ class TripletDataset(torch.utils.data.Dataset):
         self.image_size = image_size
         self.transforms = image_pre_transform
         self.triplets = self.load_triplets()
+        self.load_only_image_data = load_only_image_data
 
     def load_triplets(self):
         triplets_data = []
@@ -135,26 +136,29 @@ class TripletDataset(torch.utils.data.Dataset):
                         self.transforms(Image.open(paths[1]+'.png')),
                         self.transforms(Image.open(paths[2]+'.png')))
 
-        # Load Triplet SGs data
-        anchor_SG = np.load(paths[0] + '.npy', allow_pickle='TRUE').item()
-        positive_SG = np.load(paths[1] + '.npy', allow_pickle='TRUE').item()
-        negative_SG = np.load(paths[2] + '.npy', allow_pickle='TRUE').item()
+        if self.load_only_image_data:
+            return triplet_imgs
+        else:
+            # Load Triplet SGs data
+            anchor_SG = np.load(paths[0] + '.npy', allow_pickle='TRUE').item()
+            positive_SG = np.load(paths[1] + '.npy', allow_pickle='TRUE').item()
+            negative_SG = np.load(paths[2] + '.npy', allow_pickle='TRUE').item()
 
-        adj_on = (get_adj_matrix(anchor_SG['on']), get_adj_matrix(positive_SG['on']), get_adj_matrix(negative_SG['on']))
-        adj_in = (get_adj_matrix(anchor_SG['in']), get_adj_matrix(positive_SG['in']), get_adj_matrix(negative_SG['in']))
-        adj_proximity = (get_adj_matrix(anchor_SG['proximity']), get_adj_matrix(positive_SG['proximity']), get_adj_matrix(negative_SG['proximity']))
+            adj_on = (get_adj_matrix(anchor_SG['on']), get_adj_matrix(positive_SG['on']), get_adj_matrix(negative_SG['on']))
+            adj_in = (get_adj_matrix(anchor_SG['in']), get_adj_matrix(positive_SG['in']), get_adj_matrix(negative_SG['in']))
+            adj_proximity = (get_adj_matrix(anchor_SG['proximity']), get_adj_matrix(positive_SG['proximity']), get_adj_matrix(negative_SG['proximity']))
 
-        fractional_bboxs = (np.asarray(anchor_SG['fractional_bboxs'], dtype=np.float32),
-                            np.asarray(positive_SG['fractional_bboxs'], dtype=np.float32),
-                            np.asarray(negative_SG['fractional_bboxs'], dtype=np.float32))
+            fractional_bboxs = (np.asarray(anchor_SG['fractional_bboxs'], dtype=np.float32),
+                                np.asarray(positive_SG['fractional_bboxs'], dtype=np.float32),
+                                np.asarray(negative_SG['fractional_bboxs'], dtype=np.float32))
 
-        obj_occurence_vecs = (np.asarray(anchor_SG['vec'].todense(), dtype=np.float32),
-                              np.asarray(positive_SG['vec'].todense(), dtype=np.float32),
-                              np.asarray(negative_SG['vec'].todense(), dtype=np.float32))
+            obj_occurence_vecs = (np.asarray(anchor_SG['vec'].todense(), dtype=np.float32),
+                                  np.asarray(positive_SG['vec'].todense(), dtype=np.float32),
+                                  np.asarray(negative_SG['vec'].todense(), dtype=np.float32))
 
-        # self.show_data_points((Image.open(paths[0]+'.png'), Image.open(paths[1]+'.png'), Image.open(paths[2]+'.png')), adj_on, adj_in, adj_proximity, fractional_bboxs, paths)
+            # self.show_data_points((Image.open(paths[0]+'.png'), Image.open(paths[1]+'.png'), Image.open(paths[2]+'.png')), adj_on, adj_in, adj_proximity, fractional_bboxs, paths)
 
-        return triplet_imgs + adj_on + adj_in + adj_proximity + fractional_bboxs + obj_occurence_vecs
+            return triplet_imgs + adj_on + adj_in + adj_proximity + fractional_bboxs + obj_occurence_vecs
 
     def __len__(self):
         return len(self.triplets)
