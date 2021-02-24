@@ -210,7 +210,7 @@ class TripletNetImage(torch.nn.Module):
     '''
     # --------------------------------------------------------------------------
     def get_conv_features(self, batch_imgs):
-        return torch.squeeze(self.backbone(batch_imgs))
+        return self.backbone(batch_imgs)
     # --------------------------------------------------------------------------
     '''
     Pass the batch convolutional features (BATCH_NUM,1024,14,14) into the ResNet50 head
@@ -218,7 +218,8 @@ class TripletNetImage(torch.nn.Module):
     '''
     # --------------------------------------------------------------------------
     def conv_to_vec_feature(self, conv_features):
-        return torch.squeeze(self.head(conv_features))
+        vec_feature = torch.squeeze(torch.squeeze(self.head(conv_features), dim=2), dim=2)
+        return vec_feature
     # --------------------------------------------------------------------------
     # --------------------------------------------------------------------------
     '''Prepare batch feature matrices for GCN as Batch Inputs + Single Img Vector Embedding'''

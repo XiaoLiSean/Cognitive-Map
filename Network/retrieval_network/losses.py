@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from termcolor import colored
-from Network.retrieval_network.params import BATCH_SIZE, ALPHA_MARGIN
+from Network.retrieval_network.params import ALPHA_MARGIN
 
 COS = torch.nn.CosineSimilarity(dim=1, eps=1e-10)
 
@@ -18,7 +18,7 @@ class TripletLoss(torch.nn.Module):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     def forward(self, anchors, positives, negatives, batch_average_loss=True):
-        alphas = self.margin*torch.ones(BATCH_SIZE)
+        alphas = self.margin*torch.ones(anchors.shape[0])
         alphas = alphas.to(self.device)
         # Using ReLU instead of max since max is not differentiable
         losses = F.relu(COS(anchors, negatives) - COS(anchors, positives) + alphas)

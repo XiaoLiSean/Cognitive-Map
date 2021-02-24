@@ -101,14 +101,14 @@ def add_negative_data_from_other_angle(fifrth_tier_AP, current_key, array_maps):
 def get_AP_from_previous_tier_AN(prev_tier_APN):
     next_tier_AP = []
     for APN in prev_tier_APN:
-        next_tier_AP.append((APN[0], APN[2]))
+        next_tier_AP.append(deepcopy((APN[0], APN[2])))
 
     return next_tier_AP
 
 def cutoff_dataset(ith_tier_APN, dataset_size, fraction):
     cutoff_idx = min([len(ith_tier_APN), round(dataset_size*fraction)])
     random.shuffle(ith_tier_APN)
-    ith_tier_APN = ith_tier_APN[0:cutoff_idx]
+    ith_tier_APN = deepcopy(ith_tier_APN[0:cutoff_idx])
     return ith_tier_APN
 
 def generate_triplets(file_path, magnitude=None):
@@ -117,11 +117,12 @@ def generate_triplets(file_path, magnitude=None):
     else:
         file_name = 'triplets_APN_name_magnitude_' + str(magnitude) + '.npy'
 
-    if os.path.exists(file_path + '/' + file_name):
-        return
+    # if os.path.exists(file_path + '/' + file_name):
+    #     return
 
     triplets_APN_idx = []
     triplets_APN_name = []
+    running_total = np.array([0.0]*5, dtype=int)
     array_maps = np.load(file_path + '/' + 'array_maps.npy', allow_pickle='TRUE').item()
     for key in array_maps:
         # get array-like map for a specific robot heading [0.0, 90.0, 180.0, 270.0]
@@ -159,23 +160,23 @@ def generate_triplets(file_path, magnitude=None):
         #-----------------------------------------------------------------------
         '''Get 5'th tier data of (A,P,N) (5% of the entire dataset)'''
         #-----------------------------------------------------------------------
-        cutoff_idx = min([len(fourth_tier_APN), round(dataset_size*0.05)])
-        last_APN_tmp = fourth_tier_APN[0:cutoff_idx]
-        fifth_tier_AP = get_AP_from_previous_tier_AN(last_APN_tmp)
+        fifth_tier_AP = get_AP_from_previous_tier_AN(fourth_tier_APN)
         fifth_tier_APN = add_negative_data_from_other_angle(fifth_tier_AP, key, array_maps)
+        fifth_tier_APN = cutoff_dataset(fifth_tier_APN, dataset_size, 0.05)
         #-----------------------------------------------------------------------
         original_len = len(triplets_APN_idx)
-        triplets_APN_idx.extend(first_tier_APN)
-        triplets_APN_idx.extend(second_tier_APN)
-        triplets_APN_idx.extend(third_tier_APN)
-        triplets_APN_idx.extend(fourth_tier_APN)
-        triplets_APN_idx.extend(fifth_tier_APN)
+        triplets_APN_idx.extend(deepcopy(first_tier_APN))
+        triplets_APN_idx.extend(deepcopy(second_tier_APN))
+        triplets_APN_idx.extend(deepcopy(third_tier_APN))
+        triplets_APN_idx.extend(deepcopy(fourth_tier_APN))
+        triplets_APN_idx.extend(deepcopy(fifth_tier_APN))
         print('Finished Generate {} Triplets for {} degree: '.format(len(triplets_APN_idx)-original_len, key) +
               '({0:.0%}, '.format(len(first_tier_APN)/(len(triplets_APN_idx)-original_len)) +
               '{0:.0%}, '.format(len(second_tier_APN)/(len(triplets_APN_idx)-original_len)) +
               '{0:.0%}, '.format(len(third_tier_APN)/(len(triplets_APN_idx)-original_len)) +
               '{0:.0%}, '.format(len(fourth_tier_APN)/(len(triplets_APN_idx)-original_len)) +
               '{0:.0%})'.format(len(fifth_tier_APN)/(len(triplets_APN_idx)-original_len)))
+        running_total += np.array([len(first_tier_APN), len(second_tier_APN), len(third_tier_APN), len(fourth_tier_APN), len(fifth_tier_APN)])
     #---------------------------------------------------------------------------
     for APN in triplets_APN_idx:
         anchor = str(APN[0][3]) + '_' + str(APN[0][0]) + '_' + str(APN[0][1]) + '_' + str(APN[0][2])
@@ -185,7 +186,7 @@ def generate_triplets(file_path, magnitude=None):
 
     np.save(file_path + '/' + file_name, triplets_APN_name)
 
-    return len(triplets_APN_name)
+    return len(triplets_APN_idx), running_total
 
 
 # ------------------------------------------------------------------------------
@@ -218,7 +219,7 @@ def data_collection(partition_num, partition_list):
 # ------------------------------------------------------------------------------
 # generate triplets train, validation and test data for network image branch
 def regenerate_triplets(magnitude):
-    total_data_num = 0
+    total = np.array([0.0]*5, dtype=int)
     # Iterate through all the scenes to collect data and separate them into train, val and test sets
     for scene_type in SCENE_TYPES:
         for scene_num in range(1, SCENE_NUM_PER_TYPE + 1):
@@ -239,9 +240,14 @@ def regenerate_triplets(magnitude):
             	add_on = 400
             scene_name = 'FloorPlan' + str(add_on + scene_num)
             print('----'*20)
-            datanum = generate_triplets(FILE_PATH + '/' + scene_name, magnitude=magnitude)
-            total_data_num += datanum
-            print('{}: {} triplets, {} in total'.format(scene_name, datanum, total_data_num))
+            datanum, running_total = generate_triplets(FILE_PATH + '/' + scene_name, magnitude=magnitude)
+            total += running_total
+            print('Total {}: {} triplets, {}='.format(scene_name, datanum, np.sum(total)) +
+                  '[{}({:.0%}), '.format(total[0], total[0]/np.sum(total)) +
+                  '{}({:.0%}), '.format(total[1], total[1]/np.sum(total)) +
+                  '{}({:.0%}), '.format(total[2], total[2]/np.sum(total)) +
+                  '{}({:.0%}), '.format(total[3], total[3]/np.sum(total)) +
+                  '{}({:.0%})]'.format(total[4], total[4]/np.sum(total)))
 
 # ------------------------------------------------------------------------------
 # manually update topological map info
@@ -275,10 +281,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.regenerate:
-        # 5: 330674 triples in total
-        # 10: 661320 triples in total
-        # 20: 1322640 triples in total
-        regenerate_triplets(20)
+        # 0.2: 13210 triples in total
+        # 1: 66161 triples in total
+        regenerate_triplets(0.2)
 
     # --------------------------------------------------------------------------
     # Used to collect data

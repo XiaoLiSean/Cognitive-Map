@@ -43,6 +43,7 @@ def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix, i
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Model training on: ", device)
     print("Cuda is_available: ", torch.cuda.is_available())
+
     model.to(device)
 
     # Uncomment to see the summary of the model structure
