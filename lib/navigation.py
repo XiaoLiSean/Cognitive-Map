@@ -99,7 +99,7 @@ class Navigation():
 		self.Robot._AI2THOR_controller.Teleport_agent(door_node_position)
 		self.Robot._AI2THOR_controller.Rotate_to_degree(goal_degree=self.Robot._AI2THOR_controller.Wrap_to_degree(degree=(door_node_orien_new + 180)))
 
-		
+
 
 	def Task_nav(self, task_objects):
 
@@ -232,13 +232,13 @@ class Navigation():
 			self._action_case_num += 1
 			if self.Robot.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, max_steps=self.Robot._Navigation_max_try, rotation_degree=rotation_degree):
 				failed_case = 0
-				
+
 				self._action_success_num += 1
 				print('reach node ', node_path)
 				# time.sleep(1)
 			else:
 				failed_case += 1
-				
+
 				self._fail_type[goal_action_type] += 1
 				print('failed case: ', failed_case)
 				if failed_case >= self._fail_case_tolerance or node_path == path[-1]:

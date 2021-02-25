@@ -3,6 +3,7 @@ import time
 import os
 import copy, math
 import numpy as np
+import matplotlib.pyplot as plt
 from termcolor import colored
 from progress.bar import Bar
 from Network.retrieval_network.params import *
@@ -74,7 +75,7 @@ def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_schedul
             epoch_loss = running_loss * BATCH_SIZE / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
             print('{} Loss: \t {:.4f} \t Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
-            training_statistics[phase][0].append(epoch_acc)
+            training_statistics[phase][0].append(epoch_acc.item())
             training_statistics[phase][1].append(epoch_loss)
             np.save('training_statistics.npy', training_statistics)
             # deep copy the model: based on minimum loss
@@ -92,9 +93,26 @@ def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_schedul
     time_elapsed = time.time() - start_time
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
     print('Best val accuracy: {:4f}'.format(best_acc))
-    print('Best val loss: {:4f}'.format(best_loss))
 
     # load best model weights
     model.load_state_dict(best_model_wts)
 
     return model
+
+def plot_training_statistics():
+    f, (ax1, ax2) = plt.subplots(2, 1)
+    training_statistics = np.load('training_statistics_image.npy', allow_pickle=True).item()
+    training_statistics['train'][0] = [training_statistics['train'][0][i].item() for i in range(len(training_statistics['train'][0]))]
+    training_statistics['val'][0] = [training_statistics['val'][0][i].item() for i in range(len(training_statistics['val'][0]))]
+    epochs = [*range(len(training_statistics['train'][0]))]
+    ax1.plot(epochs, training_statistics['train'][0],'b--', linewidth=2, label='Training Acc')
+    ax2.plot(epochs, training_statistics['train'][1],'b', linewidth=2, label='Training Loss')
+    ax1.plot(epochs, training_statistics['val'][0],'r--', linewidth=2, label='Val Acc')
+    ax2.plot(epochs, training_statistics['val'][1],'r', linewidth=2, label='Val Loss')
+    ax1.legend(loc='center right', shadow=True)
+    ax2.legend(loc='center right', shadow=True)
+    ax1.set_xlabel("Epoch")
+    ax1.set_ylabel("Accuracy")
+    ax2.set_xlabel("Epoch")
+    ax2.set_ylabel("Loss")
+    plt.show()

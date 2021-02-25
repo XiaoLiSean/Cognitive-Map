@@ -25,11 +25,15 @@ class RetrievalTriplet(torch.nn.Module):
         '''
         self.image_branch = TripletNetImage(enableRoIBridge=True)
         if self_pretrained_image:
-            self.image_branch.load_state_dict(torch.load(CHECKPOINTS_DIR + 'image_best_fit.pkl'))
-            for parameter in self.image_branch.backbone.parameters():
-                parameter.requires_grad = False
-            for parameter in self.image_branch.head.parameters():
-                parameter.requires_grad = False
+            pretrained_model = torch.load(CHECKPOINTS_DIR + 'image_best_fit.pkl')
+            model_dict = self.image_branch.state_dict()
+            pretrained_dict = {k: v for k, v in pretrained_model.items() if k in model_dict}
+            model_dict.update(pretrained_dict)
+            self.image_branch.load_state_dict(model_dict)
+            # for parameter in self.image_branch.backbone.parameters():
+            #     parameter.requires_grad = False
+            # for parameter in self.image_branch.head.parameters():
+            #     parameter.requires_grad = False
 
         self.SG_branch = TripletNetSG(dropout_rate=GCN_dropout_rate, layer_structure=GCN_layers, bias=GCN_bias)
         self.fcn = torch.nn.Sequential(
@@ -120,8 +124,6 @@ class RoIBridge(torch.nn.Module):
                                               )
         # size of OBJ_TYPE_NUM * WORD_EMDEDDING_VEC_LENGTH = (256,300)
         self.word_embedding_matrix = get_glove_matrix()
-        # repeated GloVe features of size [BATCH_NUM*OBJ_TYPE_NUM, 300]
-        self.GlV_features = denseTensor_to_SparseTensor(torch.Tensor(self.get_GlV_features())).to(self.device)
         # size of (IMAGE_SIZE+1) * (BBOX_EMDEDDING_VEC_LENGTH/4) = (225,64) and PE(i) = self.position_embedding_matrix[i,:]
         self.position_embedding_matrix = positional_encoding()
     # --------------------------------------------------------------------------
@@ -157,8 +159,9 @@ class RoIBridge(torch.nn.Module):
 
     # Fill in zero vector for empty boundng box of [0,0,0,0]
     def fill_Empty_RoI_features(self, NonEmpty_RoI_Vec_features, batch_obj_vecs):
+        local_batch_size = batch_obj_vecs.shape[0]
         # Pend the truncated RoI feature to full size visual_features
-        Visual_features = torch.zeros(BATCH_SIZE*OBJ_TYPE_NUM, IMAGE_ENCODING_VEC_LENGTH).to(self.device)
+        Visual_features = torch.zeros(local_batch_size*OBJ_TYPE_NUM, IMAGE_ENCODING_VEC_LENGTH).to(self.device)
         batch_obj_vecs = torch.flatten(batch_obj_vecs, start_dim=0)
         addin_index = torch.squeeze(torch.nonzero(batch_obj_vecs, as_tuple=False))
         Visual_features.index_add_(0, addin_index, NonEmpty_RoI_Vec_features)
@@ -171,8 +174,9 @@ class RoIBridge(torch.nn.Module):
     '''
     '''well i will try it in the future... for get_PoE_features'''
     def get_PoE_features(self, batch_fractional_bboxs, batch_obj_vecs):
-        PoE_features = torch.zeros(BATCH_SIZE*OBJ_TYPE_NUM, BBOX_EMDEDDING_VEC_LENGTH)
-        for i in range(BATCH_SIZE):
+        local_batch_size = batch_fractional_bboxs.shape[0]
+        PoE_features = torch.zeros(local_batch_size*OBJ_TYPE_NUM, BBOX_EMDEDDING_VEC_LENGTH)
+        for i in range(local_batch_size):
             for j in range(OBJ_TYPE_NUM):
                 idx = j + OBJ_TYPE_NUM*i
                 if batch_obj_vecs[i][j] == 1:
@@ -183,8 +187,10 @@ class RoIBridge(torch.nn.Module):
         PoE_features = PoE_features.to(self.device)
         return denseTensor_to_SparseTensor(PoE_features)
 
-    def get_GlV_features(self):
-        return self.word_embedding_matrix.repeat(BATCH_SIZE, 1)
+    def get_GlV_features(self, local_batch_size):
+        GlV_features = self.word_embedding_matrix.repeat(local_batch_size, 1)
+        GlV_features = denseTensor_to_SparseTensor(torch.Tensor(GlV_features)).to(self.device)
+        return GlV_features
 
 # ------------------------------------------------------------------------------
 # -------------------------------Image Branch-----------------------------------
@@ -240,7 +246,10 @@ class TripletNetImage(torch.nn.Module):
 
             RoI_features = self.get_RoI_features(batch_conv_features, batch_fractional_bboxs, batch_obj_vecs)
             PoE_features = self.RoIBridge.get_PoE_features(batch_fractional_bboxs, batch_obj_vecs)
-            GlV_features = self.RoIBridge.GlV_features
+            GlV_features = self.RoIBridge.get_GlV_features(batch_imgs.shape[0])
+            print(RoI_features.shape)
+            print(PoE_features.shape)
+            print(GlV_features.shape)
 
             # Detach to double ensure no gradient propagates back to ResNet and RoI except for the feature_fcn
             raw_features = torch.cat((RoI_features, PoE_features, GlV_features), dim=1).detach().clone()
@@ -372,7 +381,8 @@ class GraphConvolution(torch.nn.Module):
     Output: [BATCH_SIZE, x, z]
     '''
     def sparse_bmm(self, batch_A, W):
-        output = [torch.spmm(batch_A[i], W) for i in range(BATCH_SIZE)]
+        local_batch_size = batch_A.shape[0]
+        output = [torch.spmm(batch_A[i], W) for i in range(local_batch_size)]
         output = torch.stack(output)
         return output
 
@@ -383,7 +393,8 @@ class GraphConvolution(torch.nn.Module):
     Output: [BATCH_SIZE, x, z]
     '''
     def sparse_bbmm(self, batch_A, batch_S):
-        output = [torch.spmm(batch_A[i], batch_S[i]) for i in range(BATCH_SIZE)]
+        local_batch_size = batch_A.shape[0]
+        output = [torch.spmm(batch_A[i], batch_S[i]) for i in range(local_batch_size)]
         output = torch.stack(output)
         return output
 

@@ -281,7 +281,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.regenerate:
-        # 0.2: 13210 triples in total
+        # 0.2: 9499 triples in total
         # 1: 66161 triples in total
         regenerate_triplets(0.2)
 

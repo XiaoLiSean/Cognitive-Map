@@ -14,7 +14,7 @@ from Network.retrieval_network.params import *
 from Network.retrieval_network.datasets import TripletDataset
 from Network.retrieval_network.networks import RetrievalTriplet, TripletNetImage
 from Network.retrieval_network.losses import TripletLoss
-from Network.retrieval_network.trainer import Training
+from Network.retrieval_network.trainer import Training, plot_training_statistics
 from os.path import dirname, abspath
 
 # ------------------------------------------------------------------------------
