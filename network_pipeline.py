@@ -72,6 +72,87 @@ def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix, i
 # ------------------------------------------------------------------------------
 # -------------------------------Testing Pipeline-------------------------------
 # ------------------------------------------------------------------------------
+def store_fail_case(checkpoints_prefix, triplet_name):
+    fig, axs = plt.subplots(1,3)
+    plt.title(triplet_name[0].split('/')[5])
+    for i in range(3):
+        img = Image.open(triplet_name[i]+'.png')
+        axs[i].imshow(img)
+        axs[i].set_title(triplet_name[i].split('/')[6])
+        axs[i].axis('off')
+
+    file_name = triplet_name[0].split('/')[5] + triplet_name[0].split('/')[6] + triplet_name[1].split('/')[6] + triplet_name[2].split('/')[6]
+    plt.savefig(checkpoints_prefix + 'failCase' + '/' + file_name + '.jpg')
+    plt.close()
+
+def show_testing_histogram(testing_statistics):
+    fig, ax1 = plt.subplots()
+    tags = []
+    total = []
+    corrects = []
+    for key in testing_statistics:
+        tags.append(key)
+        total.append(testing_statistics[key]['total'])
+        corrects.append(testing_statistics[key]['corrects'])
+
+    plt.bar(np.arange(len(tags)), total)
+    plt.bar(np.arange(len(tags)), corrects)
+    ax1.set_xticks(np.arange(len(tags)))
+    ax1.set_xticklabels(tags, rotation=90)
+
+    ax2 = ax1.twinx()
+    ax2.plot(np.arange(len(tags)), np.true_divide(np.array(corrects), np.array(total)), 'r--')
+    ax2.set_yticks(np.arange(11)/10)
+    ax2.set_yticklabels(np.arange(11)/10)
+    plt.title('Overall Success Rate {:.2%}'.format(np.true_divide(np.sum(np.array(corrects)), np.sum(np.array(total)))))
+
+    fig.tight_layout()
+    plt.show()
+
+def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=False):
+    # ---------------------------Loading testing dataset---------------------------
+    print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading testing dataset...')
+    test_dataset = Dataset(DATA_DIR, is_test=True, load_only_image_data=is_only_image_branch)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=NUM_WORKERS)
+
+    # ------------------------------Initialize model--------------------------------
+    print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
+    if is_only_image_branch:
+        model = Network(enableRoIBridge=False) # Train Image Branch
+    else:
+        model = Network(self_pretrained_image=True) # freeze image branch and train SG
+
+    model.load_state_dict(torch.load(checkpoints_prefix + 'best_fit.pkl'))
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print("Model testing on: ", device)
+    print("Cuda is_available: ", torch.cuda.is_available())
+    print('----'*20)
+    model.to(device)
+    model.eval()
+    torch.set_grad_enabled(False)
+    # ------------------------------Testing Main------------------------------------
+    testing_statistics = {}
+    bar = Bar('Processing', max=len(test_loader))
+    for batch_idx, inputs in enumerate(test_loader):
+        inputs = tuple(input.to(device) for input in inputs)
+        outputs = model(*inputs)
+        _, is_correct = LossFcn(*outputs, batch_average_loss=True)
+        iFloorPlan = test_dataset.triplets[batch_idx][0].split('/')[5]
+        if iFloorPlan in testing_statistics:
+            testing_statistics[iFloorPlan]['total'] += 1
+            testing_statistics[iFloorPlan]['corrects'] += is_correct.item()
+        else:
+            testing_statistics.update({iFloorPlan:dict(total=1, corrects=is_correct.item())})
+
+        if is_correct.item() == 0:
+            triplet_name = test_dataset.triplets[batch_idx]
+            store_fail_case(checkpoints_prefix, triplet_name)
+        bar.next()
+
+    bar.finish()
+    print('----'*20)
+    show_testing_histogram(testing_statistics)
+
 
 
 # ------------------------------------------------------------------------------
@@ -110,4 +191,17 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # Testing corresponding networks
     if args.test:
-        pass
+        if args.image and not args.all:
+            Dataset = TripletDataset
+            Network = TripletNetImage
+            LossFcn = TripletLoss()
+            checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
+        elif args.all and not args.image:
+            Dataset = TripletDataset
+            Network = RetrievalTriplet
+            LossFcn = TripletLoss()
+            checkpoints_prefix = None
+        else:
+            print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
+
+        testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=args.image)

@@ -247,9 +247,6 @@ class TripletNetImage(torch.nn.Module):
             RoI_features = self.get_RoI_features(batch_conv_features, batch_fractional_bboxs, batch_obj_vecs)
             PoE_features = self.RoIBridge.get_PoE_features(batch_fractional_bboxs, batch_obj_vecs)
             GlV_features = self.RoIBridge.get_GlV_features(batch_imgs.shape[0])
-            print(RoI_features.shape)
-            print(PoE_features.shape)
-            print(GlV_features.shape)
 
             # Detach to double ensure no gradient propagates back to ResNet and RoI except for the feature_fcn
             raw_features = torch.cat((RoI_features, PoE_features, GlV_features), dim=1).detach().clone()
