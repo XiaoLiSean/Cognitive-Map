@@ -17,6 +17,7 @@ from lib.scene_graph_generation import Scene_Graph
 sys.path.append('../')
 from experiment import *
 import networkx as nx
+from Frement import *
 
 
 class Topological_map():
@@ -52,6 +53,64 @@ class Topological_map():
 			self.Get_reachable_coordinate()
 		self._subnode_plan = False
 
+		self._subnode_records = []
+		self._orderi = 12  #order of Frouier transform used in dynamic map, max 24
+
+	def init_subnode_records(self):
+		self._subnode_records = [subnode_dynamic_record() for _ in range(len(self._graph.nodes))]
+
+	def build_frelement_subnode_object(self, obj_name, times, signal, node_name):
+
+		if obj_name not in list(self._graph.nodes[node_name]['frelements'].keys()):
+			self._graph.nodes[node_name]['frelements'][obj_name] = Frelement()
+		self._graph.nodes[node_name]['frelements'][obj_name].build(times=times, signal=signal, length=len(times), orderi=self._orderi)
+
+	def build_frelements(self):
+
+		for subnode_record in self._subnode_records:
+			for object_index in range(len(subnode_record._subnode_name)):
+				self.build_frelement_subnode_object(obj_name=subnode_record._subnode_name[object_index],
+					times=subnode_record._times[object_index], signal=subnode_record._signals[object_index], node_name=subnode_record._subnode_name)
+		
+# 	Add new observations of some time to the frelements, 
+	def add_obs_frelements(self, objs, time_current, node_name):
+
+		objs_obs_list = []
+
+		for obj in objs:
+
+			objs_obs_list.append(obj['name'])
+
+			if obj['name'] not in list(self._graph.nodes[node_name]['frelements'].keys()):
+				self._graph.nodes[node_name]['frelements'][obj['name']] = Frelement()
+
+		for obj_in_node in list(self._graph.nodes[node_name]['frelements'].keys()):
+
+			if obj_in_node in objs_obs_list:
+				self._graph.nodes[node_name]['frelements'][obj['name']].add(times=[time_current], states=[1])
+			else:
+				self._graph.nodes[node_name]['frelements'][obj['name']].add(times=[time_current], states=[0])
+
+# 	Estimate the probability of certain object showing in certain node in certain time
+	def estimate_prob_obj_vs_node(self, obj_name, time_estimate, node_name):
+
+		if obj_name not in list(self._graph.nodes[node_name]['frelements'].keys()):
+			return 0
+
+		else:
+			return self._graph.nodes[node_name]['frelements'][obj_name].estimate(times=[time_estimate])
+
+	def estimate_obj_node(self, obj_name, time_estimate):
+
+		all_nodes_list = list(self._graph.nodes)
+		node_probs_list = []
+
+		for node_name in all_nodes_list:
+			node_probs_list.append(self.estimate_prob_obj_vs_node(obj_name=obj_name, time_estimate=time_estimate, node_name=node_name))
+
+		most_prob_node_index = node_probs_list.index(max(node_probs_list))
+		return all_nodes_list[most_prob_node_index]
+
 	def get_scene_graph(self, visible_filter=True, scan_entire_corn=False):
 		SG = Scene_Graph()
 		self.Update_event()
@@ -60,7 +119,7 @@ class Topological_map():
 			if scan_entire_corn:
 				# Remain to be developed
 				print('----'*20)
-				print(colored('Remain to be developed','red'))
+				print(colored('Remain to be developed', 'red'))
 				print('----'*20)
 				position = self._event.metadata['agent']['position']
 				rotation = self._event.metadata['agent']['rotation']
@@ -255,9 +314,10 @@ class Topological_map():
 
 		return
 
+# 	Add subnode to the graph(networkx), whose attributes includes 1. position 2. rgb image 3. scene graph 4. frelements
 	def Add_sub_node(self, node_num, position, orientation, frame, scene_graph=None):
 		self._graph.add_nodes_from([
-		(self.Get_node_name(node_num, orientation), {'position': position, 'image': frame, 'scene_graph': scene_graph})
+		(self.Get_node_name(node_num, orientation), {'position': position, 'image': frame, 'scene_graph': scene_graph, 'frelements': {}})
 		])
 		return
 
