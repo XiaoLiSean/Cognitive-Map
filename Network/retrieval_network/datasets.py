@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from scipy.sparse import find as find_sparse_idx
 from torchvision import datasets, transforms
-from Network.retrieval_network.params import IMAGE_SIZE
+from Network.retrieval_network.params import IMAGE_SIZE, DATA_DIR, TRIPLET_FILE_NAME
 from PIL import Image
 from os.path import dirname, abspath
 from termcolor import colored
@@ -15,121 +15,9 @@ from lib.similarity import view_similarity
 from lib.scene_graph_generation import Scene_Graph
 
 # ------------------------------------------------------------------------------
-# Get pose dict from file name
-def  get_pose_from_name(name):
-    info = name.split('_')
-    pose = {'x': float(info[1]),
-            'z': float(info[2]),
-            'theta': float(info[3])}
-    return pose
-
-# ------------------------------------------------------------------------------
-# This function is used to update triplets npy list in train and val folder
-# filename = [FloorPlanX_x_z_theta_i_.png]
-def update_triplet_info(DATA_DIR, PN_THRESHOLD, TRIPLET_MAX_FRACTION_TO_POINTS, TRIPLET_MAX_NUM_PER_ANCHOR):
-
-    labels = ['train', 'val']
-
-    for label in labels:
-        for FloorPlan in os.listdir(DATA_DIR + '/' + label):
-            data_points = []
-            total_triplet_num = 0
-            for filename in os.listdir(DATA_DIR + '/' + label + '/' + FloorPlan):
-                if filename.endswith(".png"):
-                    data_points.append(filename[0:-4])
-
-            print(colored('Process A-P list: ','blue') + DATA_DIR + '/' + label + '/' + FloorPlan + '/')
-            random.shuffle(data_points)
-            total_triplet_max_num = len(data_points)*TRIPLET_MAX_FRACTION_TO_POINTS
-
-            # dictionary map from one anchor to its positive data_points in same FloorPlan
-            anchor_to_positives = {}
-            anchor_to_negatives = {}
-
-            for idx, anchor in enumerate(data_points):
-                anchor_to_positives.update({anchor: []})
-                anchor_to_negatives.update({anchor: []})
-
-                pose_anchor = get_pose_from_name(anchor)
-                # for one anchor image add positive pairs which are after the anchor in the list
-                for i in range(idx+1, len(data_points)):
-                    # Find positive pairs
-                    pose_i = get_pose_from_name(data_points[i])
-                    similarity = view_similarity(pose_anchor, pose_i, visualization_on=False)
-                    # Append positive and negative data_points
-                    if similarity >= PN_THRESHOLD['p'] and len(anchor_to_positives[anchor]) < TRIPLET_MAX_NUM_PER_ANCHOR:
-                        anchor_to_positives[anchor].append((data_points[i], similarity))
-                    elif similarity < PN_THRESHOLD['n'] and len(anchor_to_negatives[anchor]) < TRIPLET_MAX_NUM_PER_ANCHOR:
-                        anchor_to_negatives[anchor].append((data_points[i], similarity))
-                    # break loop for current anchor if TRIPLET_MAX_NUM_PER_ANCHOR is reached
-                    new_added_triplets = min([len(anchor_to_positives[anchor]), len(anchor_to_negatives[anchor])])
-                    if new_added_triplets >= TRIPLET_MAX_NUM_PER_ANCHOR:
-                        break
-                # Remove anchor image if it has no positive pairs
-                if len(anchor_to_positives[anchor]) == 0 or len(anchor_to_negatives[anchor]) == 0:
-                    anchor_to_positives.pop(anchor)
-                    continue
-                # update total triplet numbers
-                total_triplet_num += min([len(anchor_to_positives[anchor]), len(anchor_to_negatives[anchor])])
-
-                if total_triplet_num >= total_triplet_max_num:
-                    break
-
-            np.save(DATA_DIR + '/' + label + '/' + FloorPlan + '/' + 'anchor_to_positives.npy', anchor_to_positives) # Save dict as .npy
-            np.save(DATA_DIR + '/' + label + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', anchor_to_negatives) # Save dict as .npy
-            np.save(DATA_DIR + '/' + label + '/' + FloorPlan + '/' + 'name_list.npy', data_points) # Save list as .npy
-            print(colored('Done A-P list: ','blue') + str(total_triplet_num) + 'pairs, ' + str(len(anchor_to_positives)) + 'anchors')
-
-
-# ------------------------------------------------------------------------------
-class TripletImagesDataset(torch.utils.data.Dataset):
-    """
-    Train: For each sample (anchor) randomly chooses a positive and negative samples
-    """
-
-    def __init__(self, DATA_DIR, image_size=IMAGE_SIZE, is_train=True):
-        super(TripletImagesDataset, self).__init__()
-        self.data_dir = DATA_DIR
-        self.image_size = image_size
-        self.is_train = is_train
-        self.transforms = transforms.Compose([transforms.Resize(self.image_size),
-                                              transforms.ToTensor(),
-                                              transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-        self.triplets_img, self.triplets_alphas = self.get_triplets()
-
-    def get_triplets(self):
-        triplets_img = []
-        triplets_alphas = []
-        if self.is_train:
-            path = self.data_dir + '/' + 'train'
-        else:
-            path = self.data_dir + '/' + 'val'
-
-        # Iterate through floorplans
-        for FloorPlan in os.listdir(path):
-            anchor_to_positives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_positives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-positives
-            anchor_to_negatives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-negatives
-            for anchor in anchor_to_positives:
-                anchor_img = path + '/' + FloorPlan + '/' + anchor + '.png'
-                positives = anchor_to_positives[anchor]
-                negatives = anchor_to_negatives[anchor]
-                for i in range(min([len(positives), len(negatives)])):
-                    positive_img = path + '/' + FloorPlan + '/' + positives[i][0] + '.png'
-                    negative_img = path + '/' + FloorPlan + '/' + negatives[i][0] + '.png'
-                    # append path to desired image triplets
-                    triplets_img.append((deepcopy(anchor_img), deepcopy(positive_img), deepcopy(negative_img)))
-                    triplets_alphas.append((deepcopy(positives[i][1]), deepcopy(negatives[i][1])))
-
-        return triplets_img, triplets_alphas
-
-    def __getitem__(self, index):
-        # Path to triplet data_points
-        paths = self.triplets_img[index]
-        triplet = (self.transforms(Image.open(paths[0])), self.transforms(Image.open(paths[1])), self.transforms(Image.open(paths[2])))
-        return triplet, self.triplets_alphas[index]
-
-    def __len__(self):
-        return len(self.triplets_img)
+image_pre_transform = transforms.Compose([transforms.Resize(IMAGE_SIZE),
+                                          transforms.ToTensor(),
+                                          transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
 # ------------------------------------------------------------------------------
 # Third party function from git@github.com:tkipf/pygcn.git
@@ -185,93 +73,6 @@ def get_adj_matrix(SG):
     return sparse_mx_to_torch_sparse_tensor(adj).to_dense()
 
 # ------------------------------------------------------------------------------
-# Siamese dataset loader
-# ------------------------------------------------------------------------------
-class SiameseDataset(torch.utils.data.Dataset):
-    """
-    Train: For each sample (anchor) all positive and negative samples are chosed as (A-N) and (A-P) siamese pairs
-    """
-
-    def __init__(self, DATA_DIR, image_size=IMAGE_SIZE, is_train=True):
-        super(SiameseDataset, self).__init__()
-        self.data_dir = DATA_DIR
-        self.is_train = is_train
-        self.image_size = image_size
-        self.transforms = transforms.Compose([transforms.Resize(self.image_size),
-                                              transforms.ToTensor(),
-                                              transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-        self.siameses, self.alphas = self.get_siameses()
-
-    def get_siameses(self):
-        siameses_data = []
-        alphas = []
-        if self.is_train:
-            path = self.data_dir + '/' + 'train'
-        else:
-            path = self.data_dir + '/' + 'val'
-
-        # Iterate through floorplans
-        for FloorPlan in os.listdir(path):
-            anchor_to_positives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_positives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-positives
-            anchor_to_negatives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-negatives
-            for anchor in anchor_to_positives:
-                anchor_data = path + '/' + FloorPlan + '/' + anchor
-                # Skip empty anchor scene graph which is trival to gcn training
-                if self.sg_is_empty(anchor_data + '.npy'):
-                    continue
-                positives = anchor_to_positives[anchor]
-                negatives = anchor_to_negatives[anchor]
-                for i in range(min([len(positives), len(negatives)])):
-                    positive_data = path + '/' + FloorPlan + '/' + positives[i][0]
-                    negative_data = path + '/' + FloorPlan + '/' + negatives[i][0]
-                    # Skip empty positive scene graph which is trival to gcn training
-                    if self.sg_is_empty(positive_data + '.npy'):
-                        continue
-                    # append path to desired siamese data points
-                    siameses_data.append((deepcopy(anchor_data), deepcopy(positive_data)))
-                    alphas.append(deepcopy(positives[i][1]))
-                    siameses_data.append((deepcopy(anchor_data), deepcopy(negative_data)))
-                    alphas.append(deepcopy(negatives[i][1]))
-
-        return siameses_data, alphas
-
-    def sg_is_empty(self, sg_path):
-        is_empty = True
-        SG = np.load(sg_path, allow_pickle='TRUE').item()
-        for A in [SG['on'], SG['in'], SG['proximity']]:
-            idx = find_sparse_idx(A)
-            if len(idx[0]) != 0:
-                is_empty = False
-
-        return is_empty
-
-    def show_data_points(self, R_on, R_in, R_prox):
-        SG = Scene_Graph(R_on=R_on, R_in=R_in, R_proximity=R_prox)
-        SG.visualize_SG()
-
-
-    def __getitem__(self, index):
-        # Path to siamese data_points
-        paths = self.siameses[index]
-
-        # Load siamese Images data
-        siamese_imgs = (self.transforms(Image.open(paths[0]+'.png')),
-                        self.transforms(Image.open(paths[1]+'.png')))
-
-        # Load siamese SGs data
-        anchor_SG = np.load(paths[0] + '.npy', allow_pickle='TRUE').item()
-        pn_SG = np.load(paths[1] + '.npy', allow_pickle='TRUE').item()
-
-        adj_on = (get_adj_matrix(anchor_SG['on']), get_adj_matrix(pn_SG['on']))
-        adj_in = (get_adj_matrix(anchor_SG['in']), get_adj_matrix(pn_SG['in']))
-        adj_proximity = (get_adj_matrix(anchor_SG['proximity']), get_adj_matrix(pn_SG['proximity']))
-
-        return siamese_imgs + adj_on + adj_in + adj_proximity, self.alphas[index]
-
-    def __len__(self):
-        return len(self.siameses)
-
-# ------------------------------------------------------------------------------
 # Triplet dataset loader
 # ------------------------------------------------------------------------------
 class TripletDataset(torch.utils.data.Dataset):
@@ -279,60 +80,51 @@ class TripletDataset(torch.utils.data.Dataset):
     Train: For each sample (anchor) randomly chooses a positive and negative samples
     """
 
-    def __init__(self, DATA_DIR, image_size=IMAGE_SIZE, is_train=True):
+    def __init__(self, data_dir=DATA_DIR, triplet_file_name=TRIPLET_FILE_NAME, image_size=IMAGE_SIZE, is_train=False, is_val=False, is_test=False, load_only_image_data=False):
         super(TripletDataset, self).__init__()
-        self.data_dir = DATA_DIR
-        self.is_train = is_train
+        self.data_dir = data_dir
+        self.triplet_file_name = triplet_file_name
+        if not is_train and not is_val and not is_test:
+            print('Must specify a network state: \in [train val test]')
+        self.network_state = [is_train, is_val, is_test]
         self.image_size = image_size
-        self.transforms = transforms.Compose([transforms.Resize(self.image_size),
-                                              transforms.ToTensor(),
-                                              transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-        self.triplets, self.triplets_alphas = self.get_triplets()
+        self.transforms = image_pre_transform
+        self.triplets = self.load_triplets()
+        self.load_only_image_data = load_only_image_data
 
-    def get_triplets(self):
+    def load_triplets(self):
         triplets_data = []
-        triplets_alphas = []
-        if self.is_train:
+        if self.network_state[0]:
             path = self.data_dir + '/' + 'train'
-        else:
+        elif self.network_state[1]:
             path = self.data_dir + '/' + 'val'
+        elif self.network_state[2]:
+            path = self.data_dir + '/' + 'test'
 
         # Iterate through floorplans
         for FloorPlan in os.listdir(path):
-            anchor_to_positives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_positives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-positives
-            anchor_to_negatives = np.load(path + '/' + FloorPlan + '/' + 'anchor_to_negatives.npy', allow_pickle='TRUE').item() # load npy dict of anchor-negatives
-            for anchor in anchor_to_positives:
-                anchor_data = path + '/' + FloorPlan + '/' + anchor
-                # Skip empty anchor scene graph which is trival to gcn training
-                if self.sg_is_empty(anchor_data + '.npy'):
-                    continue
-                positives = anchor_to_positives[anchor]
-                negatives = anchor_to_negatives[anchor]
-                for i in range(min([len(positives), len(negatives)])):
-                    positive_data = path + '/' + FloorPlan + '/' + positives[i][0]
-                    negative_data = path + '/' + FloorPlan + '/' + negatives[i][0]
-                    # Skip empty positive scene graph which is trival to gcn training
-                    if self.sg_is_empty(positive_data + '.npy'):
-                        continue
-                    # append path to desired triplets
-                    triplets_data.append((deepcopy(anchor_data), deepcopy(positive_data), deepcopy(negative_data)))
-                    triplets_alphas.append((deepcopy(positives[i][1]), deepcopy(negatives[i][1])))
+            incoming_triplets = np.load(path + '/' + FloorPlan + '/' + self.triplet_file_name) # load npy list of triplets
+            for triplet in incoming_triplets:
+                anchor = path + '/' + FloorPlan + '/' + triplet[0]
+                positive = path + '/' + FloorPlan + '/' + triplet[1]
+                negative = path + '/' + FloorPlan + '/' + triplet[2]
+                triplets_data.append(deepcopy((anchor, positive, negative)))
 
-        return triplets_data, triplets_alphas
+        return triplets_data
 
-    def sg_is_empty(self, sg_path):
-        is_empty = True
-        SG = np.load(sg_path, allow_pickle='TRUE').item()
-        for A in [SG['on'], SG['in'], SG['proximity']]:
-            idx = find_sparse_idx(A)
-            if len(idx[0]) != 0:
-                is_empty = False
+    def show_data_points(self, imgs, adj_on, adj_in, adj_proximity, fractional_bboxs, paths):
+        fig, axs = plt.subplots(2, 3, figsize=(17,10))
+        plt.axis('off')
 
-        return is_empty
+        SGs = [0,0,0]
 
-    def show_data_points(self, R_on, R_in, R_prox):
-        SG = Scene_Graph(R_on=R_on, R_in=R_in, R_proximity=R_prox)
-        SG.visualize_SG()
+        for i in range(3):
+            file_names = paths[i].split('/')
+            axs[0,i].set_title(file_names[6])
+            SGs[i] = Scene_Graph(R_on=np.transpose(adj_on[i]), R_in=np.transpose(adj_in[i]), R_proximity=np.transpose(adj_proximity[i]), fractional_bboxs=fractional_bboxs[i])
+            SGs[i].visualize_one_in_triplet(imgs[i], axs[0,i], axs[1,i])
+
+        plt.show()
 
 
     def __getitem__(self, index):
@@ -344,16 +136,29 @@ class TripletDataset(torch.utils.data.Dataset):
                         self.transforms(Image.open(paths[1]+'.png')),
                         self.transforms(Image.open(paths[2]+'.png')))
 
-        # Load Triplet SGs data
-        anchor_SG = np.load(paths[0] + '.npy', allow_pickle='TRUE').item()
-        positive_SG = np.load(paths[1] + '.npy', allow_pickle='TRUE').item()
-        negative_SG = np.load(paths[2] + '.npy', allow_pickle='TRUE').item()
+        if self.load_only_image_data:
+            return triplet_imgs
+        else:
+            # Load Triplet SGs data
+            anchor_SG = np.load(paths[0] + '.npy', allow_pickle='TRUE').item()
+            positive_SG = np.load(paths[1] + '.npy', allow_pickle='TRUE').item()
+            negative_SG = np.load(paths[2] + '.npy', allow_pickle='TRUE').item()
 
-        adj_on = (get_adj_matrix(anchor_SG['on']), get_adj_matrix(positive_SG['on']), get_adj_matrix(negative_SG['on']))
-        adj_in = (get_adj_matrix(anchor_SG['in']), get_adj_matrix(positive_SG['in']), get_adj_matrix(negative_SG['in']))
-        adj_proximity = (get_adj_matrix(anchor_SG['proximity']), get_adj_matrix(positive_SG['proximity']), get_adj_matrix(negative_SG['proximity']))
+            adj_on = (get_adj_matrix(anchor_SG['on']), get_adj_matrix(positive_SG['on']), get_adj_matrix(negative_SG['on']))
+            adj_in = (get_adj_matrix(anchor_SG['in']), get_adj_matrix(positive_SG['in']), get_adj_matrix(negative_SG['in']))
+            adj_proximity = (get_adj_matrix(anchor_SG['proximity']), get_adj_matrix(positive_SG['proximity']), get_adj_matrix(negative_SG['proximity']))
 
-        return triplet_imgs + adj_on + adj_in + adj_proximity, self.triplets_alphas[index]
+            fractional_bboxs = (np.asarray(anchor_SG['fractional_bboxs'], dtype=np.float32),
+                                np.asarray(positive_SG['fractional_bboxs'], dtype=np.float32),
+                                np.asarray(negative_SG['fractional_bboxs'], dtype=np.float32))
+
+            obj_occurence_vecs = (np.asarray(anchor_SG['vec'].todense(), dtype=np.float32),
+                                  np.asarray(positive_SG['vec'].todense(), dtype=np.float32),
+                                  np.asarray(negative_SG['vec'].todense(), dtype=np.float32))
+
+            # self.show_data_points((Image.open(paths[0]+'.png'), Image.open(paths[1]+'.png'), Image.open(paths[2]+'.png')), adj_on, adj_in, adj_proximity, fractional_bboxs, paths)
+
+            return triplet_imgs + adj_on + adj_in + adj_proximity + fractional_bboxs + obj_occurence_vecs
 
     def __len__(self):
         return len(self.triplets)

@@ -183,6 +183,8 @@ def shuffle_scene_layout(controller, num_attempts=40, floor_obstacle_avoidance=F
                 for pR_ID in possible_pRs:
                     event = controller.step('GetSpawnCoordinatesAboveReceptacle', objectId=pR_ID, anywhere=True)
                     spawn_poses = event.metadata['actionReturn']
+                    if spawn_poses == None:
+                        continue
                     random.shuffle(spawn_poses) # Randomize the positions order
                     if num_attempts is not None and num_attempts < len(spawn_poses):
                         spawn_poses_tmp = copy.deepcopy(spawn_poses[0:num_attempts])

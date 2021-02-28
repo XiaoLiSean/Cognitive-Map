@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import networkx as nx
 import numpy as np
-import sys, time, io
+import sys, time, io, torch
 
 #-------------------------------------------------------------------------------
 # Function to generate points for plot_surface a cuboid
@@ -85,7 +85,7 @@ def add_index(objs):
         if name in REC_MAX_DIC:
             idx = REC_MAX_DIC[name] - ith_obj[name]
             if idx >= REC_MAX_DIC[name]:
-                sys.stderr.write(colored('ERROR: ','red') + "Index exceeds maximum instances {}/{}\n".format(idx,REC_MAX_DIC[name]))
+                sys.stderr.write(colored('ERROR: ','red') + "Index of {} exceeds maximum instances {}/{}\n".format(name, idx, REC_MAX_DIC[name]))
                 sys.exit(1)
             objs[i].update({'instance_i': idx})
             ith_obj[name] -= 1
@@ -219,14 +219,15 @@ class Scene_Graph:
     #---------------------------------------------------------------------------
     def __init__(self, R_on=lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool),
                  R_in=lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool),
-                 R_proximity=lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)):
+                 R_proximity=lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool),
+                 fractional_bboxs=[np.array([0,0,0,0])]*OBJ_TYPE_NUM):
         # All vector and sparse matrix initialized with 'False' boolean
         self._obj_vec = lil_matrix((OBJ_TYPE_NUM, 1), dtype=np.bool)    # binary object occurence vector where index follow 'obj_2_idx_dic.npy'
         self._R_on = R_on    # Relationship sparse matrix _R_on[i,j] = True , obj_i on obj_j
         self._R_in = R_in
         self._R_proximity = R_proximity
         self._R_disjoint = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
-        self._bboxs = [None]*OBJ_TYPE_NUM
+        self._fractional_bboxs = fractional_bboxs
 
     #---------------------------------------------------------------------------
     # reset all values in SG instance
@@ -237,7 +238,7 @@ class Scene_Graph:
         self._R_in = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
         self._R_proximity = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
         self._R_disjoint = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
-        self._fractional_bboxs = [None]*OBJ_TYPE_NUM
+        self._fractional_bboxs = [np.array([0,0,0,0])]*OBJ_TYPE_NUM
 
     def visibleFilter_by_2Dbbox(self, objs, objectsBboxsDict):
         if objectsBboxsDict == None:
@@ -268,25 +269,28 @@ class Scene_Graph:
             # 'on' > 'in' > 'proximity' > 'disjoint'
             # This is also used to rguarantee unique i-j Relationship
             self._R_in[obj_i, obj_j] = False
+            self._R_in[obj_j, obj_i] = False
             self._R_proximity[obj_i, obj_j] = False
             self._R_proximity[obj_j, obj_i] = False
             self._R_disjoint[obj_i, obj_j] = False
+            self._R_disjoint[obj_j, obj_i] = False
         elif r_ij == 'in':
             self._R_in[obj_i, obj_j] = True
             self._R_in[obj_j, obj_i] = False     # The Relationship arrow in SG should be directional
             self._R_proximity[obj_i, obj_j] = False # priority filter
             self._R_proximity[obj_j, obj_i] = False
             self._R_disjoint[obj_i, obj_j] = False # priority filter
-
+            self._R_disjoint[obj_j, obj_i] = False
         # 'proximity' and 'disjoint' belong to mutual Relationship
         # r_ij point from small to larger obj: chair proximity to table
         elif r_ij == 'proximity':
             self._R_proximity[obj_i, obj_j] = True
             self._R_proximity[obj_j, obj_i] = True     # The Relationship arrow in SG should be directional
             self._R_disjoint[obj_i, obj_j] = False # priority filter
+            self._R_disjoint[obj_j, obj_i] = False
         elif r_ij == 'disjoint':
             self._R_disjoint[obj_i, obj_j] = True
-            self._R_disjoint[obj_j, obj_i] = False     # The Relationship arrow in SG should be directional
+            self._R_disjoint[obj_j, obj_i] = True     # The Relationship arrow in SG should be directional
         else:
             sys.stderr.write(colored('ERROR: ','red')
                              + "Expect input r_ij = 'on', 'in', 'proximity' or 'disjoint' while get {}\n".format(r_ij))
@@ -344,10 +348,12 @@ class Scene_Graph:
         plt.axis('off')
 
         axs[0].axis('off')
+
         axs[0].imshow(img)
         image_size = img.size[0]
+
         for idx, uv in enumerate(self._fractional_bboxs):
-            if np.any(uv == None):
+            if np.all(uv == 0):
                 continue
             else:
                 uv = uv*image_size
@@ -358,6 +364,23 @@ class Scene_Graph:
         axs[1].axis('off')
         self.visualize_SG(axis=axs[1])
         plt.show()
+
+    def visualize_one_in_triplet(self, img, ax1, ax2):
+        ax1.axis('off')
+        ax1.imshow(img)
+        image_size = img.size[0]
+
+        for idx, uv in enumerate(self._fractional_bboxs):
+            if np.all(uv == 0):
+                continue
+            else:
+                uv = uv*image_size
+                bbox = Rectangle((uv[0],uv[1]), uv[2]-uv[0], uv[3]-uv[1], ec='green', fill=False, linewidth=2)
+                ax1.add_patch(bbox)
+                ax1.text(uv[0],uv[1], idx_2_obj_list[idx])
+
+        ax2.axis('off')
+        self.visualize_SG(axis=ax2)
 
     #---------------------------------------------------------------------------
     # This function is used to get object index
@@ -412,13 +435,18 @@ class Scene_Graph:
         if is_in and not R_on_stored:   # priority filter
             self.update_SG(idx_smaller, idx_larger, 'in')
         else:
-        # Exam the 'proximity' Relationship
+            '''
+            Take the two objects as two balls
+            Objects proximity to each other if and only if balls are intercept with each other
+            '''
+            # Exam the 'proximity' Relationship
             distance_ij = np.linalg.norm(np.array([center_ij[0]['x'], center_ij[0]['y'], center_ij[0]['z']])
                                          - np.array([center_ij[1]['x'], center_ij[1]['y'], center_ij[1]['z']]))
             # Note: z is the forward axis, x is the horizon axis and y is the upward axis
-            is_proximity = (distance_ij < (PROXIMITY_THRESHOLD * np.linalg.norm([size_ij[smaller_obj]['x'],
-                                                                                 size_ij[smaller_obj]['y'],
-                                                                                 size_ij[smaller_obj]['z']])))
+            small_r = np.linalg.norm([size_ij[smaller_obj]['x'], size_ij[smaller_obj]['y'], size_ij[smaller_obj]['z']]) / 2.0
+            large_r = np.linalg.norm([size_ij[larger_obj]['x'], size_ij[larger_obj]['y'], size_ij[larger_obj]['z']]) / 2.0
+
+            is_proximity = (distance_ij < (small_r + large_r))
 
             if is_proximity and not R_in_stored:   # priority filter
                 self.update_SG(idx_smaller, idx_larger, 'proximity')
@@ -428,15 +456,16 @@ class Scene_Graph:
     #-----------------------------------------------------------------------
     # update the adjancency matrices at entity [i,i] which represents the occurence of object i
     # update the self._obj_vec
-    def add_diagonal_entries(self):
-        for SG in [self._R_on, self._R_in, self._R_proximity]:
-            i_list = find_sparse_idx(SG)[0] # index for obj_i
-            j_list = find_sparse_idx(SG)[1] # index for obj_j
-            for i in i_list:
-                SG[i,i] = True
-            for j in j_list:
-                SG[j,j] = True
-
+    def add_diagonal_entries(self, objs):
+        for obj in objs:
+            if obj['objectType'] in BAN_TYPE_LIST or obj['objectType'] not in idx_2_obj_list:  # Ignore non-informative objectType e.g. 'Floor' and abnormal obj
+                continue
+            idx = self.get_obj_idx(obj)
+            self._obj_vec[idx] = True
+            self._R_on[idx, idx] = True
+            self._R_in[idx, idx] = True
+            self._R_proximity[idx, idx] = True
+            self._R_disjoint[idx, idx] = True
         return
 
     # Update self._frational_bboxs
@@ -455,6 +484,11 @@ class Scene_Graph:
         #-----------------------------------------------------------------------
         # Group up objects and indexing instances
         objs = group_up(objs)
+        #-----------------------------------------------------------------------
+        # update the adjancency matrices at entity [i,i] which represents the occurence of object i
+        # update the self._obj_vec
+        self.add_diagonal_entries(objs)
+        #-----------------------------------------------------------------------
         # Update self._frational_bboxs
         if image_size != None:
             self.update_fractional_bboxs(objs, image_size)
@@ -519,10 +553,7 @@ class Scene_Graph:
                     self.update_SG(idx_j, idx_i, 'on')
                 else:
                     self.update_except_on(objs,i,j,R_on_stored,R_in_stored,R_proximity_stored)
-        #-----------------------------------------------------------------------
-        # update the adjancency matrices at entity [i,i] which represents the occurence of object i
-        # update the self._obj_vec
-        self.add_diagonal_entries()
+
         #-----------------------------------------------------------------------
         # visualize Scene Graph
         if visualization_on:

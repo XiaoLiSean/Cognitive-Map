@@ -174,10 +174,13 @@ def update_object_type():
     np.save(INFO_FILE_PATH + '/' + 'obj_2_idx_dic.npy', obj_2_idx_dic) # Save dictionary as .npy
     np.save(INFO_FILE_PATH + '/' + 'idx_2_obj_list.npy', idx_2_obj_list) # Save list as .npy
 
+    return obj_2_idx_dic, idx_2_obj_list
+
 # --------------------------------------------------------------------------
 # This function is used to refine object info by grouping up and increase number of receptacles
 # in obj_2_idx_dic and idx_2_obj_list using GROUP_UP_LIST and REC_MAX_DIC
 def refine_object_info():
+    obj_2_idx_dic, idx_2_obj_list = update_object_type()
     obj_dic = {}
     obj_list = []
     for objectType in idx_2_obj_list:
