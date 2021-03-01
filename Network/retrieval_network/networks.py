@@ -1,4 +1,7 @@
-# This module is used to define siamese networks
+'''
+Retrieval Network, Written by Xiao
+For robot localization in a dynamic environment.
+'''
 import torch
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
@@ -242,7 +245,7 @@ class TripletNetImage(torch.nn.Module):
         batch_img_vector_embeddings = self.conv_to_vec_feature(batch_conv_features)
 
         if self.enableRoIBridge:
-            batch_obj_vecs = torch.squeeze(batch_obj_vecs)
+            batch_obj_vecs = torch.squeeze(batch_obj_vecs, dim=2)
 
             RoI_features = self.get_RoI_features(batch_conv_features, batch_fractional_bboxs, batch_obj_vecs)
             PoE_features = self.RoIBridge.get_PoE_features(batch_fractional_bboxs, batch_obj_vecs)

@@ -1,3 +1,7 @@
+'''
+Retrieval Network, Written by Xiao
+For robot localization in a dynamic environment.
+'''
 import sys
 import torch
 
@@ -22,8 +26,8 @@ if we want lr_final_epoch <= 1e-4
 this constraint will regulate the corresponding value of other params
 '''
 # Traning parameters/setting
-BATCH_SIZE = 14 # common settings for networks {image=26, SG=12}
-NUM_EPOCHS = 120 # common settings for networks {image=50, SG=1000}
+BATCH_SIZE = 14 # common settings for networks {image=26, SG=14}
+NUM_EPOCHS = 60 # common settings for networks {image=50, SG=1000}
 # --------------------------------------------
 '''
 Meanwhile, too large ALPHA_MARGIN will cause overfitting as it's functional

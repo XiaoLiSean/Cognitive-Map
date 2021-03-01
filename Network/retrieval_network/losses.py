@@ -1,3 +1,7 @@
+'''
+Retrieval Network, Written by Xiao
+For robot localization in a dynamic environment.
+'''
 import torch
 import torch.nn.functional as F
 from termcolor import colored

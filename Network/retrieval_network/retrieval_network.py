@@ -1,4 +1,7 @@
-# Import params and similarity from lib module
+'''
+Retrieval Network, Written by Xiao
+For robot localization in a dynamic environment.
+'''
 import torch
 import numpy as np
 from PIL import Image

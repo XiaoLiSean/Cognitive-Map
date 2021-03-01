@@ -1,3 +1,7 @@
+'''
+Retrieval Network, Written by Xiao
+For robot localization in a dynamic environment.
+'''
 import torch
 import time
 import os
@@ -99,20 +103,23 @@ def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_schedul
 
     return model
 
-def plot_training_statistics():
-    f, (ax1, ax2) = plt.subplots(2, 1)
-    training_statistics = np.load('training_statistics_image.npy', allow_pickle=True).item()
-    training_statistics['train'][0] = [training_statistics['train'][0][i].item() for i in range(len(training_statistics['train'][0]))]
-    training_statistics['val'][0] = [training_statistics['val'][0][i].item() for i in range(len(training_statistics['val'][0]))]
-    epochs = [*range(len(training_statistics['train'][0]))]
-    ax1.plot(epochs, training_statistics['train'][0],'b--', linewidth=2, label='Training Acc')
-    ax2.plot(epochs, training_statistics['train'][1],'b', linewidth=2, label='Training Loss')
-    ax1.plot(epochs, training_statistics['val'][0],'r--', linewidth=2, label='Val Acc')
-    ax2.plot(epochs, training_statistics['val'][1],'r', linewidth=2, label='Val Loss')
-    ax1.legend(loc='center right', shadow=True)
-    ax2.legend(loc='center right', shadow=True)
-    ax1.set_xlabel("Epoch")
-    ax1.set_ylabel("Accuracy")
-    ax2.set_xlabel("Epoch")
-    ax2.set_ylabel("Loss")
+def plot_training_statistics(file_names):
+
+    f, (ax1, ax2) = plt.subplots(2, 1, figsize=(6,5))
+    color = ['blue', 'red']
+    branch = ['Image', 'Retrieval']
+    for i in range(len(file_names)):
+        training_statistics = np.load(file_names[i], allow_pickle=True).item()
+        epochs = [*range(len(training_statistics['train'][0]))]
+        ax1.plot(epochs, training_statistics['train'][0], color=color[i], linestyle='solid', linewidth=2, label=branch[i] + ' Training')
+        ax2.plot(epochs, training_statistics['train'][1], color=color[i], linestyle='solid', linewidth=2, label=branch[i] + ' Training')
+        ax2.plot(epochs, training_statistics['val'][1], color=color[i], linestyle='dashed', linewidth=2, label=branch[i] + ' val.')
+        ax1.plot(epochs, training_statistics['val'][0], color=color[i], linestyle='dashed', linewidth=2, label=branch[i] + ' val.')
+        # ax1.set_xlabel("Epoch")
+        ax1.set_ylabel("Accuracy")
+        ax2.set_xlabel("Epoch")
+        ax2.set_ylabel("Loss")
+        ax2.grid(True)
+        ax1.grid(True)
+    ax1.legend(bbox_to_anchor=(0.10, 1.02), ncol=2)
     plt.show()
