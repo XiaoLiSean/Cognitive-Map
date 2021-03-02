@@ -114,7 +114,7 @@ def show_testing_histogram(test_file_name):
     fig.tight_layout()
     plt.show()
 # ------------------------------------------------------------------------------
-def show_testing_histogram_comparison(test_file_names):
+def show_testing_histogram_comparison(test_file_names, branch=['ResNet', 'Retrieval'], axis_off_set=False):
     fig, ax1 = plt.subplots(figsize=(6,5))
     img_statistics = np.load(test_file_names[0], allow_pickle=True).item()
     all_statistics = np.load(test_file_names[1], allow_pickle=True).item()
@@ -129,17 +129,17 @@ def show_testing_histogram_comparison(test_file_names):
         all_corrects.append(all_statistics[key]['corrects'])
 
     plt.bar(np.arange(len(tags)), total, label='Total Cases')
-    plt.bar(np.arange(len(tags)), all_corrects, label='Image Success')
-    plt.bar(np.arange(len(tags)), img_corrects, label='Retrieval Success')
+    plt.bar(np.arange(len(tags)) - int(axis_off_set)*0.25, all_corrects, width=0.8 - 0.4*int(axis_off_set), label=branch[1] + ' Success')
+    plt.bar(np.arange(len(tags)) + int(axis_off_set)*0.25, img_corrects, width=0.8 - 0.4*int(axis_off_set), label=branch[0] + ' Success')
     ax1.set_xticks(np.arange(len(tags)))
     ax1.set_xticklabels(tags, rotation=90)
-    ax1.legend(labels=['Total Cases', 'Retrieval Success', 'Image Success'], bbox_to_anchor=(0.40, 0.55))
+    ax1.legend(labels=['Total Cases', branch[1] + ' Success', branch[0] + ' Success'], bbox_to_anchor=(0.40, 0.55))
 
     ax2 = ax1.twinx()
     ax2.plot(np.arange(len(tags)), np.true_divide(np.array(img_corrects), np.array(total)), 'b--')
     ax2.plot(np.arange(len(tags)), np.true_divide(np.array(all_corrects), np.array(total)), 'r--')
-    img_label = 'Image Success Rate: {:.2%} overall'.format(np.true_divide(np.sum(np.array(img_corrects)), np.sum(np.array(total))))
-    all_label = 'Retrieval Success Rate: {:.2%} overall'.format(np.true_divide(np.sum(np.array(all_corrects)), np.sum(np.array(total))))
+    img_label = branch[0] + ' Success Rate: {:.2%} overall'.format(np.true_divide(np.sum(np.array(img_corrects)), np.sum(np.array(total))))
+    all_label = branch[1] + ' Success Rate: {:.2%} overall'.format(np.true_divide(np.sum(np.array(all_corrects)), np.sum(np.array(total))))
     ax2.legend(labels=[img_label, all_label], bbox_to_anchor=(0.70, 1.2))
     ax2.set_yticks(np.arange(11)/10)
     ax2.set_yticklabels(['{:,.1%}'.format(x) for x in np.arange(11)/10])

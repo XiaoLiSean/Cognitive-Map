@@ -41,14 +41,14 @@ class Frelement():
 		# self._
 
 	def build(self, times, signal, length, orderi):
-		
+
 		numFrequencies = self._num_periodicity
 		frequencies = [float(self._period)/(i+1) for i in range(numFrequencies)]
 		real = [0 for _ in range(numFrequencies)]
 		imag = [0 for _ in range(numFrequencies)]
 
 		signalLength = length
-		
+
 		self._order = orderi
 		self._SFrelements = [SFrelement() for _ in range(self._order)]
 		self._gain = 0

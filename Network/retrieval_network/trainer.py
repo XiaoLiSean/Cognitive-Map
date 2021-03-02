@@ -13,7 +13,7 @@ from progress.bar import Bar
 from Network.retrieval_network.params import *
 
 # ------------------------------------------------------------------------------
-def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=None):
+def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=None, batch_size=BATCH_SIZE):
     """
     Loaders, model, loss function and metrics should work together for a given task,
     i.e. The model should be able to process data output of loaders,
@@ -48,7 +48,7 @@ def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_schedul
             # ------------------------------------------------------------------
             # loading bar
             print('----'*6)
-            bar = Bar('Processing', max=math.ceil(dataset_sizes[phase]/BATCH_SIZE))
+            bar = Bar('Processing', max=math.ceil(dataset_sizes[phase]/batch_size))
             for batch_idx, inputs in enumerate(data_loaders[phase]):
                 # zero the parameter gradients
                 optimizer.zero_grad()
@@ -103,11 +103,10 @@ def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_schedul
 
     return model
 
-def plot_training_statistics(file_names):
+def plot_training_statistics(file_names, branch=['ResNet', 'Retrieval']):
 
     f, (ax1, ax2) = plt.subplots(2, 1, figsize=(6,5))
     color = ['blue', 'red']
-    branch = ['Image', 'Retrieval']
     for i in range(len(file_names)):
         training_statistics = np.load(file_names[i], allow_pickle=True).item()
         epochs = [*range(len(training_statistics['train'][0]))]
@@ -121,5 +120,6 @@ def plot_training_statistics(file_names):
         ax2.set_ylabel("Loss")
         ax2.grid(True)
         ax1.grid(True)
+
     ax1.legend(bbox_to_anchor=(0.10, 1.02), ncol=2)
     plt.show()
