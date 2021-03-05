@@ -149,6 +149,25 @@ def show_testing_histogram_comparison(test_file_names, branch=['ResNet', 'Retrie
     plt.show()
 
 # ------------------------------------------------------------------------------
+def store_success_case(checkpoints_prefix, triplet_name):
+    fig, axs = plt.subplots(1,3)
+    plt.title(triplet_name[0].split('/')[5])
+    for i in range(3):
+        img = Image.open(triplet_name[i]+'.png')
+        axs[i].imshow(img)
+        axs[i].set_title(triplet_name[i].split('/')[6])
+        axs[i].axis('off')
+
+    file_name = triplet_name[0].split('/')[5] + triplet_name[0].split('/')[6] + triplet_name[1].split('/')[6] + triplet_name[2].split('/')[6]
+    for key in all_fail_cases:
+        if triplet_name in all_fail_cases[key]:
+            file_name = key + '+' + file_name
+    plt.savefig(checkpoints_prefix + 'unique_success_cases' + '/' + file_name + '.jpg')
+    plt.close()
+
+# ------------------------------------------------------------------------------
+all_fail_cases = np.load('all_fail_cases.npy', allow_pickle=True).item()
+# ------------------------------------------------------------------------------
 def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=False):
     # ---------------------------Loading testing dataset---------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading testing dataset...')
@@ -187,13 +206,20 @@ def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_imag
         if is_correct.item() == 0:
             triplet_name = test_dataset.triplets[batch_idx]
             store_fail_case(checkpoints_prefix, triplet_name)
+            # Store Unique success case (Only Retrieval Network success while other three fail)
+            if is_only_image_branch:
+                all_fail_cases['img'].append(test_dataset.triplets[batch_idx])
+        elif is_correct.item() == 1 and not is_only_image_branch:
+            # Store Unique success case (Only Retrieval Network success while other three fail)
+            triplet_name = test_dataset.triplets[batch_idx]
+            store_success_case(checkpoints_prefix, triplet_name)
+
         bar.next()
 
     bar.finish()
     print('----'*20)
-    np.save('testing_statistics.npy', testing_statistics)
-
-
+    # np.save('testing_statistics.npy', testing_statistics)
+    np.save('all_fail_cases.npy', all_fail_cases)
 
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -248,9 +274,9 @@ if __name__ == '__main__':
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
-        plot_training_statistics(train_file_names)
+        #plot_training_statistics(train_file_names)
         testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=args.image)
-
+        exit(0)
         if args.image and not args.all:
             show_testing_histogram(test_file_name)
         elif args.all and not args.image:

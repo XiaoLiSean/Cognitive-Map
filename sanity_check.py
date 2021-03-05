@@ -25,6 +25,8 @@ from os.path import dirname, abspath
 BATCH_SIZE = 200
 CHECKPOINTS_DIR += 'sanity_check/'
 NUM_EPOCHS = 120
+#all_fail_cases = dict(sg=[], sgpos=[], img=[])
+all_fail_cases = np.load('all_fail_cases.npy', allow_pickle=True).item()
 
 # ------------------------------------------------------------------------------
 # -------------------------------Training Pipeline------------------------------
@@ -106,6 +108,11 @@ def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, positional_f
         outputs = model(*inputs)
         _, is_correct = LossFcn(*outputs, batch_average_loss=True)
         iFloorPlan = test_dataset.triplets[batch_idx][0].split('/')[5]
+
+        # Store Unique success case (Only Retrieval Network success while other three fail)
+        if is_correct.item() == 0:
+            all_fail_cases['sgpos' if positional_feature_enabled else 'sg'].append(test_dataset.triplets[batch_idx])
+
         if iFloorPlan in testing_statistics:
             testing_statistics[iFloorPlan]['total'] += 1
             testing_statistics[iFloorPlan]['corrects'] += is_correct.item()
@@ -116,7 +123,8 @@ def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, positional_f
 
     bar.finish()
     print('----'*20)
-    np.save('testing_statistics.npy', testing_statistics)
+    # np.save('testing_statistics.npy', testing_statistics)
+    np.save('all_fail_cases.npy', all_fail_cases)
 
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -143,7 +151,7 @@ if __name__ == '__main__':
         train_file_names = ['training_statistics_sg.npy']
         test_file_names = ['testing_statistics_sg.npy']
 
-    # testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, positional_feature_enabled=args.position)
+    testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, positional_feature_enabled=args.position)
     # show_testing_histogram_comparison(test_file_names, branch=['SG', 'SG+Pose'], axis_off_set=True)
 
     # model_best_fit = training_pipeline(Dataset, Network, LossFcn, TraningFcn, checkpoints_prefix, positional_feature_enabled=args.position)
