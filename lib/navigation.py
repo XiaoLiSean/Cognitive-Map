@@ -15,8 +15,8 @@ from lib.params import *
 
 
 class Navigation():
-	def __init__(self, scene_type, scene_num, save_directory, AI2THOR, server=None, comfirmed=None):
-		self.Robot = Robot(scene_type=scene_type, scene_num=scene_num, save_directory=save_directory, AI2THOR=AI2THOR, server=server, comfirmed=comfirmed)
+	def __init__(self, scene_type, scene_num, save_directory, AI2THOR, isStaticEnv=True, server=None, comfirmed=None):
+		self.Robot = Robot(scene_type=scene_type, scene_num=scene_num, isStaticEnv=isStaticEnv, save_directory=save_directory, AI2THOR=AI2THOR, server=server, comfirmed=comfirmed)
 		self.node_generator = Node_generator(controller=self.Robot._AI2THOR_controller._controller)
 		self.topo_map = Topological_map(controller=self.Robot._AI2THOR_controller._controller, node_index_list=None, neighbor_nodes_pair=None)
 		self.planner = Planner()
@@ -209,6 +209,7 @@ class Navigation():
 			_, orientation = self.topo_map.Get_node_index_orien(node_path)
 
 			goal_frame = node_value['image']
+			goal_scene_graph = node_value['scene_graph']
 			goal_pose = {'position': node_value['position'], 'rotation': copy.deepcopy(rotation_standard)}
 			goal_pose['rotation'][1] = orientation
 			goal_action_type = 'translation'
@@ -228,7 +229,7 @@ class Navigation():
 				rotation_degree = None
 
 			self._action_case_num += 1
-			if self.Robot.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, max_steps=self.Robot._Navigation_max_try, rotation_degree=rotation_degree):
+			if self.Robot.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, goal_scene_graph=goal_scene_graph, max_steps=self.Robot._Navigation_max_try, rotation_degree=rotation_degree):
 				failed_case = 0
 
 				self._action_success_num += 1

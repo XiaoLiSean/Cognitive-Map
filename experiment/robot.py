@@ -13,6 +13,8 @@ from experiment.node_generation import *
 from experiment.experiment_config import *
 from Network.action_network.action_network import Action_network
 from Network.retrieval_network.retrieval_network import Retrieval_network
+from Network.retrieval_network.datasets import get_adj_matrix
+from lib.scene_graph_generation import Scene_Graph
 from lib.params import *
 
 # SIM_WINDOW_HEIGHT = 700
@@ -45,12 +47,13 @@ logging.basicConfig(level=log_setting[args.log_level])
 
 
 class Robot():
-	def __init__(self, scene_type, scene_num, save_directory, overwrite_data=False, AI2THOR=False, grid_size=0.25, rotation_step=90, sleep_time=0.005, use_test_scene=False, debug=False, server=None, comfirmed=None):
+	def __init__(self, scene_type, scene_num, isStaticEnv=True, save_directory=None, overwrite_data=False, AI2THOR=False, grid_size=0.25, rotation_step=90, sleep_time=0.005, use_test_scene=False, debug=False, server=None, comfirmed=None):
 
 		self._grid_size = grid_size
 		self._sleep_time = sleep_time
 		self._AI2THOR_controller = AI2THOR_controller(AI2THOR, scene_type, scene_num, grid_size, rotation_step, sleep_time,
 													  save_directory, overwrite_data, use_test_scene, debug=debug)
+		self.isStaticEnv = False
 		self._use_test_scene = use_test_scene
 		self._debug = debug
 
@@ -63,7 +66,7 @@ class Robot():
 		self.goal_rotation = None
 
 		self.Set_navigation_network()
-		self.Set_localization_network()
+		self.Set_localization_network(self.isStaticEnv)
 
 	def Reset_scene(self, scene_type, scene_num):
 		self._AI2THOR_controller.Reset_scene(scene_type=scene_type, scene_num=scene_num)
@@ -75,14 +78,14 @@ class Robot():
 		else:
 			self._action_network = Action_network()
 
-	def Set_localization_network(self, network=None):
+	def Set_localization_network(self, isStaticEnv, network=None):
 		if not network is None:
 			self._localization_network = network
 			return
 		else:
-			self._localization_network = Retrieval_network()
+			self._localization_network = Retrieval_network(isStaticEnv=isStaticEnv)
 
-	def Navigation_stop(self, image_goal, image_current, goal_pose=None, hardcode=False):
+	def Navigation_stop(self, feature_goal, feature_current, goal_pose=None, hardcode=False):
 
 		position_current = list(self.Get_robot_position().values())
 		rotation_current = list(self.Get_robot_orientation().values())
@@ -101,9 +104,22 @@ class Robot():
 			else:
 				return True
 
-		Image_goal = Image.fromarray(image_goal)
-		Image_current = Image.fromarray(image_current)
-		localized = self._localization_network.is_localized_static(Image_goal, Image_current)
+		if self.isStaticEnv:
+			feature_goal = Image.fromarray(feature_goal[0])
+			feature_current = Image.fromarray(feature_current[0])
+		else:
+			goal_SG = feature_goal[1]
+			feature_goal = [Image.fromarray(feature_goal[0]), get_adj_matrix(goal_SG['on']),
+							get_adj_matrix(goal_SG['in']), get_adj_matrix(goal_SG['proximity']),
+							np.asarray(goal_SG['fractional_bboxs'], dtype=np.float32),
+							np.asarray(goal_SG['vec'].todense(), dtype=np.float32)]
+			cur_SG = feature_current[1]
+			feature_current = [Image.fromarray(feature_current[0]), get_adj_matrix(cur_SG['on']),
+							   get_adj_matrix(cur_SG['in']), get_adj_matrix(cur_SG['proximity']),
+							   np.asarray(cur_SG['fractional_bboxs'], dtype=np.float32),
+							   np.asarray(cur_SG['vec'].todense(), dtype=np.float32)]
+
+		localized = self._localization_network.is_localized(feature_current, feature_goal)
 
 		return localized
 
@@ -124,7 +140,7 @@ class Robot():
 					break
 	# --------------------------------------------------------------------------
 
-	def Navigate_by_ActionNet(self, image_goal, goal_pose, max_steps, rotation_degree=None):
+	def Navigate_by_ActionNet(self, image_goal, goal_pose, goal_scene_graph, max_steps, rotation_degree=None):
 
 		goal_position = self._AI2THOR_controller.Get_list_form(pos_or_rot=goal_pose['position'])
 		goal_rotation = self._AI2THOR_controller.Get_list_form(pos_or_rot=goal_pose['rotation'])
@@ -141,11 +157,14 @@ class Robot():
 		step = 0
 		self._AI2THOR_controller.Update_event()
 		current_frame = self._AI2THOR_controller.Get_frame()
+		current_scene_graph = self._AI2THOR_controller.Get_SceneGraph()
+		feature_current = (current_frame, current_scene_graph)
+		feature_goal = (image_goal, goal_scene_graph)
 
 		if not rotation_degree is None:
 			rotation_move = False
 
-		while not self.Navigation_stop(image_goal=image_goal, image_current=current_frame, goal_pose=goal_pose, hardcode=True):
+		while not self.Navigation_stop(feature_goal=feature_goal, feature_current=feature_current, goal_pose=goal_pose, hardcode=False):
 			# ------------------------------------------------------------------
 			# Send information to plotter
 			# ------------------------------------------------------------------
@@ -188,6 +207,8 @@ class Robot():
 				pre_action = action_predict.item()
 
 			current_frame = self._AI2THOR_controller.Get_frame()
+			current_scene_graph = self._AI2THOR_controller.Get_SceneGraph()
+			feature_current = (current_frame, current_scene_graph)
 
 			step += 1
 			if step >= max_steps:
@@ -225,10 +246,14 @@ class AI2THOR_controller():
 		self._use_test_scene = use_test_scene
 		self._scene_name = self.Get_scene_name()
 
+		# This two variable is used for localization in dynamics env
+		self._CurrentSceneGraph = Scene_Graph()
+		self._CurrentImg = []
+
 		if self._AI2THOR:
-			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW, agentMode='bot')
+			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW, renderObjectImage=True, agentMode='bot')
 		else:
-			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW)
+			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW, renderObjectImage=True)
 
 		# self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)
 		self._save_directory = save_directory
@@ -397,6 +422,12 @@ class AI2THOR_controller():
 
 	def Update_event(self):
 		self._event = self._controller.step('Pass')
+		objs = self._event.metadata['objects']
+		self._CurrentImg = self._event.frame
+		Img = Image.fromarray(self._CurrentImg, 'RGB')
+		self._CurrentSceneGraph.reset()
+		objs = self._CurrentSceneGraph.visibleFilter_by_2Dbbox(objs, self._event.instance_detections2D)
+		self._CurrentSceneGraph.update_from_data(objs, image_size=Img.size[0])
 
 	def Open_close_label_text(self):
 		if self._use_test_scene:
@@ -450,7 +481,11 @@ class AI2THOR_controller():
 
 	def Get_frame(self):
 		self.Update_event()
-		return self._event.frame
+		return self._CurrentImg
+
+	def Get_SceneGraph(self):
+		self.Update_event()
+		return self._CurrentSceneGraph.get_SG_as_dict()
 
 	def Get_list_form(self, pos_or_rot):
 		if isinstance(pos_or_rot, dict):

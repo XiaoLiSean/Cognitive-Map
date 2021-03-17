@@ -7,21 +7,29 @@ import numpy as np
 from PIL import Image
 from torchvision import transforms
 from Network.retrieval_network.params import IMAGE_SIZE, CHECKPOINTS_DIR
-from Network.retrieval_network.networks import RetrievalTriplet
+from Network.retrieval_network.networks import RetrievalTriplet, TripletNetImage
 
 class Retrieval_network():
-    def __init__(self):
+    def __init__(self, isStaticEnv=False):
         # Prepare model and load checkpoint
-        self.checkpoint = CHECKPOINTS_DIR + 'best_fit.pkl'
+        self.isStaticEnv = isStaticEnv
+        if self.isStaticEnv:
+            self.checkpoint = CHECKPOINTS_DIR + 'image_best_fit.pkl'
+        else:
+            self.checkpoint = CHECKPOINTS_DIR + 'best_fit.pkl'
+
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = self.get_network()
-        self.COS = torch.nn.CosineSimilarity(dim=0, eps=1e-10)
+        self.COS = torch.nn.CosineSimilarity(dim=1, eps=1e-10)
         self.feature_transforms = transforms.Compose([transforms.Resize(IMAGE_SIZE),
                                                      transforms.ToTensor(),
                                                      transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
     def get_network(self):
-        model = RetrievalTriplet()
+        if self.isStaticEnv:
+            model = TripletNetImage()
+        else:
+            model = RetrievalTriplet()
         model.to(self.device)
         model.load_state_dict(torch.load(self.checkpoint))
         model.eval()
@@ -35,13 +43,19 @@ class Retrieval_network():
     # ----------------------------------------------------------
     # OUTPUT: True (reached the goal) || False (did not reach the goal)
     # ----------------------------------------------------------
-    def is_localized_static(self, current_info, goal_info, threshold=0.94):
-        current_info[0] = self.feature_transforms(current_info[0]).unsqueeze(dim=0)
-        current_info = tuple(input.to(self.device) for input in current_info)
-        goal_info[0] = self.feature_transforms(goal_info[0]).unsqueeze(dim=0)
-        goal_info = tuple(input.to(self.device) for input in goal_info)
-
-        similarity = self.COS(self.model.get_embedding(*current_info), self.model.get_embedding(*goal_info)).item()
+    def is_localized(self, current_info, goal_info, threshold=0.94):
+        if self.isStaticEnv:
+            current_info = self.feature_transforms(current_info).unsqueeze(dim=0)
+            current_info = current_info.to(self.device)
+            goal_info = self.feature_transforms(goal_info).unsqueeze(dim=0)
+            goal_info = goal_info.to(self.device)
+            similarity = self.COS(self.model.get_embedding(current_info), self.model.get_embedding(goal_info)).item()
+        else:
+            current_info[0] = self.feature_transforms(current_info[0])
+            current_info = tuple(torch.unsqueeze(torch.tensor(input), 0).to(self.device) for input in current_info)
+            goal_info[0] = self.feature_transforms(goal_info[0])
+            goal_info = tuple(torch.unsqueeze(torch.tensor(input), 0).to(self.device) for input in goal_info)
+            similarity = self.COS(self.model.get_embedding(*current_info), self.model.get_embedding(*goal_info)).item()
 
         return similarity >= threshold
 

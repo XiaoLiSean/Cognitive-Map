@@ -6,7 +6,7 @@ from distutils.util import strtobool
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--scene_type", type=int, default=1,  help="Choose scene type for simulation, 1 for Kitchens, 2 for Living rooms, 3 for Bedrooms, 4 for Bathrooms")
-parser.add_argument("--scene_num", type=int, default=0,  help="Choose scene num for simulation, from 1 - 30")
+parser.add_argument("--scene_num", type=int, default=26,  help="Choose scene num for simulation, from 1 - 30")
 parser.add_argument("--grid_size", type=float, default=0.25,  help="Grid size of AI2THOR simulation")
 parser.add_argument("--rotation_step", type=float, default=10,  help="Rotation step of AI2THOR simulation")
 parser.add_argument("--sleep_time", type=float, default=0.005,  help="Sleep time between two actions")

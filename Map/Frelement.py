@@ -74,7 +74,7 @@ class Frelement():
 
 	# build the model
 	def build(self, times, signals, length, orderi):
-		
+
 		numFrequencies = self._num_periodicity
 		frequencies = [float(self._period)/(i+1) for i in range(numFrequencies)]
 		real = [0 for _ in range(numFrequencies)]

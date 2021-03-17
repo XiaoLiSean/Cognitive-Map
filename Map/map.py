@@ -17,7 +17,7 @@ from lib.scene_graph_generation import Scene_Graph
 sys.path.append('../')
 from experiment import *
 import networkx as nx
-from Frelement import *
+from Map.Frelement import *
 
 
 class Topological_map():
@@ -26,7 +26,6 @@ class Topological_map():
 		self._data = []
 		self._orientations = [0, 90, 180, 270]
 		self._controller = controller
-		self._scene_knowledge_graph = None #set up global knowledge graph: self.get_scene_graph(visible_filter=False)
 		self._neighbor_nodes_pair = neighbor_nodes_pair
 		self._node_index_list = node_index_list
 		self._updated_needed = False
@@ -44,8 +43,11 @@ class Topological_map():
 		self._action_direction_cost_coeff = [0.5, 1, 1, 0.7]
 
 		self._event = None
+		# This two variable is used for localization in dynamics env using Scene Graph
+		self._CurrentSceneGraph = Scene_Graph()
+		self._CurrentImg = []
 
-		self._scene_graph_method = self.get_scene_graph
+
 		self._Unit_rotate_func = None
 		self._Rotate_to_degree_func = None
 		self._Teleport_agent_func = None
@@ -115,40 +117,6 @@ class Topological_map():
 		SG = Scene_Graph()
 		self.Update_event()
 
-		if visible_filter:
-			if scan_entire_corn:
-				# Remain to be developed
-				print('----'*20)
-				print(colored('Remain to be developed', 'red'))
-				print('----'*20)
-				position = self._event.metadata['agent']['position']
-				rotation = self._event.metadata['agent']['rotation']
-				objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
-				objs_add_list = []
-				for _ in range(2):
-					self._controller.step(action='LookDown', degrees=30)
-					self.Update_event()
-					objs_add_list += [obj for obj in self._event.metadata['objects'] if obj['visible']]
-
-				self._controller.step(action='TeleportFull', x=position['x'], y=position['y'], z=position['z'], rotation=rotation, horizon=0.0)
-				for _ in range(2):
-					self._controller.step(action='LookUp', degrees=30)
-					self.Update_event()
-					objs_add_list += [obj for obj in self._event.metadata['objects'] if obj['visible']]
-
-				self._controller.step(action='TeleportFull', x=position['x'], y=position['y'], z=position['z'], rotation=rotation, horizon=0.0)
-				for obj in objs_add_list:
-					if obj not in objs:
-						objs.append(obj)
-			else:
-				objs = [obj for obj in self._event.metadata['objects'] if obj['visible']]
-
-		else:
-			objs = self._event.metadata['objects']
-
-		SG.reset()
-		SG.update_from_data(objs)
-		# SG.visualize_SG()
 		return SG.get_SG_as_dict()
 
 	def Set_env_from_Robot(self, Robot):
@@ -215,9 +183,6 @@ class Topological_map():
 	def Set_Teleport_agent_func(self, Teleport_agent):
 		self._Teleport_agent_func = Teleport_agent
 
-	def Set_scene_graph_method(self, scene_graph_method):
-		self._scene_graph_method = self.get_scene_graph
-
 	def Set_Unit_rotate_func(self, Unit_rotate):
 		self._Unit_rotate_func = Unit_rotate
 
@@ -241,6 +206,12 @@ class Topological_map():
 
 	def Update_event(self):
 		self._event = self._controller.step('Pass')
+		objs = self._event.metadata['objects']
+		self._CurrentImg = self._event.frame
+		Img = Image.fromarray(self._CurrentImg, 'RGB')
+		self._CurrentSceneGraph.reset()
+		objs = self._CurrentSceneGraph.visibleFilter_by_2Dbbox(objs, self._event.instance_detections2D)
+		self._CurrentSceneGraph.update_from_data(objs, image_size=Img.size[0])
 
 	def Get_reachable_coordinate(self):
 		self._event = self._controller.step(action='GetReachablePositions')
@@ -253,9 +224,15 @@ class Topological_map():
 
 	def Get_frame(self):
 		self.Update_event()
-		return self._event.frame
+		return self._CurrentImg
 
+	def Get_SceneGraph(self):
+		self.Update_event()
+		return self._CurrentSceneGraph.get_SG_as_dict()
+
+	# ==========================================================================
 	# Clear the current graph and add all nodes in graph
+	# ==========================================================================
 	def Add_all_node(self, node_index_list=None):
 
 		if not node_index_list is None:
@@ -280,10 +257,8 @@ class Topological_map():
 				self._Rotate_to_degree_func(goal_degree=orientation)
 				frames.append(self.Get_frame())
 				self._data[node_index][orien_index].append({'image': [], 'scene_graph': []})
-				if not self._scene_graph_method is None:
-					scene_graphs.append(self._scene_graph_method())
+				scene_graphs.append(self.Get_SceneGraph())
 
-				# self._data[node_index][orien_index].append({'image': self.Get_frame(), 'scene_graph': self._scene_graph_method()})
 			if len(scene_graphs) > 0:
 				self.Add_node(node_num=node_index, position=node_position, frames=frames, scene_graphs=scene_graphs)
 			else:
