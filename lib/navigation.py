@@ -8,9 +8,9 @@ from sklearn.cluster import KMeans
 from PIL import Image
 import time, copy, random
 import logging, os, sys
-sys.path.append('./Network')
-sys.path.append('./experiment')
-from Map import *
+sys.path.append('./Network') # import navi and retrieval_network
+sys.path.append('./experiment') # import simulation robot
+from Map import * # import topological map
 from lib.params import *
 
 

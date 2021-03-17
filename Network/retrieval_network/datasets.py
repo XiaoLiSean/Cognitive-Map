@@ -1,3 +1,7 @@
+'''
+Retrieval Network, Written by Xiao
+For robot localization in a dynamic environment.
+'''
 import numpy as np
 import os, sys, random, scipy
 import torch

@@ -81,7 +81,7 @@ class Frelement():
 		imag = [0 for _ in range(numFrequencies)]
 
 		signalLength = length
-		
+
 		self._order = orderi
 		self._SFrelements = [SFrelement() for _ in range(self._order)]
 		self._gain = 0

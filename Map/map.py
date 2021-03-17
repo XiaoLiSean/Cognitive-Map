@@ -17,7 +17,7 @@ from lib.scene_graph_generation import Scene_Graph
 sys.path.append('../')
 from experiment import *
 import networkx as nx
-from Frement import *
+from Frelement import *
 
 
 class Topological_map():
@@ -71,8 +71,8 @@ class Topological_map():
 			for object_index in range(len(subnode_record._subnode_name)):
 				self.build_frelement_subnode_object(obj_name=subnode_record._subnode_name[object_index],
 					times=subnode_record._times[object_index], signal=subnode_record._signals[object_index], node_name=subnode_record._subnode_name)
-		
-# 	Add new observations of some time to the frelements, 
+
+# 	Add new observations of some time to the frelements,
 	def add_obs_frelements(self, objs, time_current, node_name):
 
 		objs_obs_list = []

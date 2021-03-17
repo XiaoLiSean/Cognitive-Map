@@ -1,3 +1,7 @@
+'''
+Retrieval Network, Written by Xiao
+For robot localization in a dynamic environment.
+'''
 # Import params and similarity from lib module
 import torch
 import argparse, os, copy, pickle, time
@@ -39,7 +43,7 @@ def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix, i
     if is_only_image_branch:
         model = Network(enableRoIBridge=False) # Train Image Branch
     else:
-        model = Network(self_pretrained_image=True) # freeze image branch and train SG
+        model = Network(self_pretrained_image=True)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Model training on: ", device)
     print("Cuda is_available: ", torch.cuda.is_available())
@@ -84,9 +88,10 @@ def store_fail_case(checkpoints_prefix, triplet_name):
     file_name = triplet_name[0].split('/')[5] + triplet_name[0].split('/')[6] + triplet_name[1].split('/')[6] + triplet_name[2].split('/')[6]
     plt.savefig(checkpoints_prefix + 'failCase' + '/' + file_name + '.jpg')
     plt.close()
-
-def show_testing_histogram(testing_statistics):
+# ------------------------------------------------------------------------------
+def show_testing_histogram(test_file_name):
     fig, ax1 = plt.subplots()
+    testing_statistics = np.load(test_file_name, allow_pickle=True).item()
     tags = []
     total = []
     corrects = []
@@ -103,12 +108,66 @@ def show_testing_histogram(testing_statistics):
     ax2 = ax1.twinx()
     ax2.plot(np.arange(len(tags)), np.true_divide(np.array(corrects), np.array(total)), 'r--')
     ax2.set_yticks(np.arange(11)/10)
-    ax2.set_yticklabels(np.arange(11)/10)
+    ax2.set_yticklabels(['{:,.1%}'.format(x) for x in np.arange(11)/10])
     plt.title('Overall Success Rate {:.2%}'.format(np.true_divide(np.sum(np.array(corrects)), np.sum(np.array(total)))))
 
     fig.tight_layout()
     plt.show()
+# ------------------------------------------------------------------------------
+def show_testing_histogram_comparison(test_file_names, branch=['ResNet', 'Retrieval'], axis_off_set=False):
+    fig, ax1 = plt.subplots(figsize=(6,5))
+    img_statistics = np.load(test_file_names[0], allow_pickle=True).item()
+    all_statistics = np.load(test_file_names[1], allow_pickle=True).item()
+    tags = []
+    total = []
+    img_corrects = []
+    all_corrects = []
+    for key in img_statistics:
+        tags.append(key)
+        total.append(img_statistics[key]['total'])
+        img_corrects.append(img_statistics[key]['corrects'])
+        all_corrects.append(all_statistics[key]['corrects'])
 
+    plt.bar(np.arange(len(tags)), total, label='Total Cases')
+    plt.bar(np.arange(len(tags)) - int(axis_off_set)*0.25, all_corrects, width=0.8 - 0.4*int(axis_off_set), label=branch[1] + ' Success')
+    plt.bar(np.arange(len(tags)) + int(axis_off_set)*0.25, img_corrects, width=0.8 - 0.4*int(axis_off_set), label=branch[0] + ' Success')
+    ax1.set_xticks(np.arange(len(tags)))
+    ax1.set_xticklabels(tags, rotation=90)
+    ax1.legend(labels=['Total Cases', branch[1] + ' Success', branch[0] + ' Success'], bbox_to_anchor=(0.40, 0.55))
+
+    ax2 = ax1.twinx()
+    ax2.plot(np.arange(len(tags)), np.true_divide(np.array(img_corrects), np.array(total)), 'b--')
+    ax2.plot(np.arange(len(tags)), np.true_divide(np.array(all_corrects), np.array(total)), 'r--')
+    img_label = branch[0] + ' Success Rate: {:.2%} overall'.format(np.true_divide(np.sum(np.array(img_corrects)), np.sum(np.array(total))))
+    all_label = branch[1] + ' Success Rate: {:.2%} overall'.format(np.true_divide(np.sum(np.array(all_corrects)), np.sum(np.array(total))))
+    ax2.legend(labels=[img_label, all_label], bbox_to_anchor=(0.70, 1.2))
+    ax2.set_yticks(np.arange(11)/10)
+    ax2.set_yticklabels(['{:,.1%}'.format(x) for x in np.arange(11)/10])
+    ax1.grid(True)
+
+    fig.tight_layout()
+    plt.show()
+
+# ------------------------------------------------------------------------------
+def store_success_case(checkpoints_prefix, triplet_name):
+    fig, axs = plt.subplots(1,3)
+    plt.title(triplet_name[0].split('/')[5])
+    for i in range(3):
+        img = Image.open(triplet_name[i]+'.png')
+        axs[i].imshow(img)
+        axs[i].set_title(triplet_name[i].split('/')[6])
+        axs[i].axis('off')
+
+    file_name = triplet_name[0].split('/')[5] + triplet_name[0].split('/')[6] + triplet_name[1].split('/')[6] + triplet_name[2].split('/')[6]
+    for key in all_fail_cases:
+        if triplet_name in all_fail_cases[key]:
+            file_name = key + '+' + file_name
+    plt.savefig(checkpoints_prefix + 'unique_success_cases' + '/' + file_name + '.jpg')
+    plt.close()
+
+# ------------------------------------------------------------------------------
+all_fail_cases = np.load('all_fail_cases.npy', allow_pickle=True).item()
+# ------------------------------------------------------------------------------
 def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=False):
     # ---------------------------Loading testing dataset---------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading testing dataset...')
@@ -120,7 +179,7 @@ def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_imag
     if is_only_image_branch:
         model = Network(enableRoIBridge=False) # Train Image Branch
     else:
-        model = Network(self_pretrained_image=True) # freeze image branch and train SG
+        model = Network()
 
     model.load_state_dict(torch.load(checkpoints_prefix + 'best_fit.pkl'))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -147,13 +206,20 @@ def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_imag
         if is_correct.item() == 0:
             triplet_name = test_dataset.triplets[batch_idx]
             store_fail_case(checkpoints_prefix, triplet_name)
+            # Store Unique success case (Only Retrieval Network success while other three fail)
+            if is_only_image_branch:
+                all_fail_cases['img'].append(test_dataset.triplets[batch_idx])
+        elif is_correct.item() == 1 and not is_only_image_branch:
+            # Store Unique success case (Only Retrieval Network success while other three fail)
+            triplet_name = test_dataset.triplets[batch_idx]
+            store_success_case(checkpoints_prefix, triplet_name)
+
         bar.next()
 
     bar.finish()
     print('----'*20)
-    show_testing_histogram(testing_statistics)
-
-
+    # np.save('testing_statistics.npy', testing_statistics)
+    np.save('all_fail_cases.npy', all_fail_cases)
 
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -180,7 +246,7 @@ if __name__ == '__main__':
             Dataset = TripletDataset
             Network = RetrievalTriplet
             LossFcn = TripletLoss()
-            checkpoints_prefix = None
+            checkpoints_prefix = CHECKPOINTS_DIR
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
@@ -192,16 +258,26 @@ if __name__ == '__main__':
     # Testing corresponding networks
     if args.test:
         if args.image and not args.all:
+            train_file_names = ['training_statistics_image.npy']
+            test_file_names = 'testing_statistics_image.npy'
             Dataset = TripletDataset
             Network = TripletNetImage
             LossFcn = TripletLoss()
             checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
         elif args.all and not args.image:
+            train_file_names = ['training_statistics_image.npy', 'training_statistics_all.npy']
+            test_file_names = ['testing_statistics_image.npy', 'testing_statistics_all.npy']
             Dataset = TripletDataset
             Network = RetrievalTriplet
             LossFcn = TripletLoss()
-            checkpoints_prefix = None
+            checkpoints_prefix = CHECKPOINTS_DIR
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
+        #plot_training_statistics(train_file_names)
         testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=args.image)
+        exit(0)
+        if args.image and not args.all:
+            show_testing_histogram(test_file_name)
+        elif args.all and not args.image:
+            show_testing_histogram_comparison(test_file_names)
