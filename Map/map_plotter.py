@@ -199,7 +199,7 @@ class Plotter():
 			# ------------------------------------------------------------------
 			# plot robot icon
 			# ------------------------------------------------------------------
-			scale = 2*self.grid_size
+			scale = self.grid_size
 			pose_cur = info['cur_pose']
 			rob = self.toggleMap.imshow(rob_icon.rotate(-pose_cur[2]), extent=[pose_cur[0] - scale, pose_cur[0] + scale, pose_cur[1] - scale, pose_cur[1] + scale])
 			# plot current robot field of view

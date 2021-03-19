@@ -15,8 +15,8 @@ from lib.params import *
 
 
 class Navigation():
-	def __init__(self, scene_type, scene_num, save_directory, AI2THOR, isStaticEnv=True, server=None, comfirmed=None):
-		self.Robot = Robot(scene_type=scene_type, scene_num=scene_num, isStaticEnv=isStaticEnv, save_directory=save_directory, AI2THOR=AI2THOR, server=server, comfirmed=comfirmed)
+	def __init__(self, scene_type, scene_num, save_directory, AI2THOR, isResNetLocalization=False, server=None, comfirmed=None):
+		self.Robot = Robot(scene_type=scene_type, scene_num=scene_num, isResNetLocalization=isResNetLocalization, save_directory=save_directory, AI2THOR=AI2THOR, server=server, comfirmed=comfirmed)
 		self.node_generator = Node_generator(controller=self.Robot._AI2THOR_controller._controller)
 		self.topo_map = Topological_map(controller=self.Robot._AI2THOR_controller._controller, node_index_list=None, neighbor_nodes_pair=None)
 		self.planner = Planner()

@@ -47,13 +47,13 @@ logging.basicConfig(level=log_setting[args.log_level])
 
 
 class Robot():
-	def __init__(self, scene_type, scene_num, isStaticEnv=True, save_directory=None, overwrite_data=False, AI2THOR=False, grid_size=0.25, rotation_step=90, sleep_time=0.005, use_test_scene=False, debug=False, server=None, comfirmed=None):
+	def __init__(self, scene_type, scene_num, isResNetLocalization=True, save_directory=None, overwrite_data=False, AI2THOR=False, grid_size=0.25, rotation_step=90, sleep_time=0.005, use_test_scene=False, debug=False, server=None, comfirmed=None):
 
 		self._grid_size = grid_size
 		self._sleep_time = sleep_time
 		self._AI2THOR_controller = AI2THOR_controller(AI2THOR, scene_type, scene_num, grid_size, rotation_step, sleep_time,
 													  save_directory, overwrite_data, use_test_scene, debug=debug)
-		self.isStaticEnv = isStaticEnv
+		self.isResNetLocalization = isResNetLocalization
 		self._use_test_scene = use_test_scene
 		self._debug = debug
 
@@ -66,7 +66,7 @@ class Robot():
 		self.goal_rotation = None
 
 		self.Set_navigation_network()
-		self.Set_localization_network(self.isStaticEnv)
+		self.Set_localization_network(self.isResNetLocalization)
 
 	def Reset_scene(self, scene_type, scene_num):
 		self._AI2THOR_controller.Reset_scene(scene_type=scene_type, scene_num=scene_num)
@@ -78,12 +78,12 @@ class Robot():
 		else:
 			self._action_network = Action_network()
 
-	def Set_localization_network(self, isStaticEnv, network=None):
+	def Set_localization_network(self, isResNetLocalization, network=None):
 		if not network is None:
 			self._localization_network = network
 			return
 		else:
-			self._localization_network = Retrieval_network(isStaticEnv=isStaticEnv)
+			self._localization_network = Retrieval_network(isResNetLocalization=isResNetLocalization)
 
 	def Navigation_stop(self, feature_goal, feature_current, goal_pose=None, hardcode=False):
 
@@ -104,7 +104,7 @@ class Robot():
 			else:
 				return True
 
-		if self.isStaticEnv:
+		if self.isResNetLocalization:
 			feature_goal = Image.fromarray(feature_goal[0])
 			feature_current = Image.fromarray(feature_current[0])
 		else:

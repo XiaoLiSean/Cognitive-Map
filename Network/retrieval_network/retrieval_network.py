@@ -10,10 +10,10 @@ from Network.retrieval_network.params import IMAGE_SIZE, CHECKPOINTS_DIR
 from Network.retrieval_network.networks import RetrievalTriplet, TripletNetImage
 
 class Retrieval_network():
-    def __init__(self, isStaticEnv=False):
+    def __init__(self, isResNetLocalization=False):
         # Prepare model and load checkpoint
-        self.isStaticEnv = isStaticEnv
-        if self.isStaticEnv:
+        self.isResNetLocalization = isResNetLocalization
+        if self.isResNetLocalization:
             self.checkpoint = CHECKPOINTS_DIR + 'image_best_fit.pkl'
         else:
             self.checkpoint = CHECKPOINTS_DIR + 'best_fit.pkl'
@@ -26,7 +26,7 @@ class Retrieval_network():
                                                      transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
     def get_network(self):
-        if self.isStaticEnv:
+        if self.isResNetLocalization:
             model = TripletNetImage()
         else:
             model = RetrievalTriplet()
@@ -44,7 +44,7 @@ class Retrieval_network():
     # OUTPUT: True (reached the goal) || False (did not reach the goal)
     # ----------------------------------------------------------
     def is_localized(self, current_info, goal_info):
-        if self.isStaticEnv:
+        if self.isResNetLocalization:
             current_info = self.feature_transforms(current_info).unsqueeze(dim=0)
             current_info = current_info.to(self.device)
             goal_info = self.feature_transforms(goal_info).unsqueeze(dim=0)
