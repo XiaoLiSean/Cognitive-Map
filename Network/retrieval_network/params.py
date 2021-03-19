@@ -49,5 +49,6 @@ TEST_FRACTION = 0.15
 # ------------------------------------------------------------------------------
 DATA_DIR = './Network/retrieval_network/datasets' # Training and validation data directory
 TRIPLET_FILE_NAME = 'triplets_APN_name_magnitude_0.2.npy' # 13210 triples in total
+PAIR_FILE_NAME = 'pairs_name_fraction_0.005.npy' # 93354 pairs
 CHECKPOINTS_DIR = './Network/retrieval_network/checkpoints/'
 # ------------------------------------------------------------------------------

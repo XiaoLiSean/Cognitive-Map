@@ -188,7 +188,46 @@ def generate_triplets(file_path, magnitude=None):
 
     return len(triplets_APN_idx), running_total
 
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+def get_all_pairs_in_array_map(array_map):
+    all_list = []
+    slot_list, _ = get_index_as_tuple_list(array_map)
+    for slot in slot_list:
+        num = array_map[slot[0], slot[1]]
+        items = [*range(1, num + 1)]
+        for i in items:
+            all_list.append((slot[0], slot[1], i))
+    return list(combinations(all_list, 2))
 
+def generate_pairs(file_path, fraction=None):
+    if fraction == None:
+        file_name = 'pairs_name.npy'
+    else:
+        file_name = 'pairs_name_fraction_' + str(fraction) + '.npy'
+
+    pairs_name = []
+    running_total = 0
+    array_maps = np.load(file_path + '/' + 'array_maps.npy', allow_pickle='TRUE').item()
+    for key in array_maps:
+        array_map = array_maps[key]
+        pairs = get_all_pairs_in_array_map(array_map)
+
+        if fraction != None:
+            endIdx = int(fraction*len(pairs))
+            random.shuffle(pairs)
+            pairs = deepcopy(pairs[0:endIdx])
+
+        for pair in pairs:
+            A = str(key) + '_' + str(pair[0][0]) + '_' + str(pair[0][1]) + '_' + str(pair[0][2])
+            B = str(key) + '_' + str(pair[1][0]) + '_' + str(pair[1][1]) + '_' + str(pair[1][2])
+            pairs_name.append(deepcopy((A, B)))
+
+    np.save(file_path + '/' + file_name, pairs_name)
+
+    return len(pairs_name)
+
+# ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 # collect train, validation and test data for network image branch
 def data_collection(partition_num, partition_list):
@@ -250,6 +289,29 @@ def regenerate_triplets(magnitude):
                   '{}({:.0%})]'.format(total[4], total[4]/np.sum(total)))
 
 # ------------------------------------------------------------------------------
+# Used for determine the loclaization similarity threshold
+def generate_pairs_in_validation(fraction=None):
+    # Iterate through all validation scenes to collect pairs to generate heatmap
+    total = 0
+    for scene_type in SCENE_TYPES:
+        if scene_type == 'Kitchen':
+        	add_on = 0
+        elif scene_type == 'Living room':
+        	add_on = 200
+        elif scene_type == 'Bedroom':
+        	add_on = 300
+        elif scene_type == 'Bathroom':
+        	add_on = 400
+
+        for scene_num in range(int(SCENE_NUM_PER_TYPE*TRAIN_FRACTION) + 1, int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1):
+            FILE_PATH = DATA_DIR + '/val'
+            scene_name = 'FloorPlan' + str(add_on + scene_num)
+            print('----'*20)
+            datanum = generate_pairs(FILE_PATH + '/' + scene_name, fraction=fraction)
+            total += datanum
+            print('Total {}: {} pairs in Scene {}'.format(total, datanum, scene_name))
+
+# ------------------------------------------------------------------------------
 # manually update topological map info
 def iter_test_scene(is_xiao=False, is_yidong=False):
     # Initialize robot
@@ -275,15 +337,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--topo", help="manually update topological map info", action="store_true")
     parser.add_argument("--regenerate", help="regenerate_triplets", action="store_true")
+    parser.add_argument("--gen_pair_in_val", help="regenerate pair data in validation datasets", action="store_true")
     parser.add_argument("--collect_partition", nargs="+", default=[])
     parser.add_argument("--yidong", help="manually collect topological map node for yidong", action="store_true")
     parser.add_argument("--xiao", help="manually collect topological map node for xiao", action="store_true")
     args = parser.parse_args()
 
+    # Used for regenerating triplets
     if args.regenerate:
         # 0.2: 9499 triples in total
         # 1: 66161 triples in total
-        regenerate_triplets(0.2)
+        regenerate_triplets(20)
+
+    # Used for determine the loclaization similarity threshold
+    if args.gen_pair_in_val:
+        generate_pairs_in_validation(fraction=0.005)
 
     # --------------------------------------------------------------------------
     # Used to collect data

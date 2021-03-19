@@ -15,9 +15,9 @@ from torchsummary import summary
 from termcolor import colored
 from lib.scene_graph_generation import Scene_Graph
 from Network.retrieval_network.params import *
-from Network.retrieval_network.datasets import TripletDataset
+from Network.retrieval_network.datasets import TripletDataset, PairDataset
 from Network.retrieval_network.networks import RetrievalTriplet, TripletNetImage
-from Network.retrieval_network.losses import TripletLoss
+from Network.retrieval_network.losses import TripletLoss, CosineSimilarity
 from Network.retrieval_network.trainer import Training, plot_training_statistics
 from os.path import dirname, abspath
 
@@ -75,6 +75,61 @@ def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix, i
 
 # ------------------------------------------------------------------------------
 # -------------------------------Testing Pipeline-------------------------------
+# ------------------------------------------------------------------------------
+all_fail_cases = np.load('./Network/retrieval_network/checkpoints/all_fail_cases.npy', allow_pickle=True).item()
+# ------------------------------------------------------------------------------
+def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=False):
+    # ---------------------------Loading testing dataset---------------------------
+    print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading testing dataset...')
+    test_dataset = Dataset(DATA_DIR, is_test=True, load_only_image_data=is_only_image_branch)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=NUM_WORKERS)
+
+    # ------------------------------Initialize model--------------------------------
+    print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
+    if is_only_image_branch:
+        model = Network(enableRoIBridge=False) # Train Image Branch
+    else:
+        model = Network()
+
+    model.load_state_dict(torch.load(checkpoints_prefix + 'best_fit.pkl'))
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print("Model testing on: ", device)
+    print("Cuda is_available: ", torch.cuda.is_available())
+    print('----'*20)
+    model.to(device)
+    model.eval()
+    torch.set_grad_enabled(False)
+    # ------------------------------Testing Main------------------------------------
+    testing_statistics = {}
+    bar = Bar('Processing', max=len(test_loader))
+    for batch_idx, inputs in enumerate(test_loader):
+        inputs = tuple(input.to(device) for input in inputs)
+        outputs = model(*inputs)
+        _, is_correct = LossFcn(*outputs, batch_average_loss=True)
+        iFloorPlan = test_dataset.triplets[batch_idx][0].split('/')[5]
+        if iFloorPlan in testing_statistics:
+            testing_statistics[iFloorPlan]['total'] += 1
+            testing_statistics[iFloorPlan]['corrects'] += is_correct.item()
+        else:
+            testing_statistics.update({iFloorPlan:dict(total=1, corrects=is_correct.item())})
+
+        if is_correct.item() == 0:
+            triplet_name = test_dataset.triplets[batch_idx]
+            store_fail_case(checkpoints_prefix, triplet_name)
+            # Store Unique success case (Only Retrieval Network success while other three fail)
+            if is_only_image_branch:
+                all_fail_cases['img'].append(test_dataset.triplets[batch_idx])
+        elif is_correct.item() == 1 and not is_only_image_branch:
+            # Store Unique success case (Only Retrieval Network success while other three fail)
+            triplet_name = test_dataset.triplets[batch_idx]
+            store_success_case(checkpoints_prefix, triplet_name)
+
+        bar.next()
+
+    bar.finish()
+    print('----'*20)
+    # np.save('testing_statistics.npy', testing_statistics)
+    np.save('all_fail_cases.npy', all_fail_cases)
 # ------------------------------------------------------------------------------
 def store_fail_case(checkpoints_prefix, triplet_name):
     fig, axs = plt.subplots(1,3)
@@ -166,13 +221,13 @@ def store_success_case(checkpoints_prefix, triplet_name):
     plt.close()
 
 # ------------------------------------------------------------------------------
-all_fail_cases = np.load('all_fail_cases.npy', allow_pickle=True).item()
+# ---------------------------Thresholding and Heatmap---------------------------
 # ------------------------------------------------------------------------------
-def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=False):
+def thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=False):
     # ---------------------------Loading testing dataset---------------------------
-    print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading testing dataset...')
-    test_dataset = Dataset(DATA_DIR, is_test=True, load_only_image_data=is_only_image_branch)
-    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=NUM_WORKERS)
+    print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading thresholding/val dataset...')
+    dataset = Dataset(DATA_DIR, is_val=True, load_only_image_data=is_only_image_branch)
+    loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=NUM_WORKERS)
 
     # ------------------------------Initialize model--------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
@@ -183,43 +238,74 @@ def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_imag
 
     model.load_state_dict(torch.load(checkpoints_prefix + 'best_fit.pkl'))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print("Model testing on: ", device)
+    print("Model thresholding on: ", device)
     print("Cuda is_available: ", torch.cuda.is_available())
     print('----'*20)
     model.to(device)
     model.eval()
     torch.set_grad_enabled(False)
-    # ------------------------------Testing Main------------------------------------
-    testing_statistics = {}
-    bar = Bar('Processing', max=len(test_loader))
-    for batch_idx, inputs in enumerate(test_loader):
-        inputs = tuple(input.to(device) for input in inputs)
-        outputs = model(*inputs)
-        _, is_correct = LossFcn(*outputs, batch_average_loss=True)
-        iFloorPlan = test_dataset.triplets[batch_idx][0].split('/')[5]
-        if iFloorPlan in testing_statistics:
-            testing_statistics[iFloorPlan]['total'] += 1
-            testing_statistics[iFloorPlan]['corrects'] += is_correct.item()
-        else:
-            testing_statistics.update({iFloorPlan:dict(total=1, corrects=is_correct.item())})
+    # ------------------------------Thresholding Main------------------------------------
+    heatmap_size = (36, 36)
+    staticstics = dict(n=np.zeros(heatmap_size), sum=np.zeros(heatmap_size), sq_sum=np.zeros(heatmap_size))
 
-        if is_correct.item() == 0:
-            triplet_name = test_dataset.triplets[batch_idx]
-            store_fail_case(checkpoints_prefix, triplet_name)
-            # Store Unique success case (Only Retrieval Network success while other three fail)
-            if is_only_image_branch:
-                all_fail_cases['img'].append(test_dataset.triplets[batch_idx])
-        elif is_correct.item() == 1 and not is_only_image_branch:
-            # Store Unique success case (Only Retrieval Network success while other three fail)
-            triplet_name = test_dataset.triplets[batch_idx]
-            store_success_case(checkpoints_prefix, triplet_name)
+    bar = Bar('Processing', max=len(loader))
+    for batch_idx, inputs in enumerate(loader):
+        A = tuple(input.to(device) for idx, input in enumerate(inputs) if idx%2 == 0)
+        B = tuple(input.to(device) for idx, input in enumerate(inputs) if idx%2 == 1)
+        Vec_A = model.get_embedding(*A)
+        Vec_B = model.get_embedding(*B)
+        score = CosineSimilarity(Vec_A, Vec_B).item()
+        x_A = dataset.pairs[batch_idx][0].split('_')[2]
+        z_A = dataset.pairs[batch_idx][0].split('_')[3]
+        x_B = dataset.pairs[batch_idx][1].split('_')[2]
+        z_B = dataset.pairs[batch_idx][1].split('_')[3]
+
+        d_x = abs(int(x_A)-int(x_B))
+        d_z = abs(int(z_A)-int(z_B))
+        staticstics['n'][d_x, d_z] += 1
+        staticstics['sum'][d_x, d_z] += score
+        staticstics['sq_sum'][d_x, d_z] += score**2
 
         bar.next()
 
     bar.finish()
     print('----'*20)
-    # np.save('testing_statistics.npy', testing_statistics)
-    np.save('all_fail_cases.npy', all_fail_cases)
+    np.save(checkpoints_prefix + '_thresholding_staticstics.npy', staticstics)
+    plot_heatmap(staticstics)
+
+# ------------------------------------------------------------------------------
+# Visualize Test Staticstics
+def plot_heatmap(staticstics):
+    map_len = staticstics['n'].shape[0]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    num = copy.deepcopy(staticstics['n'])
+    num[staticstics['sum'] == 0] = 1.0
+    mean = np.true_divide(staticstics['sum'], num)
+    img_mean = ax1.imshow(mean)
+    img_mean.set_clim(0,1)
+    fig.colorbar(img_mean, ax=ax1, shrink=0.6)
+
+    std = np.true_divide(staticstics['sq_sum'], num) - np.true_divide(np.power(staticstics['sum'], 2), np.power(num, 2))
+    sigma = np.power(std, 0.5)
+    print(sigma)
+    sigma_max = np.amax(sigma)
+    sigma_min = np.amin(sigma)
+    sigma = (sigma - sigma_min) / (sigma_max - sigma_min)
+    img_sigma = ax2.imshow(sigma)
+    img_sigma.set_clim(0,1)
+    fig.colorbar(img_sigma, ax=ax2, shrink=0.6)
+
+    for ax, data in zip([ax1, ax2], [mean, sigma]):
+        tick_step = 5
+        ax.set_xticks(np.arange(0, map_len+1, tick_step))
+        ax.set_yticks(np.arange(0, map_len+1, tick_step))
+        ax.set_xticklabels(np.arange(0, map_len+1, tick_step))
+        ax.set_yticklabels(np.arange(0, map_len+1, tick_step))
+
+    # fig.suptitle('Heatmap for view angle difference of {} degree'.format(angles[k]))
+
+    plt.show()
 
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -228,6 +314,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--train", help="train network", action="store_true")
     parser.add_argument("--test", help="test network", action="store_true")
+    parser.add_argument("--heatmap", help="test network", action="store_true")
     parser.add_argument("--image", help="network image branch", action="store_true")
     parser.add_argument("--all", help="entire network", action="store_true")
     args = parser.parse_args()
@@ -237,15 +324,13 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # Train corresponding networks
     if args.train:
+        Dataset = TripletDataset
+        LossFcn = TripletLoss()
         if args.image and not args.all:
-            Dataset = TripletDataset
             Network = TripletNetImage
-            LossFcn = TripletLoss()
             checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
         elif args.all and not args.image:
-            Dataset = TripletDataset
             Network = RetrievalTriplet
-            LossFcn = TripletLoss()
             checkpoints_prefix = CHECKPOINTS_DIR
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
@@ -257,27 +342,43 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # Testing corresponding networks
     if args.test:
+        Dataset = TripletDataset
+        LossFcn = TripletLoss()
         if args.image and not args.all:
             train_file_names = ['training_statistics_image.npy']
             test_file_names = 'testing_statistics_image.npy'
-            Dataset = TripletDataset
             Network = TripletNetImage
-            LossFcn = TripletLoss()
             checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
         elif args.all and not args.image:
             train_file_names = ['training_statistics_image.npy', 'training_statistics_all.npy']
             test_file_names = ['testing_statistics_image.npy', 'testing_statistics_all.npy']
-            Dataset = TripletDataset
             Network = RetrievalTriplet
-            LossFcn = TripletLoss()
             checkpoints_prefix = CHECKPOINTS_DIR
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
         #plot_training_statistics(train_file_names)
         testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=args.image)
-        exit(0)
         if args.image and not args.all:
             show_testing_histogram(test_file_name)
         elif args.all and not args.image:
             show_testing_histogram_comparison(test_file_names)
+
+    # --------------------------------------------------------------------------
+    # Plot Heatmap and determine threshold for localization
+    if args.heatmap:
+        Dataset = PairDataset
+        if args.image and not args.all:
+            Network = TripletNetImage
+            checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
+        elif args.all and not args.image:
+            Network = RetrievalTriplet
+            checkpoints_prefix = CHECKPOINTS_DIR
+        else:
+            print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
+
+        # staticstics = np.load(checkpoints_prefix + '_thresholding_staticstics.npy', allow_pickle=True).item()
+        # plot_heatmap(staticstics)
+        # exit()
+
+        thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=args.image)

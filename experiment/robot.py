@@ -53,7 +53,7 @@ class Robot():
 		self._sleep_time = sleep_time
 		self._AI2THOR_controller = AI2THOR_controller(AI2THOR, scene_type, scene_num, grid_size, rotation_step, sleep_time,
 													  save_directory, overwrite_data, use_test_scene, debug=debug)
-		self.isStaticEnv = False
+		self.isStaticEnv = isStaticEnv
 		self._use_test_scene = use_test_scene
 		self._debug = debug
 
