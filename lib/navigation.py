@@ -15,11 +15,13 @@ from lib.params import *
 
 
 class Navigation():
-	def __init__(self, scene_type, scene_num, save_directory, AI2THOR, server=None, comfirmed=None):
-		self.Robot = Robot(scene_type=scene_type, scene_num=scene_num, save_directory=save_directory, AI2THOR=AI2THOR, server=server, comfirmed=comfirmed)
+	def __init__(self, scene_type, scene_num, save_directory, AI2THOR, server=None, comfirmed=None, exec_path=None):
+		self.Robot = Robot(scene_type=scene_type, scene_num=scene_num, save_directory=save_directory,
+						   AI2THOR=AI2THOR, server=server, comfirmed=comfirmed, exec_path=exec_path)
 		self.node_generator = Node_generator(controller=self.Robot._AI2THOR_controller._controller)
 		self.topo_map = Topological_map(controller=self.Robot._AI2THOR_controller._controller, node_index_list=None, neighbor_nodes_pair=None)
 		self.planner = Planner()
+		self.planner._edge_constraints = CONSTRAINTS[self.Robot._AI2THOR_controller.Get_scene_name(scene_type,scene_num)]
 		self._fail_case_tolerance = 3
 		self._valid_action_type = VALID_ACTION_TYPE
 		self._fail_type = {'translation': 0, 'rotation': 0}
@@ -28,6 +30,7 @@ class Navigation():
 		self._nav_test_case_num = 0
 		self._nav_success_case_num = 0
 		self._node_list = None
+		self._edge_constraints = None
 
 	def nav_test(self):
 		for scene_type in range(3, 4):
@@ -53,6 +56,7 @@ class Navigation():
 	def Update_node_generator(self):
 		self.node_generator.Init_node_generator()
 		self._node_list = NODES[self.Robot._AI2THOR_controller.Get_scene_name()]
+		self._edge_constraints = CONSTRAINTS[self.Robot._AI2THOR_controller.Get_scene_name()]
 		print('self._node_list: ', self._node_list)
 		self.node_generator.Get_node_from_position(self._node_list)
 		self.node_generator.Get_connected_orientaton_by_geometry()
@@ -65,7 +69,7 @@ class Navigation():
 
 	def Update_topo_map_env(self):
 		self.topo_map.Set_env_from_Robot(Robot=self.Robot)
-		self.topo_map.Update_topo_map(node_index_list=self.node_generator.Get_node_list(), node_pair_list=self._node_pair_list, connected_subnodes=self._subnodes)
+		self.topo_map.Update_topo_map(node_index_list=self.node_generator.Get_node_list(), node_pair_list=self._node_pair_list, connected_subnodes=self._subnodes, edge_constraints=self._edge_constraints)
 		return self.topo_map
 
 	def Update_planner_env(self):
@@ -150,7 +154,8 @@ class Navigation():
 
 		return match, node_matched_name
 
-	def Closed_loop_nav(self, goal_node_index=5, goal_orientation=270, current_node_index=None, current_orientation=None):
+	def Closed_loop_nav(self, goal_node_index=5, goal_orientation=270, current_node_index=None,
+						current_orientation=None, object_dims=None, pickup_object=None):
 
 		if current_node_index is None and current_orientation is None:
 			current_node_index = self.Robot._AI2THOR_controller.Get_agent_current_pos_index()
@@ -159,11 +164,17 @@ class Navigation():
 			else:
 				current_node_index = 0
 			current_orientation = self.Robot._AI2THOR_controller.Get_agent_current_orientation()
-		path = self.planner.Find_dij_path(current_node_index=current_node_index, current_orientation=current_orientation,
-										  goal_node_index=goal_node_index, goal_orientation=goal_orientation)
-		print('path: ', path)
 
-		nav_result = self.Navigate_by_path(path=path)
+		if pickup_object is not None:
+			print("getting object dims")
+			object_dims = self.Robot._AI2THOR_controller.Get_obj_dims(pickup_object)
+		path = self.planner.Find_dij_path(current_node_index=current_node_index, current_orientation=current_orientation,
+										  goal_node_index=goal_node_index, goal_orientation=goal_orientation, object_dims=object_dims)
+		print('path: ', path)
+		if path is None:
+			print("No Path exists")
+			return
+		nav_result = self.Navigate_by_path(path=path,object_type=pickup_object)
 
 		self._nav_test_case_num += 1
 		if nav_result is True:
@@ -193,23 +204,45 @@ class Navigation():
 
 			nav_result = self.Navigate_by_path(path=path)
 
-	def Navigate_by_path(self, path):
+	def Navigate_by_path(self, path, object_type=None):
 
 		init_position = self.topo_map.Get_node_value_dict_by_name(path[0])['position']
-		_, orientation = self.topo_map.Get_node_index_orien(path[0])
+		idx, orientation = self.topo_map.Get_node_index_orien(path[0])
 
 		self.Robot._AI2THOR_controller.Teleport_agent(init_position, position_localize=True)
 		self.Robot._AI2THOR_controller.Rotate_to_degree(orientation)
 
+		if object_type is not None:
+			if self.Robot._AI2THOR_controller.Pickup_object(object_type):
+				print("got object")
+			else:
+				print("did not get object")
+
+
 		rotation_standard = list(self.Robot.Get_robot_orientation().values())
 
 		failed_case = 0
+		prev_node = idx
 
 		for node_path_num, node_path in enumerate(path):
 
-			node_value = self.topo_map.Get_node_value_dict_by_name(node_path)
-			_, orientation = self.topo_map.Get_node_index_orien(node_path)
 
+			node_value = self.topo_map.Get_node_value_dict_by_name(node_path)
+			idx, orientation = self.topo_map.Get_node_index_orien(node_path)
+
+			# This feels like the right place to actually do the object rotation
+			if object_type is not None:
+				print(f"checking constraint going to {node_path}")
+				current_constraint = None
+				for c in self.planner._edge_constraints:
+					if (c[0][0] == prev_node and c[0][1] == idx) or (
+							c[0][1] == prev_node and c[0][0] == idx):
+						current_constraint = c[1]
+						print(f"found constraint: {c}")
+				if current_constraint is not None:
+					fit.fitObject(self.Robot._AI2THOR_controller._controller, current_constraint)
+
+			prev_node = idx
 			goal_frame = node_value['image']
 			goal_pose = {'position': node_value['position'], 'rotation': copy.deepcopy(rotation_standard)}
 			goal_pose['rotation'][1] = orientation
@@ -230,7 +263,7 @@ class Navigation():
 				rotation_degree = None
 
 			self._action_case_num += 1
-			if self.Robot.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, max_steps=self.Robot._Navigation_max_try, rotation_degree=rotation_degree):
+			if self.Robot.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, max_steps=self.Robot._Navigation_max_try, rotation_degree=rotation_degree, object_type=object_type):
 				failed_case = 0
 				
 				self._action_success_num += 1

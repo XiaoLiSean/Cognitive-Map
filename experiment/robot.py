@@ -8,6 +8,8 @@ from PIL import Image
 import numpy as np
 import time, copy, random
 import logging, argparse, os, sys, csv
+import ObjectDynamics.FitObject as fit
+import cv2
 
 from experiment.node_generation import *
 from experiment.experiment_config import *
@@ -37,7 +39,7 @@ print(args)
 
 if args.scene_num == 0:
 	args.scene_num = random.randint(1, 30)
-scene_setting = {1: 0, 2: 200, 3: 300, 4: 400}
+scene_setting = {1: 0, 2: 200, 3: 300, 4: 400, 6:600}
 
 log_setting = {1: logging.CRITICAL, 2: logging.ERROR, 3: logging.WARNING, 4: logging.INFO, 5: logging.DEBUG}
 
@@ -45,12 +47,15 @@ logging.basicConfig(level=log_setting[args.log_level])
 
 
 class Robot():
-	def __init__(self, scene_type, scene_num, save_directory, overwrite_data=False, AI2THOR=False, grid_size=0.25, rotation_step=90, sleep_time=0.005, use_test_scene=False, debug=False, server=None, comfirmed=None):
+	def __init__(self, scene_type, scene_num, save_directory,
+				 overwrite_data=False, AI2THOR=False, grid_size=0.25, rotation_step=90,
+				 sleep_time=0.005, use_test_scene=False, debug=False, server=None, comfirmed=None,
+				 exec_path=None):
 
 		self._grid_size = grid_size
 		self._sleep_time = sleep_time
 		self._AI2THOR_controller = AI2THOR_controller(AI2THOR, scene_type, scene_num, grid_size, rotation_step, sleep_time,
-													  save_directory, overwrite_data, use_test_scene, debug=debug)
+													  save_directory, overwrite_data, use_test_scene, debug=debug,exec_path=exec_path)
 		self._use_test_scene = use_test_scene
 		self._debug = debug
 
@@ -124,7 +129,35 @@ class Robot():
 					break
 	# --------------------------------------------------------------------------
 
-	def Navigate_by_ActionNet(self, image_goal, goal_pose, max_steps, rotation_degree=None):
+	def Mask_out_object(self, image, object):
+		"""
+		remove object from image
+		@param image: image to remove object shape from
+		@param object: object to remove
+		@return: image with masked out pixels where object is in view
+		"""
+
+		if object is None:
+			return image
+		mask = np.ones((image.shape[0], image.shape[1]))
+		#print("image size: {}".format(image.shape))
+		#mask[int(image.shape[0]/2):,:] = 0
+		new_image = image.copy()
+		new_image[int(image.shape[0]*1/2):,:,:] = 0
+		return new_image
+		"""
+		masks = self._AI2THOR_controller.Get_frame_masks()
+		k = self._AI2THOR_controller._held_object['objectId']
+		if k in masks.keys():
+			print("have instance masks")
+			return cv2.bitwise_and(image, image, mask=masks[k])
+		else:
+			print("no instance masks: {}".format(masks))
+			return image
+		"""
+
+	def Navigate_by_ActionNet(self, image_goal, goal_pose, max_steps, rotation_degree=None, object_type=None):
+
 
 		goal_position = self._AI2THOR_controller.Get_list_form(pos_or_rot=goal_pose['position'])
 		goal_rotation = self._AI2THOR_controller.Get_list_form(pos_or_rot=goal_pose['rotation'])
@@ -141,9 +174,10 @@ class Robot():
 		step = 0
 		self._AI2THOR_controller.Update_event()
 		current_frame = self._AI2THOR_controller.Get_frame()
-
+		image_goal = self.Mask_out_object(image_goal, object_type)
 		if not rotation_degree is None:
 			rotation_move = False
+
 
 		while not self.Navigation_stop(image_goal=image_goal, image_current=current_frame, goal_pose=goal_pose, hardcode=True):
 			# ------------------------------------------------------------------
@@ -155,8 +189,12 @@ class Robot():
 			self.send_msg_to_client(is_reached=False)
 			# ------------------------------------------------------------------
 			# ------------------------------------------------------------------
-
+			#if rotation_degree is None:
+			#	fit.fitObject(self._AI2THOR_controller._controller,[0.6,0.75,1.00])
 			image_current = self._AI2THOR_controller.Get_frame()
+			if object_type is not None:
+				image_current = self.Mask_out_object(image_current, object_type)
+
 			action_predict = self._action_network.predict(image_current=image_current, image_goal=image_goal)
 
 			if not rotation_degree is None and not rotation_move:
@@ -215,7 +253,8 @@ class Robot():
 
 
 class AI2THOR_controller():
-	def __init__(self, AI2THOR, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory, overwrite_data=False, use_test_scene=False, debug=False):
+	def __init__(self, AI2THOR, scene_type, scene_num, grid_size, rotation_step, sleep_time, save_directory,
+				 overwrite_data=False, use_test_scene=False, debug=False, exec_path=None):
 		self._scene_type = scene_type
 		self._scene_num = scene_num
 		self._grid_size = grid_size
@@ -226,9 +265,13 @@ class AI2THOR_controller():
 		self._scene_name = self.Get_scene_name()
 
 		if self._AI2THOR:
-			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW, agentMode='bot')
+			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size,
+										  visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW, agentMode='bot',
+										  local_executable_path=exec_path, renderInstanceSegmentation = True)
 		else:
-			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW)
+			self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size,
+										  visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW,
+										  local_executable_path=exec_path, renderInstanceSegmentation = True)
 
 		# self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)
 		self._save_directory = save_directory
@@ -243,6 +286,7 @@ class AI2THOR_controller():
 		self._point_list = []
 		self._agent_current_pos_index = None
 		self._agent_current_orientation = None
+		self._held_object = None
 
 		self._get_reachable_list()
 		self.Self_localize()
@@ -254,7 +298,7 @@ class AI2THOR_controller():
 		return self._agent_current_orientation
 
 	def store_toggled_map(self):
-		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size)
+		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, renderInstanceSegmentation = True)
 		self._event = self._controller.step('Pass')
 		self._controller.step({"action": "ToggleMapView"})
 		self._controller.step({"action": "Initialize", "makeAgentsVisible": False,})
@@ -277,7 +321,7 @@ class AI2THOR_controller():
 
 	def Reset_scene(self, scene_type, scene_num):
 		self._scene_name = self.Get_scene_name(scene_type=scene_type, scene_num=scene_num)
-		self._controller.reset(scene=self._scene_name)
+		self._controller.reset(scene=self._scene_name, renderInstanceSegmentation = True)
 
 	def get_scene_info(self):
 		scene_name = self.Get_scene_name()
@@ -358,7 +402,16 @@ class AI2THOR_controller():
 		if closest_point_index is False:
 			return (False, -1)
 		if move:
-			self.Teleport_agent(position=self._point_list[closest_point_index], save_image=False)
+			# changed by jake to stop teleporting since this seems to always reset the chair
+			if direction.lower() == 'forward':
+				self.Unit_move()
+			if direction.lower() == 'backward':
+				self.Unit_move_back()
+			if direction.lower() == 'right':
+				self.Unit_move_right()
+			if direction.lower() == 'left':
+				self.Unit_move_left()
+			#self.Teleport_agent(position=self._point_list[closest_point_index], save_image=False)
 		return (True, closest_point_index)
 
 	def Get_current_direction(self):
@@ -396,7 +449,7 @@ class AI2THOR_controller():
 		return nearest_index
 
 	def Update_event(self):
-		self._event = self._controller.step('Pass')
+		self._event = self._controller.step('Pass',manualInteract=True)
 
 	def Open_close_label_text(self):
 		if self._use_test_scene:
@@ -452,6 +505,10 @@ class AI2THOR_controller():
 		self.Update_event()
 		return self._event.frame
 
+	def Get_frame_masks(self):
+		self.Update_event()
+		return self._event.instance_masks
+
 	def Get_list_form(self, pos_or_rot):
 		if isinstance(pos_or_rot, dict):
 			pos_or_rot_list = list(pos_or_rot.values())
@@ -468,7 +525,7 @@ class AI2THOR_controller():
 		self.Update_event()
 
 		position_list = self.Get_list_form(pos_or_rot=position)
-		self._event = self._controller.step(action='Teleport', x=position_list[0], y=position_list[1], z=position_list[2])
+		self._event = self._controller.step(action='Teleport', x=position_list[0], y=position_list[1], z=position_list[2], manualInteract=True)
 		if position_localize:
 			self.Self_localize()
 
@@ -477,19 +534,19 @@ class AI2THOR_controller():
 		return 'MOVE_FORWARD'
 
 	def Unit_move(self):
-		self._event = self._controller.step(action='MoveAhead')
+		self._event = self._controller.step(action='MoveAhead',manualInteract=True)
 		return 'MOVE_FORWARD'
 
 	def Unit_move_back(self):
-		self._event = self._controller.step(action='MoveBack')
+		self._event = self._controller.step(action='MoveBack',manualInteract=True)
 		return 'MOVE_FORWARD'
 
 	def Unit_move_left(self):
-		self._event = self._controller.step(action='MoveLeft')
+		self._event = self._controller.step(action='MoveLeft',manualInteract=True)
 		return 'MOVE_Left'
 
 	def Unit_move_right(self):
-		self._event = self._controller.step(action='MoveRight')
+		self._event = self._controller.step(action='MoveRight',manualInteract=True)
 		return 'MOVE_Right'
 
 	def Rotate_to_degree(self, goal_degree):
@@ -506,10 +563,69 @@ class AI2THOR_controller():
 		while degree_corrected < -180:
 			degree_corrected += 360
 		if degree_corrected > 0:
-			self._event = self._controller.step(action='RotateRight', degrees=np.abs(degree_corrected))
+			self._event = self._controller.step(action='RotateRight', degrees=np.abs(degree_corrected), manualInteract=True)
 			self.Self_localize(orientation_only=True)
 			return 'TURN_RIGHT'
 		else:
-			self._event = self._controller.step(action='RotateLeft', degrees=np.abs(degree_corrected))
+			self._event = self._controller.step(action='RotateLeft', degrees=np.abs(degree_corrected), manualInteract=True)
 			self.Self_localize(orientation_only=True)
 			return 'TURN_LEFT'
+
+	def Pickup_object(self, object_type):
+		"""
+		pick up an object, must be in front of the robot
+		@param object_type: type of the object to pick up
+		@return: true if succeeds, false otherwise
+		"""
+
+		frame = self._event.frame
+		self._event = self._controller.step(action="MoveAhead")
+		#self._event = self._controller.step(action="MoveRight")
+		self._event = self._controller.step(action="LookDown")
+
+		frame = self._event.frame
+		cv2.imwrite("InitView.png", cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+
+
+
+		object_id = None
+		got = False
+		for o in self._event.metadata['objects']:
+			if o['visible'] and o['pickupable'] and o['objectType'] == object_type:
+				self._event = self._controller.step(action="PickupObject", objectId=o['objectId'],raise_for_failure=True)
+				#object_id = self._event.metadata['objects'][o['objectId']]
+				got = self._event.metadata['lastActionSuccess']
+				self._held_object = o
+				print(f"found object: {self._held_object['objectType']}")
+				break
+
+		self._event = self._controller.step(action="LookUp")
+		self._event=self._controller.step(action="MoveBack")
+		#self._event=self._controller.step(action="MoveBack")
+		self._event = self._controller.step(action="MoveHandDelta",x = 0, y=-1.1, z=0, raise_for_failure=True)
+		#self._event = self._controller.step(action="RotateHandRelative", x=45,y=0,z=0,raise_for_failure=True)
+
+
+		frame = self._event.frame
+		cv2.imwrite("InitView2.png", cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+
+
+		return self._held_object is not None and got
+
+	def Get_obj_dims(self, object_type):
+
+		frame = self._event.frame
+		cv2.imwrite("InitView.png", cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+
+		object_id = None
+		for o in self._event.metadata['objects']:
+			if o['pickupable'] and o['objectType'] == object_type:
+				print(f"object dims: {o['axisAlignedBoundingBox']['size']}")
+				return [o['axisAlignedBoundingBox']['size']['x'],
+						o['axisAlignedBoundingBox']['size']['y'],o['axisAlignedBoundingBox']['size']['z']]
+
+		print("found no object for dims")
+		return None
+
+
+

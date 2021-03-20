@@ -10,6 +10,7 @@ import time
 import copy
 import random
 import logging
+import ObjectDynamics.FitObject as fit
 import os
 import sys
 
@@ -20,6 +21,7 @@ class Planner():
 		self._graph = None
 		self._grid_size = 0.25
 		self._dij_graph = dij.Graph()
+		self._edge_constraints = None
 
 	def Set_env_from_topo_map(self, topo_map):
 		self._grid_size = copy.deepcopy(topo_map._grid_size)
@@ -80,8 +82,9 @@ class Planner():
 
 		return
 
-	def _build_node_dij_graph(self):
 
+	def _build_node_dij_graph(self):
+		print("building dij graph")
 		for current_node_name, neighbor_nodes in self._graph.adj.items():
 
 			current_node_dij_index = self.Get_node_dij_index(node_name=current_node_name)
@@ -105,13 +108,14 @@ class Planner():
 
 					self._dij_graph.add_edge(current_node_dij_index, neighbor_node_dij_index, distance)
 
+
 		return
 
-	def Find_dij_path(self, current_node_index, current_orientation, goal_node_index, goal_orientation):
+	def Find_dij_path(self, current_node_index, current_orientation, goal_node_index, goal_orientation, object_dims=None):
 		if self._subnode_plan:
 			return self.Find_subnode_dij_path(current_node_index, current_orientation, goal_node_index, goal_orientation)
 		else:
-			return self.Find_node_dij_path(current_node_index, current_orientation, goal_node_index, goal_orientation)
+			return self.Find_node_dij_path(current_node_index, current_orientation, goal_node_index, goal_orientation, object_dims=object_dims)
 
 	def Find_subnode_dij_path(self, current_node_index, current_orientation, goal_node_index, goal_orientation):
 
@@ -130,7 +134,23 @@ class Planner():
 
 		return path_nodes_name
 
-	def Find_node_dij_path(self, current_node_index, current_orientation, goal_node_index, goal_orientation):
+	def _remove_impossible_edges(self, object_dims):
+		"""
+		Since the dijkstar algorithm does not allow for constraint checking
+		I believe it is best if we just remove the edges that cannot be traversed
+		So that's what this function does
+		@param object_dims: dimensions of the object
+		@return: None
+		"""
+
+
+		for c in self._edge_constraints:
+			if not fit.does_fit(object_dims, c[1]):
+				self._dij_graph.remove_edge(c[0][0], c[0][1])
+				#self._dij_graph.remove_edge(c[0][1], c[0][0])
+
+
+	def Find_node_dij_path(self, current_node_index, current_orientation, goal_node_index, goal_orientation, object_dims):
 
 		current_node_name = self.Get_node_name(node_num=current_node_index, orientation=current_orientation)
 		current_dij_index = self.Get_node_dij_index(node_name=current_node_name)
@@ -138,7 +158,17 @@ class Planner():
 		goal_node_name = self.Get_node_name(node_num=goal_node_index, orientation=goal_orientation)
 		goal_dij_index = self.Get_node_dij_index(node_name=goal_node_name)
 
-		result = dij.find_path(self._dij_graph, current_dij_index, goal_dij_index)
+		if object_dims is not None:
+			print("removing bad edges")
+			self._remove_impossible_edges(object)
+
+		try:
+			result = dij.find_path(self._dij_graph, current_dij_index, goal_dij_index)
+			self.Build_dij_graph()
+		except dij.algorithm.NoPathError:
+			self.Build_dij_graph()
+			return None
+
 		path = result.nodes
 		print('Find_node_dij_path: ', 'Find_node_dij_path')
 		path_subnode = []

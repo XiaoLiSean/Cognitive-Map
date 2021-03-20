@@ -6,17 +6,23 @@ picNum=0
 
 def saveImg(event, picNum):
     #print("saving pic {}".format(picNum))
-    frame = event.third_party_camera_frames[0]
-    cv2.imwrite("TestPics/pic{}.png".format(picNum),cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+    frame = event.frame
+    cv2.imwrite("TestPics/FloorPlan604.png".format(picNum),cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
 
 exec_path = "/Users/Jake/MastersFirstYear/PROGRESS_LAB/ai2thor/unity/builds/thor-OSXIntel64-local/thor-OSXIntel64-local.app/Contents/MacOS/AI2-Thor"
-controller = Controller(scene='ChairHallwayTest', gridSize=0.25,
+controller = Controller(scene='FloorPlan604', gridSize=0.25,
                         local_executable_path=exec_path)
+event = controller.step({"action":"ToggleMapView"})
+
+saveImg(event, 0)
+
+assert False
 
 event = controller.step("AddThirdPartyCamera",
                 rotation=dict(x=45,y=180,z=0),
                 position=dict(x=1.75, y=2.9, z=2.2)
                 )
+
 
 
 event = controller.step("LookDown")

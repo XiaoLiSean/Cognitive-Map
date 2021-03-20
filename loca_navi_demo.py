@@ -19,8 +19,11 @@ parser.add_argument("--special", type=lambda x: bool(strtobool(x)), default=Fals
 parser.add_argument("--AI2THOR", type=lambda x: bool(strtobool(x)), default=False, help="True for RobotTHOR false for ITHOR")
 args = parser.parse_args()
 
+exec_path = "/Users/Jake/MastersFirstYear/PROGRESS_LAB/ai2thor/unity/builds/thor-OSXIntel64-local/thor-OSXIntel64-local.app/Contents/MacOS/AI2-Thor"
+
 def navigation_fcn(server, comfirmed, initialized):
-	navigation = Navigation(scene_type=args.scene_type, scene_num=args.scene_num, save_directory=args.save_directory, AI2THOR=args.AI2THOR, server=server, comfirmed=comfirmed)
+	navigation = Navigation(scene_type=args.scene_type, scene_num=args.scene_num, save_directory=args.save_directory,
+							AI2THOR=args.AI2THOR, server=server, comfirmed=comfirmed, exec_path=exec_path)
 	navigation.Update_node_generator()
 	navigation.Update_topo_map_env()
 	navigation.Update_planner_env()
@@ -30,8 +33,10 @@ def navigation_fcn(server, comfirmed, initialized):
 	# Navigation task
 	while True:
 		if initialized.value:
-			navigation.Closed_loop_nav(goal_node_index=4, goal_orientation=270)
-			navigation.Closed_loop_nav(goal_node_index=2, goal_orientation=270)
+			navigation.Closed_loop_nav(goal_node_index=1, goal_orientation=180, current_node_index=3, current_orientation=270, pickup_object="Stool")
+			print("first navi complete")
+			#navigation.Closed_loop_nav(goal_node_index=2, goal_orientation=270)
+			#print("second navi complete")
 			break
 
 def visualization_fcn(client, comfirmed, initialized):
@@ -40,6 +45,7 @@ def visualization_fcn(client, comfirmed, initialized):
 	initialized.value = 1
 	while True:
 		visualization_panel.show_map()
+
 
 if __name__ == '__main__':
 	comfirmed = multiprocessing.Value('i')  # Int value: 1 for confirm complete task and other process can go on while 0 otherwise

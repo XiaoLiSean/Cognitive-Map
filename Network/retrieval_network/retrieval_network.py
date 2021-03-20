@@ -20,7 +20,7 @@ class Retrieval_network():
     def get_network(self):
         model = SiameseNetImage()
         model.to(self.device)
-        model.load_state_dict(torch.load(self.checkpoint))
+        model.load_state_dict(torch.load(self.checkpoint, map_location=torch.device('cpu')))
         model.eval()
         return model
 # ------------------------------------------------------------------------------

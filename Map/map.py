@@ -65,7 +65,7 @@ class Topological_map():
 			logging.warning('Graph needs to be updated to match node list')
 		return copy.deepcopy(self._graph)
 
-	def Update_topo_map(self, node_index_list=None, node_pair_list=None, connected_subnodes=None):
+	def Update_topo_map(self, node_index_list=None, node_pair_list=None, connected_subnodes=None, edge_constraints=None):
 		if self._Rotate_to_degree_func is None or self._Teleport_agent_func is None:
 			logging.error('Action function not set in topo map class')
 			return
@@ -83,12 +83,17 @@ class Topological_map():
 		if not connected_subnodes is None:
 			self.Set_subnode_connection(connected_subnodes=connected_subnodes)
 
+		if not edge_constraints is None:
+			self.Set_edge_constraints(edge_constraints)
+
+
 		if self._node_index_list is None or self._connected_subnodes is None:
 			logging.error('Node list or subnode connection is not set')
 			return
 
 		self.Add_all_node()
 		self.Add_all_edges()
+		self.Add_all_constraints()
 		self._updated_needed = False
 
 	def _wrap_to_360(self, degree):
@@ -173,6 +178,11 @@ class Topological_map():
 		self._node_index_list = node_index_list
 		self._updated_needed = True
 		self.init_data()
+
+	def Set_edge_constraints(self, edge_constraints):
+		self._edge_constraints = edge_constraints
+		self._updated_needed = True
+
 
 	def Set_subnode_connection(self, connected_subnodes):
 		self._connected_subnodes = connected_subnodes
@@ -266,6 +276,51 @@ class Topological_map():
 
 		for nodes_pair_index in range(len(self._connected_subnodes)):
 			self.Add_edge_between_nodes(node_pair_index=nodes_pair_index, orientations=self._connected_subnodes[nodes_pair_index])
+
+
+	def _edge_in_constraints(self, node_pair_index, constraints):
+		"""
+		@param node_pair_index:
+		@param constraints:
+		@return:
+		"""
+		for c in constraints:
+			if c[0][0] == node_pair_index[0] and c[0][1] == node_pair_index[1]:
+				return True
+		return False
+
+	def Add_constraint_to_edge(self, node_1, orientation_1, node_2, orientation_2, constraint):
+		"""
+		Add a constraint attribute to the edge between the specified node/orientation pairs
+		@param node_1: first positional node index
+		@param orientation_1: orientation at first node (to specify subnode)
+		@param node_2: second positional node index
+		@param orientation_2: orientation at second node (to specify subnode)
+		@param constraint: list of dimensional constraints (relative to robot orientation)
+		@return: None
+		"""
+		self._graph[self.Get_node_name(node_1, orientation_1)][self.Get_node_name(node_2, orientation_2)].update({'footprint': constraint})
+
+	def Add_all_constraints(self):
+		"""
+		Add all constraints from self._edge_constraints to the edges of the graph
+		@return: None
+		"""
+		print("adding constraints")
+		# for each constraint listed
+		for c in self._edge_constraints:
+			first_node= c[0][0]
+			second_node= c[0][1]
+			# check each orientation between the two postional nodes identified in the given constraint
+			for o in self._orientations:
+				first_name = self.Get_node_name(first_node, o)
+				second_name = self.Get_node_name(second_node, o)
+				# check that there is an edge between the two nodes at a given orientation
+				if self._graph.has_edge(first_name, second_name):
+					self.Add_constraint_to_edge(first_node, o, second_node, o, c[1])
+					#if so, add constraint
+
+
 
 	def Add_edge_between_nodes(self, node_pair_index, orientations):
 

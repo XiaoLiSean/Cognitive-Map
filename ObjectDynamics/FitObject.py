@@ -1,6 +1,8 @@
 from ai2thor.controller import Controller
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+from shapely.geometry import Point, Polygon
+import shapely.affinity as aff
 
 # constraints are just dimensions for each axis projection
 # we want to get a bounding box approximating the object relative to the robot, as well as the robot
@@ -47,8 +49,62 @@ def create_transform(event):
     return out
 
 
+def does_fit(object_dims, max_dims):
+    # check trivial case
 
-def fitObject(controller, maxDims):
+    already_fits = True
+    for i in range(0, 3):
+        if object_dims[i] > max_dims[i]:
+            already_fits = False
+    if (already_fits):
+        print(f"no axis realign during graph check: {object_dims} vs {max_dims}")
+        return True
+
+    # check axis aligned case
+    ordered_obj_dims = object_dims.copy()
+    ordered_max_dims = max_dims.copy()
+    ordered_obj_dims.sort(reverse=True)
+    ordered_max_dims.sort(reverse=True)
+
+    if (ordered_obj_dims < ordered_max_dims):
+        print(f"axis realign required during graph check: {ordered_obj_dims} vs {ordered_max_dims}")
+        return True
+    return False
+
+def does_fit_poly(object, max_dims, robot_pos):
+    corners = object['objectOrientedBoundingBox']
+    object_poly = Polygon(corners)
+    constraint_corners = []
+    for i in [-1,1]:
+        for j in [-1,1]:
+            for k in [-1,1]:
+                modified = [max_dims[0]*i+robot_pos[0],
+                            max_dims[1]*j+robot_pos[1],
+                            max_dims[2]*k+robot_pos[2]]
+                constraint_corners.append(modified)
+
+    constraint_poly = Polygon(constraint_corners)
+    return rotate_to_fit(constraint_poly, object_poly) is not None
+
+def rotate_to_fit(constraint_box, object_box):
+    if constraint_box.contains(object_box):
+        return 0,0,0
+    rotations = [0, np.pi/2, np.pi]
+    for x in rotations:
+        for y in rotations:
+            for z in rotations:
+                r = R.from_rotvec([x,y,z])
+                mat = r.as_matrix()
+                flattened = list(np.concatenate(mat).flat)
+                flattened.extend([0, 0, 0])
+                rotated = aff.affine_transform(object_box, flattened)
+                if constraint_box.contains(rotated):
+                    return x,y,z
+
+    return None
+
+
+def fitObject(controller, max_dims):
     event = controller.step("Pass")
 
     robot_centric = create_transform(event)
@@ -63,14 +119,17 @@ def fitObject(controller, maxDims):
     object_dims = [bounding_box['size']['x'], bounding_box['size']['y'],bounding_box['size']['z']]
 
     # check trivial case
-
-    if (object_dims < maxDims):
-        print("No realign")
-        return
+    already_fits = True
+    for i in range(0,3):
+        if object_dims[i] > max_dims[i]:
+            already_fits = False
+    if (already_fits):
+        print("No realign:{},{}".format(object_dims,max_dims))
+        return True
 
     # check axis aligned case
     ordered_obj_dims = object_dims.copy()
-    ordered_max_dims = maxDims.copy()
+    ordered_max_dims = max_dims.copy()
     ordered_obj_dims.sort(reverse=True)
     ordered_max_dims.sort(reverse=True)
 
@@ -86,22 +145,23 @@ def fitObject(controller, maxDims):
         constraint_dim_ordering = [0,0,0]
         for i in range(0, 3):
             for j in range(0,3):
-                if maxDims[i] == ordered_max_dims[j]:
+                if max_dims[i] == ordered_max_dims[j]:
                     constraint_dim_ordering[i] = j
 
+        # check one rotation solutions
         if dim_object_ordering[0] == constraint_dim_ordering[0]:
-            controller.step("RotateHandRelative", x=90, raise_for_failure=True)
-            return
+            controller.step("RotateHandRelative", x=90)
+            return True
         elif dim_object_ordering[1] == constraint_dim_ordering[1]:
-            controller.step("RotateHandRelative", y=90,raise_for_failure=True)
-            return
+            controller.step("RotateHandRelative", y=90)
+            return True
         elif dim_object_ordering[2] == constraint_dim_ordering[2]:
-            controller.step("RotateHandRelative", z=90,raise_for_failure=True)
-            return
+            controller.step("RotateHandRelative", z=90)
+            return True
 
         print("All offset")
 
-        #if they're all offset
+        #if they're all offset, use a two rotation solution
         if dim_object_ordering[-1] == 0 and dim_object_ordering[0] == 1:
             controller.step("RotateHandRelative", x=90)
             controller.step("RotateHandRelative", z=90)
@@ -122,9 +182,11 @@ def fitObject(controller, maxDims):
             controller.step("RotateHandRelative", x=90)
 
 
-        return
+        return True
 
-
+    #since we don't have the generalized checker implemented yet, if we fail to fit in either of these scenarios, then we return false
+    return False
+    """
     # check longest distance case
     obj_longest = calcMag(object_dims)
     longest_dims = calcMag(maxDims)
@@ -141,6 +203,7 @@ def fitObject(controller, maxDims):
         return
 
     print("no flags")
+    """
 
 
 

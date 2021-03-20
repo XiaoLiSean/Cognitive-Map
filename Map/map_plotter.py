@@ -21,6 +21,7 @@ class Plotter():
 		self.node_radius = VISBILITY_DISTANCE
 		self.reachable_points = reachable_points
 		self.objects = objects
+		self.img_num = 0
 		self.multithread_node = dict(client=client, comfirmed=comfirmed)
 
 	def is_reachable(self, pi, pj):
@@ -238,6 +239,8 @@ class Plotter():
 			# ------------------------------------------------------------------
 
 			plt.show(block=False)
+			plt.savefig(f"plt_imgs/pic{self.img_num}.png")
+			self.img_num += 1
 			plt.pause(0.5)
 
 			self.multithread_node['comfirmed'].value = 1

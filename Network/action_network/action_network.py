@@ -159,7 +159,7 @@ class Action_network():
 		print('torch.cuda.is_available(): ', torch.cuda.is_available())
 		if torch.cuda.is_available():
 			self._model.cuda()
-		self._model.load_state_dict(torch.load(weight_file_path))
+		self._model.load_state_dict(torch.load(weight_file_path,map_location=torch.device('cpu')))
 		self._model.eval()
 
 	def predict(self, image_current, image_goal):

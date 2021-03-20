@@ -13,7 +13,7 @@ import time, copy, sys, random, os
 
 # Class for agent and nodes in simulation env
 class Agent_Sim():
-	def __init__(self, scene_type='Kitchen', scene_num=1, grid_size=0.25, node_radius=VISBILITY_DISTANCE, default_resol=True, ToggleMapView=False, applyActionNoise=False):
+	def __init__(self, scene_type='Kitchen', scene_num=1, grid_size=0.25, node_radius=VISBILITY_DISTANCE, default_resol=True, ToggleMapView=False, applyActionNoise=False, exec_path=None):
 		self._scene_type = scene_type
 		self._scene_num = scene_num
 		self._grid_size = grid_size
@@ -37,6 +37,8 @@ class Agent_Sim():
 			add_on = 300
 		elif scene_type == 'Bathroom':
 			add_on = 400
+		elif scene_type == "Dynamics":
+			add_on = 600
 		else:
 			sys.stderr.write(colored('ERROR: ','red')
 							 + "Expect scene_type 'Kitchen', 'Living room', 'Bedroom' or 'Bathroom' while get '{}'\n".format(scene_type))
@@ -45,7 +47,8 @@ class Agent_Sim():
 
 		self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
 
-		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE, fieldOfView=FIELD_OF_VIEW, applyActionNoise=applyActionNoise)
+		self._controller = Controller(scene=self._scene_name, gridSize=self._grid_size, visibilityDistance=VISBILITY_DISTANCE,
+									  fieldOfView=FIELD_OF_VIEW, applyActionNoise=applyActionNoise, local_executable_path=exec_path)
 
 		if not default_resol:
 			self._controller.step('ChangeResolution', x=SIM_WINDOW_WIDTH, y=SIM_WINDOW_HEIGHT)  # Change simulation window size
@@ -75,7 +78,7 @@ class Agent_Sim():
 		self._event = self._controller.step(action='GetReachablePositions')
 		return self._event.metadata['actionReturn']
 
-	def reset_scene(self, scene_type, scene_num, ToggleMapView=False, Show_doorway=False, shore_toggle_map=False):
+	def reset_scene(self, scene_type, scene_num, ToggleMapView=False, Show_doorway=False, shore_toggle_map=False, custom_map=False):
 		if scene_type == 'Kitchen':
 		# This code is used to store map in toggle view to visualize the task flow
 		# self.store_toggled_map()
@@ -87,13 +90,18 @@ class Agent_Sim():
 			add_on = 300
 		elif scene_type == 'Bathroom':
 			add_on = 400
-		else:
+		elif scene_type == "Dynamics":
+			add_on = 600
+		elif not custom_map:
 			sys.stderr.write(colored('ERROR: ','red')
 							 + "Expect scene_type 'Kitchen', 'Living room', 'Bedroom' or 'Bathroom' while get '{}'\n".format(scene_type))
 			sys.exit(1)
 		self._scene_type = scene_type
 		self._scene_num = scene_num
-		self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
+		if custom_map:
+			self._scene_name = scene_type
+		else:
+			self._scene_name = 'FloorPlan' + str(add_on + self._scene_num)
 		self._controller.reset(self._scene_name)
 
 		if Show_doorway and self._scene_name in DOOR_NODE:
@@ -206,6 +214,7 @@ class Agent_Sim():
 
 	def add_edges(self, nodes, ax=None):
 		edges = []
+
 		# Iterature through nodes to generate edges
 		for i in range(len(nodes)-1):
 			node_i = nodes[i]
