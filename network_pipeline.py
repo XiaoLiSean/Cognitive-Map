@@ -291,9 +291,9 @@ def plot_heatmap(staticstics):
     print(sigma)
     sigma_max = np.amax(sigma)
     sigma_min = np.amin(sigma)
-    sigma = (sigma - sigma_min) / (sigma_max - sigma_min)
+    #sigma = (sigma - sigma_min) / (sigma_max - sigma_min)
     img_sigma = ax2.imshow(sigma)
-    img_sigma.set_clim(0,1)
+    #img_sigma.set_clim(0,1)
     fig.colorbar(img_sigma, ax=ax2, shrink=0.6)
 
     for ax, data in zip([ax1, ax2], [mean, sigma]):
@@ -377,8 +377,8 @@ if __name__ == '__main__':
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
-        # staticstics = np.load(checkpoints_prefix + '_thresholding_staticstics.npy', allow_pickle=True).item()
-        # plot_heatmap(staticstics)
-        # exit()
+        staticstics = np.load(checkpoints_prefix + '_thresholding_staticstics.npy', allow_pickle=True).item()
+        plot_heatmap(staticstics)
+        exit()
 
         thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=args.image)
