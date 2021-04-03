@@ -160,7 +160,7 @@ class Planner():
 
 		if object_dims is not None:
 			print("removing bad edges")
-			self._remove_impossible_edges(object)
+			self._remove_impossible_edges(object_dims)
 
 		try:
 			result = dij.find_path(self._dij_graph, current_dij_index, goal_dij_index)
