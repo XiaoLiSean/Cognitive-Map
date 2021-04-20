@@ -3,7 +3,10 @@ Navigation Network, Written by Xiao
 For robot localization in a dynamic environment.
 '''
 
-ACTION_CLASSNUM = 3 # dimension of action space [left, right, forward]
+ACTION_ENCODING = dict(left=[1,0,0], right=[0,1,0], forward=[0,0,1])
+ACTION_CLASSNUM = len(ACTION_ENCODING) # dimension of action space [left, right, forward]
+HORIZONTAL_MOVE_MAX = 3 # maximum number of grid steps in horizontal movement
+FORWARD_MOVE_MAX = 6 # maximum number of grid steps in forward movement
 # ------------------------------------------------------------------------------
 '''
 NUM_EPOCHS, STEP_SIZE, GAMMA, lr0 satisfies
@@ -31,7 +34,7 @@ TRAIN_FRACTION = 0.7
 VAL_FRACTION = 0.15
 TEST_FRACTION = 0.15
 # ------------------------------------------------------------------------------
-DATA_DIR = './Network/navigation_network/datasets' # Training and validation data directory
-PAIR_FILE_NAME = 'pairs_name_fraction_0.005.npy' # 93354 pairs
+DATA_DIR = './Network/datasets' # Training and validation data directory
+TRAJECTORY_FILE_NAME = 'trajectories_fraction_0.002.npy' #  23040 pairs
 CHECKPOINTS_DIR = './Network/navigation_network/checkpoints/'
 # ------------------------------------------------------------------------------

@@ -131,7 +131,7 @@ class Agent_Sim():
                              + 'Moving distance {} too small'.format(position_error))
             sys.exit(1)
 
-        rotate_steps = int(np.abs(rotation_error_corrected / self._rotation_step))
+        rotate_steps = round(np.abs(rotation_error_corrected / self._rotation_step))
 
         for _ in range(rotate_steps):
             time.sleep(self._sleep_time)

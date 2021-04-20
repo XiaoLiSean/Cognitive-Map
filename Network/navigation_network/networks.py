@@ -34,11 +34,11 @@ class NavigationNet(torch.nn.Module):
                                         torch.nn.ReLU(inplace=True)
                                                 )
 
-    def forward(self, G_img, C_img, G_on, C_on, G_in, C_in, G_prox, C_prox, G_bbox, C_bbox, G_vec, C_vec):
+    def forward(self, A_img, B_img, A_on, B_on, A_in, B_in, A_prox, B_prox, A_bbox, B_bbox, A_vec, B_vec):
 
-        goal_embedding = self.naviBackbone.get_embedding(G_img, G_on, G_in, G_prox, G_bbox, G_vec)
-        current_embedding = self.naviBackbone.get_embedding(C_img, C_on, C_in, C_prox, C_bbox, C_vec)
-        concacenated = torch.cat((goal_embedding, current_embedding), dim=1)
+        current_embedding = self.naviBackbone.get_embedding(A_img, A_on, A_in, A_prox, A_bbox, A_vec)
+        goal_embedding = self.naviBackbone.get_embedding(B_img, B_on, B_in, B_prox, B_bbox, B_vec)
+        concacenated = torch.cat((current_embedding, goal_embedding), dim=1)
         distribution = self.decisionHead(concacenated)
 
         return distribution

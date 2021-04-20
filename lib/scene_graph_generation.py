@@ -220,7 +220,7 @@ class Scene_Graph:
     def __init__(self, R_on=lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool),
                  R_in=lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool),
                  R_proximity=lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool),
-                 fractional_bboxs=[np.array([0,0,0,0])]*OBJ_TYPE_NUM):
+                 fractional_bboxs=[np.array([0,0,0,0]) for i in range(OBJ_TYPE_NUM)]):
         # All vector and sparse matrix initialized with 'False' boolean
         self._obj_vec = lil_matrix((OBJ_TYPE_NUM, 1), dtype=np.bool)    # binary object occurence vector where index follow 'obj_2_idx_dic.npy'
         self._R_on = R_on    # Relationship sparse matrix _R_on[i,j] = True , obj_i on obj_j
@@ -238,7 +238,7 @@ class Scene_Graph:
         self._R_in = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
         self._R_proximity = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
         self._R_disjoint = lil_matrix((OBJ_TYPE_NUM, OBJ_TYPE_NUM), dtype=np.bool)
-        self._fractional_bboxs = [np.array([0,0,0,0])]*OBJ_TYPE_NUM
+        self._fractional_bboxs = [np.array([0,0,0,0]) for i in range(OBJ_TYPE_NUM)]
 
     def visibleFilter_by_2Dbbox(self, objs, objectsBboxsDict):
         if objectsBboxsDict == None:

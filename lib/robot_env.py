@@ -222,7 +222,7 @@ class Agent_Sim():
 						is_edge = self.is_reachable(node_i, node_j)
 						if is_edge:
 							cost = (diff[0] + diff[1]) / self._grid_size
-							edges.append((node_i, node_j, int(cost)))
+							edges.append((node_i, node_j, round(cost)))
 
 
 				if diff[1] < self._node_radius:
@@ -230,12 +230,12 @@ class Agent_Sim():
 						is_edge = self.is_reachable(node_i, node_j)
 						if is_edge:
 							cost = (diff[0] + diff[1]) / self._grid_size
-							edges.append((node_i, node_j, int(cost)))
+							edges.append((node_i, node_j, round(cost)))
 
 
 				if is_edge and ax != None:
 					ax.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0)
-					ax.text((node_i[0]+node_j[0]) / 2.0, (node_i[1]+node_j[1]) / 2.0, int(cost), size=8,
+					ax.text((node_i[0]+node_j[0]) / 2.0, (node_i[1]+node_j[1]) / 2.0, round(cost), size=8,
 					        ha="center", va="center",
 					        bbox=dict(boxstyle="round",
 					                  ec=(1., 0.5, 0.5),
@@ -277,7 +277,7 @@ class Agent_Sim():
 		plt.xticks(np.arange(floor(min(scene_bbox[0])/self._grid_size), ceil(max(scene_bbox[0])/self._grid_size)+1, 1) * self._grid_size, rotation=90)
 		plt.yticks(np.arange(floor(min(scene_bbox[1])/self._grid_size), ceil(max(scene_bbox[1])/self._grid_size)+1, 1) * self._grid_size)
 		plt.xlabel("x coordnates, [m]")
-		plt.xlabel("z coordnates, [m]")
+		plt.ylabel("z coordnates, [m]")
 		plt.title("{}: Node radius {} [m]".format(self._scene_name, str(self._node_radius)))
 		plt.xlim(min(scene_bbox[0])-self._grid_size, max(scene_bbox[0])+self._grid_size)
 		plt.ylim(min(scene_bbox[1])-self._grid_size, max(scene_bbox[1])+self._grid_size)

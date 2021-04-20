@@ -21,7 +21,7 @@ class Robot():
         self._scene_type = scene_type
         self._scene_num = scene_num
         self._grid_size = grid_size
-        self._node_radius = node_radius
+        self._node_radius = node_radiusxlabel
         # Used to collect data points
         self._SG = Scene_Graph()
         self._img = []
@@ -114,7 +114,7 @@ class Robot():
                 node_idx = DOOR_NODE[self._scene_name][0]
                 node = NODES[self._scene_name][node_idx]
                 subnode = DOOR_NODE[self._scene_name][1]
-                self._controller.step(action='TeleportFull', x=node[0], y=self.get_agent_position()['y'], z=node[1], rotation=dict(x=0.0, y=subnode, z=0.0))
+                self._controller.step(action='Teleport', position=dict(x=node[0], y=self.get_agent_position()['y'], z=node[1]), rotation=dict(x=0.0, y=subnode, z=0.0))
                 time.sleep(5)
 
         if ToggleMapView:   # Top view of the map to see the objets layout. issue: no SG can be enerated
@@ -231,7 +231,7 @@ class Robot():
                 for nominal_theta in rotations:
                     for _ in range(pertubation_round):
                         pose_x, pose_z, pose_r = self.get_noisy_target_pose(nominal_x, nominal_z, nominal_theta)
-                        event = self._controller.step(action='TeleportFull', x=pose_x, y=p['y'], z=pose_z, rotation=pose_r)
+                        event = self._controller.step(action='Teleport', position=dict(x=pose_x, y=p['y'], z=pose_z), rotation=pose_r)
 
                         if not event.metadata['lastActionSuccess']:
                             continue
