@@ -316,6 +316,17 @@ def generate_pairs_in_validation(fraction=None):
 # ------------------------------------------------------------------------------
 # Generate trajectory data points for navigation_network
 # ------------------------------------------------------------------------------
+def get_action(dH, dF):
+    if dH == 0:
+        action = dF*ACTION_ENCODING['forward']
+    elif dH > 0:
+        action = dH*ACTION_ENCODING['right'] + dF*ACTION_ENCODING['forward']
+    elif dH < 0:
+        action = -dH*ACTION_ENCODING['left'] + dF*ACTION_ENCODING['forward']
+
+    action = action/np.sum(action)
+    return action
+
 def generate_uniform_trajectory(array_map, angle, fraction):
 
     goal_counting_arr = np.zeros((2*HORIZONTAL_MOVE_MAX+1, FORWARD_MOVE_MAX+1))
@@ -342,12 +353,7 @@ def generate_uniform_trajectory(array_map, angle, fraction):
                     if array_map[i_goal, j_goal] == 0:
                         continue
                     # horizontal movement first to get larger view overlap at the begining and end of trajectory
-                    if dH == 0:
-                        action = ACTION_ENCODING['forward']
-                    elif dH > 0:
-                        action = ACTION_ENCODING['right']
-                    elif dH < 0:
-                        action = ACTION_ENCODING['left']
+                    action = get_action(dH, dF)
                     # augment trajectory by the dynamics rounds
                     for cur_dynamics in range(1, array_map[i, j]+1):
                         for goal_dynamics in range(1, array_map[i_goal, j_goal]+1):
@@ -457,8 +463,7 @@ if __name__ == '__main__':
         regenerate_triplets(0.2)
     # Used for regenerating trajectory data for Navigation Network
     elif args.regenerate_NaviNet:
-        # 0.002:  23040 points
-        # 0.005: 66624 points
+        # 0.002:  19296 points
         regenerate_trajectory(0.002)
     # Used for determine the loclaization similarity threshold
     elif args.gen_pair_in_val:

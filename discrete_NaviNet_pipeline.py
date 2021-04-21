@@ -16,8 +16,8 @@ from lib.scene_graph_generation import Scene_Graph
 from Network.navigation_network.params import *
 from Network.navigation_network.datasets import NaviDataset
 from Network.navigation_network.networks import NavigationNet
-from torch.nn import CrossEntropyLoss
-from Network.retrieval_network.trainer import Training
+from Network.navigation_network.losses import CrossEntropyLoss
+from Network.navigation_network.trainer import Training
 from os.path import dirname, abspath
 
 # ------------------------------------------------------------------------------
