@@ -361,14 +361,17 @@ def generate_uniform_trajectory(array_map, angle, fraction):
                             trajectory_data[dH+HORIZONTAL_MOVE_MAX][dF].append(deepcopy(((i,j,cur_dynamics),(i_goal,j_goal,goal_dynamics), action)))
 
     goal_counting_arr[HORIZONTAL_MOVE_MAX,0] = np.max(goal_counting_arr)
-    max_len = int(fraction*np.min(goal_counting_arr))
+    max_len = int(fraction*np.sum(goal_counting_arr))
     # cut off data and store in trajectory_data_augmented
     trajectory_data_augmented = []
     for dH in range(-HORIZONTAL_MOVE_MAX, HORIZONTAL_MOVE_MAX+1): # Horizontal movement
         for dF in range(0, FORWARD_MOVE_MAX+1): # Forward movement
             if dH == 0 and dF == 0: # no movement in this case
                 continue
-            trajectory_data_augmented.extend(deepcopy(trajectory_data[dH+HORIZONTAL_MOVE_MAX][dF][0:max_len]))
+            trajectory_data_augmented.extend(deepcopy(trajectory_data[dH+HORIZONTAL_MOVE_MAX][dF]))
+
+    random.shuffle(trajectory_data_augmented)
+    trajectory_data_augmented = deepcopy(trajectory_data_augmented[0:max_len])
 
     return trajectory_data_augmented
 
@@ -463,8 +466,9 @@ if __name__ == '__main__':
         regenerate_triplets(0.2)
     # Used for regenerating trajectory data for Navigation Network
     elif args.regenerate_NaviNet:
-        # 0.002:  19296 points
-        regenerate_trajectory(0.002)
+        # 0.0005: 9437
+        # 0.001: 19043
+        regenerate_trajectory(0.0005)
     # Used for determine the loclaization similarity threshold
     elif args.gen_pair_in_val:
         generate_pairs_in_validation(fraction=0.005)

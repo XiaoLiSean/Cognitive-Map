@@ -16,24 +16,26 @@ import numpy as np
 # -----------------------------navigation_network-------------------------------
 # ------------------------------------------------------------------------------
 class NavigationNet(torch.nn.Module):
-    def __init__(self, only_image_branch=False, self_pretrained_image=True):
+    def __init__(self, only_image_branch=False):
         super(NavigationNet, self).__init__()
         self.only_image_branch = only_image_branch
         if self.only_image_branch:
-            self.naviBackbone = TripletNetImage(enableRoIBridge=False)
+            self.naviBackbone = TripletNetImage(enableRoIBridge=False, pretrainedResNet=True)
             feature_embedding_len = IMAGE_ENCODING_VEC_LENGTH
         else:
-            self.naviBackbone = RetrievalTriplet(self_pretrained_image=False)
+            self.naviBackbone = RetrievalTriplet(self_pretrained_image=False, pretrainedResNet=True)
             feature_embedding_len = SCENE_ENCODING_VEC_LENGTH
-            if self_pretrained_image:
-                self.naviBackbone.load_self_pretrained_image(CHECKPOINTS_DIR + 'image_best_fit.pkl')
 
         self.decisionHead = torch.nn.Sequential(
                                         torch.nn.Linear(2*feature_embedding_len, 1024, bias=True),
                                         torch.nn.ReLU(inplace=True),
                                         torch.nn.Linear(1024, 256, bias=True),
                                         torch.nn.ReLU(inplace=True),
-                                        torch.nn.Linear(256, ACTION_CLASSNUM, bias=True),
+                                        torch.nn.Linear(256, 64, bias=True),
+                                        torch.nn.ReLU(inplace=True),
+                                        torch.nn.Linear(64, 32, bias=True),
+                                        torch.nn.ReLU(inplace=True),
+                                        torch.nn.Linear(32, ACTION_CLASSNUM, bias=True),
                                         torch.nn.Softmax(dim=1)
                                                 )
 

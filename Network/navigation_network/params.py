@@ -18,8 +18,8 @@ if we want lr_final_epoch <= 1e-4
 this constraint will regulate the corresponding value of other params
 '''
 # Traning parameters/setting
-BATCH_SIZE = 26 # common settings for networks {image=26, SG=14}
-NUM_EPOCHS = 60 # common settings for networks {image=50, SG=1000}
+BATCH_SIZE = 14 # common settings for networks {image=26, SG=14}
+NUM_EPOCHS = 70 # common settings for networks {image=50, SG=1000}
 # --------------------------------------------
 '''
 Meanwhile, too large ALPHA_MARGIN will cause overfitting as it's functional
@@ -30,14 +30,14 @@ LEARNING_RATE = 0.01 # common settings for networks {image=0.01, SG=0.01}
 MOMENTUM = 0.9 # common settings for networks {image=0.9}
 # --------------------------------------------
 # Decay LR by a factor of GAMMA (LR*=GAMMA) every STEP_SIZE epochs
-STEP_SIZE = 10 # common settings for networks {image=10, SG=10}
-GAMMA = 0.7 # common settings for networks {image=0.1, SG=0.01}
+STEP_SIZE = 7 # common settings for networks {image=10, SG=10}
+GAMMA = 0.5 # common settings for networks {image=0.1, SG=0.01}
 # ------------------------------------------------------------------------------
 TRAIN_FRACTION = 0.7
 VAL_FRACTION = 0.15
 TEST_FRACTION = 0.15
 # ------------------------------------------------------------------------------
 DATA_DIR = './Network/datasets' # Training and validation data directory
-TRAJECTORY_FILE_NAME = 'trajectories_fraction_0.002.npy' #  19296 pairs
+TRAJECTORY_FILE_NAME = 'trajectories_fraction_0.0005.npy' #  9437 pairs
 CHECKPOINTS_DIR = './Network/navigation_network/checkpoints/'
 # ------------------------------------------------------------------------------

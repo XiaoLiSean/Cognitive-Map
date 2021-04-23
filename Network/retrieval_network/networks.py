@@ -17,7 +17,7 @@ import numpy as np
 # -----------------------------retrieval_network--------------------------------
 # ------------------------------------------------------------------------------
 class RetrievalTriplet(torch.nn.Module):
-    def __init__(self, GCN_dropout_rate=DROPOUT_RATE, GCN_layers=GCN_TIER, GCN_bias=True, self_pretrained_image=True):
+    def __init__(self, GCN_dropout_rate=DROPOUT_RATE, GCN_layers=GCN_TIER, GCN_bias=True, self_pretrained_image=True, pretrainedResNet=True):
         super(RetrievalTriplet, self).__init__()
         self.ModelName = 'RetrievalTriplet'
         '''
@@ -26,7 +26,7 @@ class RetrievalTriplet(torch.nn.Module):
         visuial features (RoI feature and entire image feature). By this, the backward gradient flow
         from the sg branch through the RoI align to image branch is cut-off.
         '''
-        self.image_branch = TripletNetImage(enableRoIBridge=True)
+        self.image_branch = TripletNetImage(enableRoIBridge=True, pretrainedResNet=pretrainedResNet)
         if self_pretrained_image:
             self.load_self_pretrained_image(CHECKPOINTS_DIR + 'image_best_fit.pkl')
 
@@ -198,11 +198,11 @@ class RoIBridge(torch.nn.Module):
 # -------------------------------Image Branch-----------------------------------
 # ------------------------------------------------------------------------------
 class TripletNetImage(torch.nn.Module):
-    def __init__(self, enableRoIBridge=False):
+    def __init__(self, enableRoIBridge=False, pretrainedResNet=True):
         super(TripletNetImage, self).__init__()
         self.ModelName = 'TripletNetImage'
         # Initialize weight using ImageNet pretrained weights
-        model = models.resnet50(pretrained=True)
+        model = models.resnet50(pretrained=pretrainedResNet)
         # The ResNet50-C4 Backbone
         self.backbone = torch.nn.Sequential(*(list(model.children())[:-3]))
         # ResNet Stage 5 except from the last linear classifier

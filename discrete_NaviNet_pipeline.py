@@ -55,7 +55,8 @@ def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix, i
     loss_fcn = LossFcn
     # Observe that all parameters are being optimized
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
-    # Decay LR by a factor of 0.1 every 7 epochs
+    # optimizer = torch.optim.Adam(model.parameters())
+    # Decay LR by a factor of GAMMA every STEP_SIZE epochs
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=STEP_SIZE, gamma=GAMMA)
 
     # --------------------------------Training--------------------------------------
