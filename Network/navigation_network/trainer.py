@@ -104,7 +104,7 @@ def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_schedul
 
     return model
 
-def plot_training_statistics(file_names, branch=['ResNet', 'Retrieval']):
+def plot_training_statistics(file_names, branch=['ResNet', 'Navi-Net']):
 
     f, (ax1, ax2) = plt.subplots(2, 1, figsize=(6,5))
     color = ['blue', 'red']

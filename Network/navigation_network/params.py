@@ -18,7 +18,7 @@ if we want lr_final_epoch <= 1e-4
 this constraint will regulate the corresponding value of other params
 '''
 # Traning parameters/setting
-BATCH_SIZE = 14 # common settings for networks {image=26, SG=14}
+BATCH_SIZE = 26 # common settings for networks {image=26, SG=14}
 NUM_EPOCHS = 70 # common settings for networks {image=50, SG=1000}
 # --------------------------------------------
 '''
@@ -38,6 +38,6 @@ VAL_FRACTION = 0.15
 TEST_FRACTION = 0.15
 # ------------------------------------------------------------------------------
 DATA_DIR = './Network/datasets' # Training and validation data directory
-TRAJECTORY_FILE_NAME = 'trajectories_fraction_0.0005.npy' #  9437 pairs
+TRAJECTORY_FILE_NAME = 'trajectories_fraction_0.001.npy' #  19043 pairs
 CHECKPOINTS_DIR = './Network/navigation_network/checkpoints/'
 # ------------------------------------------------------------------------------

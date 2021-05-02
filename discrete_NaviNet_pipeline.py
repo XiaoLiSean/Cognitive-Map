@@ -16,9 +16,110 @@ from lib.scene_graph_generation import Scene_Graph
 from Network.navigation_network.params import *
 from Network.navigation_network.datasets import NaviDataset
 from Network.navigation_network.networks import NavigationNet
-from Network.navigation_network.losses import CrossEntropyLoss
-from Network.navigation_network.trainer import Training
+from Network.navigation_network.losses import Cross_Entropy_Loss
+from Network.navigation_network.trainer import Training, plot_training_statistics
 from os.path import dirname, abspath
+
+# ------------------------------------------------------------------------------
+# -------------------------------Testing Pipeline-------------------------------
+# ------------------------------------------------------------------------------
+def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=False):
+    # ---------------------------Loading testing dataset---------------------------
+    print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading testing dataset...')
+    test_dataset = Dataset(DATA_DIR, is_test=True, load_only_image_data=is_only_image_branch)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=NUM_WORKERS)
+
+    # ------------------------------Initialize model--------------------------------
+    print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
+    model = Network(only_image_branch=is_only_image_branch)
+    model.load_state_dict(torch.load(checkpoints_prefix + 'best_fit.pkl'))
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print("Model testing on: ", device)
+    print("Cuda is_available: ", torch.cuda.is_available())
+    print('----'*20)
+    model.to(device)
+    model.eval()
+    torch.set_grad_enabled(False)
+    # ------------------------------Testing Main------------------------------------
+    testing_statistics = {}
+    bar = Bar('Processing', max=len(test_loader))
+    for batch_idx, (inputs, targets) in enumerate(test_loader):
+        inputs = tuple(input.to(device) for input in inputs)
+        targets = targets.to(device)
+        outputs = model(*inputs)
+        _, is_correct = LossFcn(outputs, targets, batch_average_loss=True)
+        iFloorPlan = test_dataset.trajectories[batch_idx][0].split('/')[4]
+        if iFloorPlan in testing_statistics:
+            testing_statistics[iFloorPlan]['total'] += 1
+            testing_statistics[iFloorPlan]['corrects'] += is_correct.item()
+        else:
+            testing_statistics.update({iFloorPlan:dict(total=1, corrects=is_correct.item())})
+        bar.next()
+
+    bar.finish()
+    print('----'*20)
+    np.save(checkpoints_prefix + 'testing_statistics.npy', testing_statistics)
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+def show_testing_histogram(test_file_name):
+    fig, ax1 = plt.subplots()
+    testing_statistics = np.load(test_file_name, allow_pickle=True).item()
+    tags = []
+    total = []
+    corrects = []
+    for key in testing_statistics:
+        tags.append(key)
+        total.append(testing_statistics[key]['total'])
+        corrects.append(testing_statistics[key]['corrects'])
+
+    plt.bar(np.arange(len(tags)), total)
+    plt.bar(np.arange(len(tags)), corrects)
+    ax1.set_xticks(np.arange(len(tags)))
+    ax1.set_xticklabels(tags, rotation=90)
+
+    ax2 = ax1.twinx()
+    ax2.plot(np.arange(len(tags)), np.true_divide(np.array(corrects), np.array(total)), 'r--')
+    ax2.set_yticks(np.arange(11)/10)
+    ax2.set_yticklabels(['{:,.1%}'.format(x) for x in np.arange(11)/10])
+    plt.title('Overall Success Rate {:.2%}'.format(np.true_divide(np.sum(np.array(corrects)), np.sum(np.array(total)))))
+
+    fig.tight_layout()
+    plt.show()
+# ------------------------------------------------------------------------------
+def show_testing_histogram_comparison(test_file_names, branch=['ResNet', 'Navi-Net'], axis_off_set=False):
+    fig, ax1 = plt.subplots(figsize=(6,5))
+    img_statistics = np.load(test_file_names[0], allow_pickle=True).item()
+    all_statistics = np.load(test_file_names[1], allow_pickle=True).item()
+    tags = []
+    total = []
+    img_corrects = []
+    all_corrects = []
+    for key in img_statistics:
+        tags.append(key)
+        total.append(img_statistics[key]['total'])
+        img_corrects.append(img_statistics[key]['corrects'])
+        all_corrects.append(all_statistics[key]['corrects'])
+
+    plt.bar(np.arange(len(tags)), total, label='Total Cases')
+    plt.bar(np.arange(len(tags)) - int(axis_off_set)*0.25, all_corrects, width=0.8 - 0.4*int(axis_off_set), label=branch[1] + ' Success')
+    plt.bar(np.arange(len(tags)) + int(axis_off_set)*0.25, img_corrects, width=0.8 - 0.4*int(axis_off_set), label=branch[0] + ' Success')
+    ax1.set_xticks(np.arange(len(tags)))
+    ax1.set_xticklabels(tags, rotation=90)
+    ax1.legend(labels=['Total Cases', branch[1] + ' Success', branch[0] + ' Success'], bbox_to_anchor=(0.40, 0.55))
+
+    ax2 = ax1.twinx()
+    ax2.plot(np.arange(len(tags)), np.true_divide(np.array(img_corrects), np.array(total)), 'b--')
+    ax2.plot(np.arange(len(tags)), np.true_divide(np.array(all_corrects), np.array(total)), 'r--')
+    img_label = branch[0] + ' Success Rate: {:.2%} overall'.format(np.true_divide(np.sum(np.array(img_corrects)), np.sum(np.array(total))))
+    all_label = branch[1] + ' Success Rate: {:.2%} overall'.format(np.true_divide(np.sum(np.array(all_corrects)), np.sum(np.array(total))))
+    ax2.legend(labels=[img_label, all_label], bbox_to_anchor=(0.70, 1.2))
+    ax2.set_yticks(np.arange(11)/10)
+    ax2.set_yticklabels(['{:,.1%}'.format(x) for x in np.arange(11)/10])
+    ax1.grid(True)
+
+    fig.tight_layout()
+    plt.show()
+
 
 # ------------------------------------------------------------------------------
 # -------------------------------Training Pipeline------------------------------
@@ -88,12 +189,11 @@ if __name__ == '__main__':
     # Train corresponding networks
     if args.train:
         Dataset = NaviDataset
-        LossFcn = CrossEntropyLoss()
+        Network = NavigationNet
+        LossFcn = Cross_Entropy_Loss()
         if args.image and not args.all:
-            Network = NavigationNet
             checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
         elif args.all and not args.image:
-            Network = NavigationNet
             checkpoints_prefix = CHECKPOINTS_DIR
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
@@ -101,3 +201,27 @@ if __name__ == '__main__':
         TraningFcn = Training
         model_best_fit = training_pipeline(Dataset, Network, LossFcn, TraningFcn, checkpoints_prefix, is_only_image_branch=args.image)
         torch.save(model_best_fit.state_dict(), checkpoints_prefix + 'best_fit.pkl')
+    # --------------------------------------------------------------------------
+    # Test corresponding networks
+    if args.test:
+        Dataset = NaviDataset
+        Network = NavigationNet
+        LossFcn = Cross_Entropy_Loss()
+        if args.image and not args.all:
+            train_file_names = [CHECKPOINTS_DIR+'image_training_history/training_statistics.npy']
+            test_file_names = CHECKPOINTS_DIR+'image_testing_statistics.npy'
+            checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
+        elif args.all and not args.image:
+            train_file_names = [CHECKPOINTS_DIR+'image_training_history/training_statistics.npy', CHECKPOINTS_DIR+'training_history/training_statistics.npy']
+            test_file_names = [CHECKPOINTS_DIR+'image_testing_statistics.npy', CHECKPOINTS_DIR+'testing_statistics.npy']
+            checkpoints_prefix = CHECKPOINTS_DIR
+        else:
+            print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
+
+        plot_training_statistics(train_file_names)
+        #testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=args.image)
+
+        if args.image and not args.all:
+            show_testing_histogram(test_file_names)
+        elif args.all and not args.image:
+            show_testing_histogram_comparison(test_file_names)

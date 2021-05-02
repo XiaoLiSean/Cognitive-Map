@@ -22,22 +22,29 @@ class NavigationNet(torch.nn.Module):
         if self.only_image_branch:
             self.naviBackbone = TripletNetImage(enableRoIBridge=False, pretrainedResNet=True)
             feature_embedding_len = IMAGE_ENCODING_VEC_LENGTH
+            self.decisionHead = torch.nn.Sequential(
+                                            torch.nn.Linear(2*feature_embedding_len, 1024, bias=True),
+                                            torch.nn.ReLU(inplace=True),
+                                            torch.nn.Linear(1024, 256, bias=True),
+                                            torch.nn.ReLU(inplace=True),
+                                            torch.nn.Linear(256, ACTION_CLASSNUM, bias=True),
+                                            torch.nn.ReLU(inplace=True)
+                                                    )
         else:
             self.naviBackbone = RetrievalTriplet(self_pretrained_image=False, pretrainedResNet=True)
             feature_embedding_len = SCENE_ENCODING_VEC_LENGTH
-
-        self.decisionHead = torch.nn.Sequential(
-                                        torch.nn.Linear(2*feature_embedding_len, 1024, bias=True),
-                                        torch.nn.ReLU(inplace=True),
-                                        torch.nn.Linear(1024, 256, bias=True),
-                                        torch.nn.ReLU(inplace=True),
-                                        torch.nn.Linear(256, 64, bias=True),
-                                        torch.nn.ReLU(inplace=True),
-                                        torch.nn.Linear(64, 32, bias=True),
-                                        torch.nn.ReLU(inplace=True),
-                                        torch.nn.Linear(32, ACTION_CLASSNUM, bias=True),
-                                        torch.nn.Softmax(dim=1)
-                                                )
+            self.decisionHead = torch.nn.Sequential(
+                                            torch.nn.Linear(2*feature_embedding_len, 1024, bias=True),
+                                            torch.nn.ReLU(inplace=True),
+                                            torch.nn.Linear(1024, 256, bias=True),
+                                            torch.nn.ReLU(inplace=True),
+                                            torch.nn.Linear(256, 64, bias=True),
+                                            torch.nn.ReLU(inplace=True),
+                                            torch.nn.Linear(64, 32, bias=True),
+                                            torch.nn.ReLU(inplace=True),
+                                            torch.nn.Linear(32, ACTION_CLASSNUM, bias=True),
+                                            torch.nn.ReLU(inplace=True)
+                                                    )
 
     def forward(self, A_img, B_img, A_on=None, B_on=None, A_in=None, B_in=None, A_prox=None, B_prox=None, A_bbox=None, B_bbox=None, A_vec=None, B_vec=None):
 
