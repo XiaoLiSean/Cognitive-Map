@@ -46,14 +46,19 @@ class NavigationNet(torch.nn.Module):
                                             torch.nn.ReLU(inplace=True)
                                                     )
 
+    def get_embedding(self, A_img, A_on=None, A_in=None, A_prox=None, A_bbox=None, A_vec=None):
+        if self.only_image_branch:
+            embedding = self.naviBackbone.get_embedding(A_img)
+        else:
+            embedding = self.naviBackbone.get_embedding(A_img, A_on, A_in, A_prox, A_bbox, A_vec)
+
+        return embedding
+
+
     def forward(self, A_img, B_img, A_on=None, B_on=None, A_in=None, B_in=None, A_prox=None, B_prox=None, A_bbox=None, B_bbox=None, A_vec=None, B_vec=None):
 
-        if self.only_image_branch:
-            current_embedding = self.naviBackbone.get_embedding(A_img)
-            goal_embedding = self.naviBackbone.get_embedding(B_img)
-        else:
-            current_embedding = self.naviBackbone.get_embedding(A_img, A_on, A_in, A_prox, A_bbox, A_vec)
-            goal_embedding = self.naviBackbone.get_embedding(B_img, B_on, B_in, B_prox, B_bbox, B_vec)
+        current_embedding = self.get_embedding(A_img, A_on, A_in, A_prox, A_bbox, A_vec)
+        goal_embedding = self.get_embedding(B_img, B_on, B_in, B_prox, B_bbox, B_vec)
 
         concacenated = torch.cat((current_embedding, goal_embedding), dim=1)
         distribution = self.decisionHead(concacenated)

@@ -12,6 +12,7 @@ import logging, argparse, os, sys, csv
 from experiment.node_generation import *
 from experiment.experiment_config import *
 from Network.action_network.action_network import Action_network
+from Network.navigation_network.navigation_network import Navigation_network
 from Network.retrieval_network.retrieval_network import Retrieval_network
 from Network.retrieval_network.datasets import get_adj_matrix
 from lib.scene_graph_generation import Scene_Graph
@@ -85,6 +86,25 @@ class Robot():
 		else:
 			self._localization_network = Retrieval_network(isResNetLocalization=isResNetLocalization)
 
+	# Used to pre-process the features [scene graph, image] for network prediction (localization and navigation)
+	def feature_preprocess(self, info_goal, info_current):
+		if self.isResNetLocalization:
+			feature_goal = Image.fromarray(info_goal[0])
+			feature_current = Image.fromarray(info_current[0])
+		else:
+			goal_SG = info_goal[1]
+			feature_goal = [Image.fromarray(info_goal[0]), get_adj_matrix(goal_SG['on']),
+							get_adj_matrix(goal_SG['in']), get_adj_matrix(goal_SG['proximity']),
+							np.asarray(goal_SG['fractional_bboxs'], dtype=np.float32),
+							np.asarray(goal_SG['vec'].todense(), dtype=np.float32)]
+			cur_SG = info_current[1]
+			feature_current = [Image.fromarray(info_current[0]), get_adj_matrix(cur_SG['on']),
+							   get_adj_matrix(cur_SG['in']), get_adj_matrix(cur_SG['proximity']),
+							   np.asarray(cur_SG['fractional_bboxs'], dtype=np.float32),
+							   np.asarray(cur_SG['vec'].todense(), dtype=np.float32)]
+
+		return feature_goal, feature_current
+
 	def Navigation_stop(self, feature_goal, feature_current, goal_pose=None, hardcode=False):
 
 		position_current = list(self.Get_robot_position().values())
@@ -104,21 +124,7 @@ class Robot():
 			else:
 				return True
 
-		if self.isResNetLocalization:
-			feature_goal = Image.fromarray(feature_goal[0])
-			feature_current = Image.fromarray(feature_current[0])
-		else:
-			goal_SG = feature_goal[1]
-			feature_goal = [Image.fromarray(feature_goal[0]), get_adj_matrix(goal_SG['on']),
-							get_adj_matrix(goal_SG['in']), get_adj_matrix(goal_SG['proximity']),
-							np.asarray(goal_SG['fractional_bboxs'], dtype=np.float32),
-							np.asarray(goal_SG['vec'].todense(), dtype=np.float32)]
-			cur_SG = feature_current[1]
-			feature_current = [Image.fromarray(feature_current[0]), get_adj_matrix(cur_SG['on']),
-							   get_adj_matrix(cur_SG['in']), get_adj_matrix(cur_SG['proximity']),
-							   np.asarray(cur_SG['fractional_bboxs'], dtype=np.float32),
-							   np.asarray(cur_SG['vec'].todense(), dtype=np.float32)]
-
+		feature_goal, feature_current = self.feature_preprocess(feature_goal, feature_current)
 		localized = self._localization_network.is_localized(feature_current, feature_goal)
 
 		return localized
