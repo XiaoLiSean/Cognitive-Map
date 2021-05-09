@@ -17,6 +17,7 @@ import sys
 class Planner():
 	def __init__(self):
 		self._subnode_plan = False
+		self._orientations = [0, 90, 180, 270]
 		self._graph = None
 		self._grid_size = 0.25
 		self._dij_graph = dij.Graph()
@@ -104,6 +105,7 @@ class Planner():
 						distance *= 2
 
 					self._dij_graph.add_edge(current_node_dij_index, neighbor_node_dij_index, distance)
+					# self._dij_graph.add_edge(neighbor_node_dij_index, current_node_dij_index, distance)
 
 		return
 
@@ -120,6 +122,13 @@ class Planner():
 
 		goal_node_name = self.Get_node_name(node_num=goal_node_index, orientation=goal_orientation)
 		goal_dij_index = self.Get_subnode_dij_index(node_name=goal_node_name)
+
+		# if current_dij_index > 102 or goal_dij_index > 102:
+		# 	print('current_dij_index: ', current_dij_index)
+		# 	print('goal_dij_index: ', goal_dij_index)
+		# 	print('current_node_name: ', current_node_name)
+
+		# 	print('goal_node_name: ', goal_node_name)
 
 		result = dij.find_path(self._dij_graph, current_dij_index, goal_dij_index)
 		path = result.nodes
@@ -140,22 +149,22 @@ class Planner():
 
 		result = dij.find_path(self._dij_graph, current_dij_index, goal_dij_index)
 		path = result.nodes
-		print('Find_node_dij_path: ', 'Find_node_dij_path')
+		# print('Find_node_dij_path: ', 'Find_node_dij_path')
 		path_subnode = []
 		path_subnode.append(current_node_name)
-		print('path_subnode: ', path_subnode)
+		# print('path_subnode: ', path_subnode)
 
-		print('path: ', path)
+		# print('path: ', path)
 
 		for path_node in path:
-			print('path_node: ', path_node)
+			# print('path_node: ', path_node)
 			path_subnode = self._local_subnode_plan(path_subnode=path_subnode, goal_node=path_node)
 			# if path_node == 1:
 			# 	break
 
 		path_subnode = self._local_subnode_plan(path_subnode=path_subnode, goal_node=goal_node_index, goal_orientation=goal_orientation)
 
-		print('path_subnode: ', path_subnode)
+		# print('path_subnode: ', path_subnode)
 		# path_nodes_name = []
 		# for node_dij_index in path:
 		# 	path_nodes_name.append(self.Get_subnode_index_from_dij_index(node_dij_index))
@@ -173,14 +182,14 @@ class Planner():
 		if not current_node_num == goal_node:
 
 			moving_orientations = self._find_optimal_orientation(current_node=current_node_num, goal_node=goal_node)
-			print('moving_orientations: ', moving_orientations)
+			# print('moving_orientations: ', moving_orientations)
 			for moving_orientation in moving_orientations:
 
 				attempting_current_node = self.Get_node_name(node_num=current_node_num, orientation=moving_orientation)
 				attempting_goal_node = self.Get_node_name(node_num=goal_node, orientation=moving_orientation)
 
 				if attempting_goal_node in list(self._graph.adj[attempting_current_node].keys()):
-					print('working moving_orientation: ', moving_orientation)
+					# print('working moving_orientation: ', moving_orientation)
 					# print('path_subnode_temp: ', path_subnode_temp)
 
 					# print('attempting_current_node: ', attempting_current_node)

@@ -85,6 +85,23 @@ class Robot():
 		else:
 			self._localization_network = Retrieval_network(isResNetLocalization=isResNetLocalization)
 
+	def HardCodeLocalization(self, goal_pose=None):
+		position_current = list(self.Get_robot_position().values())
+		rotation_current = list(self.Get_robot_orientation().values())
+
+		if goal_pose is None:
+			return False
+		goal_position = self._AI2THOR_controller.Get_list_form(pos_or_rot=goal_pose['position'])
+		goal_rotation = self._AI2THOR_controller.Get_list_form(pos_or_rot=goal_pose['rotation'])
+
+		distance = np.linalg.norm(np.array(list(map(lambda x, y: x - y, goal_position, position_current))))
+		rotation_difference = np.abs(goal_rotation[1] - rotation_current[1])
+
+		if distance > 0.5 * self._grid_size or rotation_difference > 10:
+			return False
+		else:
+			return True
+
 	def Navigation_stop(self, feature_goal, feature_current, goal_pose=None, hardcode=False):
 
 		position_current = list(self.Get_robot_position().values())
@@ -152,6 +169,8 @@ class Robot():
 		move_action = [0, 3, 4, 5]
 		rotation_action = [1, 2]
 
+		fail_type = 'navigation'
+
 		self._AI2THOR_controller.Self_localize()
 
 		step = 0
@@ -174,6 +193,15 @@ class Robot():
 			self.send_msg_to_client(is_reached=False)
 			# ------------------------------------------------------------------
 			# ------------------------------------------------------------------
+
+			position_current = list(self.Get_robot_position().values())
+			rotation_current = list(self.Get_robot_orientation().values())
+
+			distance = np.linalg.norm(np.array(list(map(lambda x, y: x - y, goal_position, position_current))))
+			rotation_difference = np.abs(goal_rotation[1] - rotation_current[1])
+
+			if distance < 0.5 * self._grid_size and rotation_difference < 10:
+				fail_type = 'localization'
 
 			image_current = self._AI2THOR_controller.Get_frame()
 			action_predict = self._action_network.predict(image_current=image_current, image_goal=image_goal)
@@ -212,7 +240,7 @@ class Robot():
 
 			step += 1
 			if step >= max_steps:
-				return False
+				return (False, fail_type)
 
 		# ----------------------------------------------------------------------
 		# Send information to plotter
@@ -223,6 +251,17 @@ class Robot():
 		self.send_msg_to_client(is_reached=True)
 		# ----------------------------------------------------------------------
 		# ----------------------------------------------------------------------
+
+		position_current = list(self.Get_robot_position().values())
+		rotation_current = list(self.Get_robot_orientation().values())
+
+		distance = np.linalg.norm(np.array(list(map(lambda x, y: x - y, goal_position, position_current))))
+		rotation_difference = np.abs(goal_rotation[1] - rotation_current[1])
+
+		if distance > 0.5 * self._grid_size or rotation_difference > 10:
+			error_type = 'localization'
+			return (False, fail_type)
+
 		return True
 
 	def Open_close_label_text(self):
