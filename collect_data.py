@@ -9,6 +9,7 @@ from lib.robot_env import Agent_Sim
 from lib.simulation_agent import Robot
 from lib.params import VISBILITY_DISTANCE, SCENE_TYPES, SCENE_NUM_PER_TYPE
 from Network.retrieval_network.params import TRAIN_FRACTION, VAL_FRACTION, DATA_DIR
+from Network.navigation_network.params import ACTION_ENCODING, HORIZONTAL_MOVE_MAX, FORWARD_MOVE_MAX
 
 # Generate a tuple list of non empty index [(i,j), (j,k) ...]
 def get_index_as_tuple_list(array_map):
@@ -122,7 +123,7 @@ def generate_triplets(file_path, magnitude=None):
 
     triplets_APN_idx = []
     triplets_APN_name = []
-    running_total = np.array([0.0]*5, dtype=int)
+    running_total = np.array([0.0]*5, dtype=object)
     array_maps = np.load(file_path + '/' + 'array_maps.npy', allow_pickle='TRUE').item()
     for key in array_maps:
         # get array-like map for a specific robot heading [0.0, 90.0, 180.0, 270.0]
@@ -176,7 +177,7 @@ def generate_triplets(file_path, magnitude=None):
               '{0:.0%}, '.format(len(third_tier_APN)/(len(triplets_APN_idx)-original_len)) +
               '{0:.0%}, '.format(len(fourth_tier_APN)/(len(triplets_APN_idx)-original_len)) +
               '{0:.0%})'.format(len(fifth_tier_APN)/(len(triplets_APN_idx)-original_len)))
-        running_total += np.array([len(first_tier_APN), len(second_tier_APN), len(third_tier_APN), len(fourth_tier_APN), len(fifth_tier_APN)])
+        running_total += np.array([len(first_tier_APN), len(second_tier_APN), len(third_tier_APN), len(fourth_tier_APN), len(fifth_tier_APN)], dtype=object)
     #---------------------------------------------------------------------------
     for APN in triplets_APN_idx:
         anchor = str(APN[0][3]) + '_' + str(APN[0][0]) + '_' + str(APN[0][1]) + '_' + str(APN[0][2])
@@ -189,6 +190,7 @@ def generate_triplets(file_path, magnitude=None):
     return len(triplets_APN_idx), running_total
 
 # ------------------------------------------------------------------------------
+# Generate pair data points for heatmap plotting of retrieval network
 # ------------------------------------------------------------------------------
 def get_all_pairs_in_array_map(array_map):
     all_list = []
@@ -228,8 +230,8 @@ def generate_pairs(file_path, fraction=None):
     return len(pairs_name)
 
 # ------------------------------------------------------------------------------
+# collect train, validation and test data for networks
 # ------------------------------------------------------------------------------
-# collect train, validation and test data for network image branch
 def data_collection(partition_num, partition_list):
     # Initialize robot
     robot = Robot()
@@ -258,7 +260,7 @@ def data_collection(partition_num, partition_list):
 # ------------------------------------------------------------------------------
 # generate triplets train, validation and test data for network image branch
 def regenerate_triplets(magnitude):
-    total = np.array([0.0]*5, dtype=int)
+    total = np.array([0.0]*5, dtype=object)
     # Iterate through all the scenes to collect data and separate them into train, val and test sets
     for scene_type in SCENE_TYPES:
         for scene_num in range(1, SCENE_NUM_PER_TYPE + 1):
@@ -312,7 +314,119 @@ def generate_pairs_in_validation(fraction=None):
             print('Total {}: {} pairs in Scene {}'.format(total, datanum, scene_name))
 
 # ------------------------------------------------------------------------------
+# Generate trajectory data points for navigation_network
+# ------------------------------------------------------------------------------
+def get_action(dH, dF):
+    if dH == 0:
+        action = dF*ACTION_ENCODING['forward']
+    elif dH > 0:
+        action = dH*ACTION_ENCODING['right'] + dF*ACTION_ENCODING['forward']
+    elif dH < 0:
+        action = -dH*ACTION_ENCODING['left'] + dF*ACTION_ENCODING['forward']
+
+    action = action/np.sum(action)
+    return action
+
+def generate_uniform_trajectory(array_map, angle, fraction):
+
+    goal_counting_arr = np.zeros((2*HORIZONTAL_MOVE_MAX+1, FORWARD_MOVE_MAX+1))
+    trajectory_data = [[[] for i in range(FORWARD_MOVE_MAX+1)] for j in range(2*HORIZONTAL_MOVE_MAX+1)]
+    theta = float(angle)*np.pi/180.0
+    # iterate through all entries in array_map as starting point of trajectories
+    for i in range(array_map.shape[0]):
+        for j in range(array_map.shape[1]):
+            if array_map[i, j] == 0:
+                continue
+            # chose goals starting at array_map[i,j] and end at array_map[i+di,j+dj]
+            # with movement [dH, dF] = [Horizontal movement, Forward movement]
+            for dH in range(-HORIZONTAL_MOVE_MAX, HORIZONTAL_MOVE_MAX+1): # Horizontal movement
+                for dF in range(0, FORWARD_MOVE_MAX+1): # Forward movement
+                    if dH == 0 and dF == 0: # no movement in this case
+                        continue
+                    di = round(np.cos(theta)*dH + np.sin(theta)*dF)
+                    dj = round(-np.sin(theta)*dH + np.cos(theta)*dF)
+
+                    i_goal = i + di
+                    j_goal = j + dj
+                    if i_goal < 0 or i_goal >= array_map.shape[0] or j_goal < 0 or j_goal >= array_map.shape[1]:
+                        continue
+                    if array_map[i_goal, j_goal] == 0:
+                        continue
+                    # horizontal movement first to get larger view overlap at the begining and end of trajectory
+                    action = get_action(dH, dF)
+                    # augment trajectory by the dynamics rounds
+                    for cur_dynamics in range(1, array_map[i, j]+1):
+                        for goal_dynamics in range(1, array_map[i_goal, j_goal]+1):
+                            goal_counting_arr[dH+HORIZONTAL_MOVE_MAX,dF] += 1
+                            trajectory_data[dH+HORIZONTAL_MOVE_MAX][dF].append(deepcopy(((i,j,cur_dynamics),(i_goal,j_goal,goal_dynamics), action)))
+
+    goal_counting_arr[HORIZONTAL_MOVE_MAX,0] = np.max(goal_counting_arr)
+    max_len = int(fraction*np.sum(goal_counting_arr))
+    # cut off data and store in trajectory_data_augmented
+    trajectory_data_augmented = []
+    for dH in range(-HORIZONTAL_MOVE_MAX, HORIZONTAL_MOVE_MAX+1): # Horizontal movement
+        for dF in range(0, FORWARD_MOVE_MAX+1): # Forward movement
+            if dH == 0 and dF == 0: # no movement in this case
+                continue
+            trajectory_data_augmented.extend(deepcopy(trajectory_data[dH+HORIZONTAL_MOVE_MAX][dF]))
+
+    random.shuffle(trajectory_data_augmented)
+    trajectory_data_augmented = deepcopy(trajectory_data_augmented[0:max_len])
+
+    return trajectory_data_augmented
+
+def generate_trajectory(file_path, fraction=1.0):
+    if fraction == 1.0:
+        file_name = 'trajectories.npy'
+    elif fraction < 1.0 and fraction > 0.0:
+        file_name = 'trajectories_fraction_' + str(fraction) + '.npy'
+
+    pairs_name = []
+    running_total = 0
+    array_maps = np.load(file_path + '/' + 'array_maps.npy', allow_pickle='TRUE').item()
+    for key in array_maps:
+        array_map = array_maps[key]
+        pairs = generate_uniform_trajectory(array_map, key, fraction)
+
+        for pair in pairs:
+            curr = str(key) + '_' + str(pair[0][0]) + '_' + str(pair[0][1]) + '_' + str(pair[0][2])
+            goal = str(key) + '_' + str(pair[1][0]) + '_' + str(pair[1][1]) + '_' + str(pair[1][2])
+            action = pair[2]
+            pairs_name.append(deepcopy((curr, goal, action)))
+
+    np.save(file_path + '/' + file_name, pairs_name)
+    return len(pairs_name)
+
+def regenerate_trajectory(fraction):
+    # Iterate through all validation scenes to collect pairs to generate heatmap
+    total = dict(train=0, val=0, test=0)
+    for scene_type in SCENE_TYPES:
+        for scene_num in range(1, SCENE_NUM_PER_TYPE + 1):
+            if scene_num <= int(SCENE_NUM_PER_TYPE*TRAIN_FRACTION):
+                phase = 'train'
+            elif scene_num <= int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)):
+                phase = 'val'
+            else:
+                phase = 'test'
+            FILE_PATH = DATA_DIR + '/' + phase
+
+            if scene_type == 'Kitchen':
+            	add_on = 0
+            elif scene_type == 'Living room':
+            	add_on = 200
+            elif scene_type == 'Bedroom':
+            	add_on = 300
+            elif scene_type == 'Bathroom':
+            	add_on = 400
+            scene_name = 'FloorPlan' + str(add_on + scene_num)
+            print('----'*20)
+            running_total = generate_trajectory(FILE_PATH + '/' + scene_name, fraction=fraction)
+            total[phase] += running_total
+            print('{} {} points,\t Total {}'.format(scene_name, running_total, total))
+
+# ------------------------------------------------------------------------------
 # manually update topological map info
+# ------------------------------------------------------------------------------
 def iter_test_scene(is_xiao=False, is_yidong=False):
     # Initialize robot
     robot = Agent_Sim()
@@ -327,7 +441,7 @@ def iter_test_scene(is_xiao=False, is_yidong=False):
 
         for scene_num in range(test_idx_initial, test_idx_end):
             robot.reset_scene(scene_type=scene_type, scene_num=scene_num, ToggleMapView=True, Show_doorway=False, shore_toggle_map=False)
-            robot.show_map(show_nodes=False, show_edges=False)
+            robot.show_map(show_nodes=True, show_edges=True)
 
 
 # ------------------------------------------------------------------------------
@@ -335,30 +449,33 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # Get argument from CMD line
     parser = argparse.ArgumentParser()
-    parser.add_argument("--topo", help="manually update topological map info", action="store_true")
-    parser.add_argument("--regenerate", help="regenerate_triplets", action="store_true")
-    parser.add_argument("--gen_pair_in_val", help="regenerate pair data in validation datasets", action="store_true")
+    parser.add_argument("--regenerate_RNet", help="regenerate triplets for RNet", action="store_true")
+    parser.add_argument("--regenerate_NaviNet", help="regenerate trajectory for NaviNet", action="store_true")
+    parser.add_argument("--gen_pair_in_val", help="regenerate pair data for heatmap plotting of retrieval network", action="store_true")
     parser.add_argument("--collect_partition", nargs="+", default=[])
+    parser.add_argument("--topo", help="manually update topological map info", action="store_true")
     parser.add_argument("--yidong", help="manually collect topological map node for yidong", action="store_true")
     parser.add_argument("--xiao", help="manually collect topological map node for xiao", action="store_true")
     args = parser.parse_args()
 
+    # --------------------------------------------------------------------------
     # Used for regenerating triplets
-    if args.regenerate:
+    if args.regenerate_RNet:
         # 0.2: 9499 triples in total
         # 1: 66161 triples in total
-        regenerate_triplets(20)
-
+        regenerate_triplets(0.2)
+    # Used for regenerating trajectory data for Navigation Network
+    elif args.regenerate_NaviNet:
+        # 0.0005: 9437
+        # 0.001: 19043
+        regenerate_trajectory(0.0005)
     # Used for determine the loclaization similarity threshold
-    if args.gen_pair_in_val:
+    elif args.gen_pair_in_val:
         generate_pairs_in_validation(fraction=0.005)
-
-    # --------------------------------------------------------------------------
     # Used to collect data
-    if len(args.collect_partition) > 0:
+    elif len(args.collect_partition) > 0:
         partition_num = 30
         data_collection(partition_num, args.collect_partition)
-
     # Used to see visualization of each test scene and record the topological node manually
-    if args.topo:
+    elif args.topo:
         iter_test_scene(is_xiao=args.xiao, is_yidong=args.yidong)

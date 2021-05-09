@@ -1,5 +1,5 @@
 '''
-Retrieval Network, Written by Xiao
+Retrieval Network Testing in Discrete World, Written by Xiao
 For robot localization in a dynamic environment.
 '''
 # Import params and similarity from lib module
@@ -276,7 +276,18 @@ def thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=Fals
 # ------------------------------------------------------------------------------
 # Visualize Test Staticstics
 def plot_heatmap(staticstics):
-    map_len = staticstics['n'].shape[0]
+    map_len = 2*staticstics['n'].shape[0] - 1
+    mid_idx = staticstics['n'].shape[0] - 1
+
+    # Processing the staticstics data to make a symetrical heatmap
+    new_staticstics = dict(n=np.zeros((map_len, map_len)), sum=np.zeros((map_len, map_len)), sq_sum=np.zeros((map_len, map_len)))
+    for key in staticstics:
+        new_staticstics[key][mid_idx:, mid_idx:] = staticstics[key]
+        new_staticstics[key][0:mid_idx+1, mid_idx:] = np.flip(staticstics[key],0)
+        new_staticstics[key][mid_idx:, 0:mid_idx+1] = np.flip(staticstics[key],1)
+        new_staticstics[key][0:mid_idx+1, 0:mid_idx+1] = np.flip(staticstics[key],(0,1))
+
+    staticstics = copy.deepcopy(new_staticstics)
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
     num = copy.deepcopy(staticstics['n'])
@@ -291,9 +302,9 @@ def plot_heatmap(staticstics):
     print(sigma)
     sigma_max = np.amax(sigma)
     sigma_min = np.amin(sigma)
-    sigma = (sigma - sigma_min) / (sigma_max - sigma_min)
+    #sigma = (sigma - sigma_min) / (sigma_max - sigma_min)
     img_sigma = ax2.imshow(sigma)
-    img_sigma.set_clim(0,1)
+    #img_sigma.set_clim(0,1)
     fig.colorbar(img_sigma, ax=ax2, shrink=0.6)
 
     for ax, data in zip([ax1, ax2], [mean, sigma]):
@@ -377,8 +388,8 @@ if __name__ == '__main__':
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
-        # staticstics = np.load(checkpoints_prefix + '_thresholding_staticstics.npy', allow_pickle=True).item()
-        # plot_heatmap(staticstics)
-        # exit()
+        staticstics = np.load(checkpoints_prefix + '_thresholding_staticstics.npy', allow_pickle=True).item()
+        plot_heatmap(staticstics)
+        exit()
 
         thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=args.image)
