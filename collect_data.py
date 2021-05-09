@@ -461,9 +461,11 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # Used for regenerating triplets
     if args.regenerate_RNet:
-        # 0.2: 9499 triples in total
-        # 1: 66161 triples in total
-        regenerate_triplets(0.2)
+        # 0.2: 9499 triplets in total
+        # 0.3: 14279 triplets
+        # 0.5: 23825
+        # 1: 66161 triplets in total
+        regenerate_triplets(0.5)
     # Used for regenerating trajectory data for Navigation Network
     elif args.regenerate_NaviNet:
         # 0.0005: 9437

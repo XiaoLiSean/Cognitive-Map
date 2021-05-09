@@ -9,7 +9,7 @@ from torchvision import models, ops
 from lib.params import OBJ_TYPE_NUM
 from Network.retrieval_network.params import BBOX_EMDEDDING_VEC_LENGTH, ROI_EMDEDDING_VEC_LENGTH, WORD_EMDEDDING_VEC_LENGTH, OBJ_FEATURE_VEC_LENGTH
 from Network.retrieval_network.params import SG_ENCODING_VEC_LENGTH, IMAGE_ENCODING_VEC_LENGTH, SCENE_ENCODING_VEC_LENGTH
-from Network.retrieval_network.params import CHECKPOINTS_DIR, BATCH_SIZE, IMAGE_SIZE, GCN_TIER, DROPOUT_RATE
+from Network.retrieval_network.params import CHECKPOINTS_DIR, IMAGE_SIZE, GCN_TIER, DROPOUT_RATE
 import math
 import numpy as np
 
@@ -17,7 +17,7 @@ import numpy as np
 # -----------------------------retrieval_network--------------------------------
 # ------------------------------------------------------------------------------
 class RetrievalTriplet(torch.nn.Module):
-    def __init__(self, GCN_dropout_rate=DROPOUT_RATE, GCN_layers=GCN_TIER, GCN_bias=True, self_pretrained_image=True, pretrainedResNet=True):
+    def __init__(self, GCN_dropout_rate=DROPOUT_RATE, GCN_layers=GCN_TIER, GCN_bias=True, self_pretrained_image=False, pretrainedXXXNet=False):
         super(RetrievalTriplet, self).__init__()
         self.ModelName = 'RetrievalTriplet'
         '''
@@ -26,7 +26,7 @@ class RetrievalTriplet(torch.nn.Module):
         visuial features (RoI feature and entire image feature). By this, the backward gradient flow
         from the sg branch through the RoI align to image branch is cut-off.
         '''
-        self.image_branch = TripletNetImage(enableRoIBridge=True, pretrainedResNet=pretrainedResNet)
+        self.image_branch = TripletNetImage(enableRoIBridge=True, pretrainedXXXNet=pretrainedXXXNet)
         if self_pretrained_image:
             self.load_self_pretrained_image(CHECKPOINTS_DIR + 'image_best_fit.pkl')
 
@@ -198,18 +198,38 @@ class RoIBridge(torch.nn.Module):
 # -------------------------------Image Branch-----------------------------------
 # ------------------------------------------------------------------------------
 class TripletNetImage(torch.nn.Module):
-    def __init__(self, enableRoIBridge=False, pretrainedResNet=True):
+    def __init__(self, enableRoIBridge=False, pretrainedXXXNet=False, XXXNetName='resnet50'):
         super(TripletNetImage, self).__init__()
-        self.ModelName = 'TripletNetImage'
-        # Initialize weight using ImageNet pretrained weights
-        model = models.resnet50(pretrained=pretrainedResNet)
-        # The ResNet50-C4 Backbone
-        self.backbone = torch.nn.Sequential(*(list(model.children())[:-3]))
-        # ResNet Stage 5 except from the last linear classifier
-        self.head = torch.nn.Sequential(*(list(model.children())[-3:-1]))
-        self.enableRoIBridge = enableRoIBridge
-        if self.enableRoIBridge:
-            self.RoIBridge = RoIBridge()
+        self.NetName = XXXNetName
+        if self.NetName == 'resnet50':
+            # Initialize weight using ImageNet pretrained weights
+            model = models.resnet50(pretrained=pretrainedXXXNet)
+            # The ResNet50-C4 Backbone
+            self.backbone = torch.nn.Sequential(*(list(model.children())[:-3]))
+            # ResNet Stage 5 except from the last linear classifier
+            self.head = torch.nn.Sequential(*(list(model.children())[-3:-1]))
+            self.enableRoIBridge = enableRoIBridge
+            if self.enableRoIBridge:
+                self.RoIBridge = RoIBridge()
+        # ----------------------------------------------------------------------
+        # For benchmark testing
+        elif self.NetName == 'vgg16':
+            self.enableRoIBridge = False
+            model = models.vgg16(pretrained=pretrainedXXXNet)
+            model.classifier[6] = torch.nn.Linear(4096, IMAGE_ENCODING_VEC_LENGTH, bias=True)
+            self.model = model
+        elif self.NetName == 'resnext50_32x4d':
+            self.enableRoIBridge = False
+            model = models.resnext50_32x4d(pretrained=pretrainedXXXNet)
+            self.model = torch.nn.Sequential(*(list(model.children())[:-1]))
+        elif self.NetName == 'googlenet':
+            self.enableRoIBridge = False
+            model = models.alexnet(pretrained=pretrainedXXXNet)
+            model.classifier[6] = torch.nn.Linear(4096, IMAGE_ENCODING_VEC_LENGTH, bias=True)
+            self.model = model
+        else:
+            print('benchmark network name: vgg16, resnet50, resnext50_32x4d, alexnet')
+        # ----------------------------------------------------------------------
     # --------------------------------------------------------------------------
     # --------------------------------------------------------------------------
     '''
@@ -239,6 +259,16 @@ class TripletNetImage(torch.nn.Module):
         return RoI_features
 
     def get_embedding(self, batch_imgs, batch_fractional_bboxs=None, batch_obj_vecs=None):
+        # ----------------------------------------------------------------------
+        # For benchmark testing
+        if self.NetName in ['vgg16', 'resnext50_32x4d', 'googlenet']:
+            if self.NetName == 'resnext50_32x4d':
+                batch_img_vector_embeddings = torch.squeeze(torch.squeeze(self.model(batch_imgs), dim=2), dim=2)
+            else:
+                batch_img_vector_embeddings = self.model(batch_imgs)
+
+            return batch_img_vector_embeddings
+        # ----------------------------------------------------------------------
 
         batch_conv_features = self.get_conv_features(batch_imgs)
         batch_img_vector_embeddings = self.conv_to_vec_feature(batch_conv_features)

@@ -13,7 +13,7 @@ from progress.bar import Bar
 from Network.retrieval_network.params import *
 
 # ------------------------------------------------------------------------------
-def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=None, batch_size=BATCH_SIZE):
+def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=None, batch_size=None):
     """
     Loaders, model, loss function and metrics should work together for a given task,
     i.e. The model should be able to process data output of loaders,
@@ -76,16 +76,16 @@ def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_schedul
                 lr_scheduler.step() # update LEARNING_RATE
 
             # Epoch loss calculation
-            epoch_loss = running_loss * BATCH_SIZE / dataset_sizes[phase]
+            epoch_loss = running_loss * batch_size / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
             print('{} Loss: \t {:.4f} \t Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
             training_statistics[phase][0].append(epoch_acc.item())
             training_statistics[phase][1].append(epoch_loss)
-            np.save('training_statistics.npy', training_statistics)
+            np.save(checkpoints_prefix + 'training_statistics.npy', training_statistics)
             # deep copy the model: based on minimum loss
             if phase == 'val':
                 if checkpoints_prefix != None:
-                    FILE = checkpoints_prefix + '_loss_' + str(epoch_loss) + '_acc_' + str(epoch_acc.item()) + '_epoch_' + str(epoch+1) + '.pkl'
+                    FILE = checkpoints_prefix + 'training_history/' + '_loss_' + str(epoch_loss) + '_acc_' + str(epoch_acc.item()) + '_epoch_' + str(epoch+1) + '.pkl'
                     torch.save(model.state_dict(), FILE)
 
                 if epoch_acc > best_acc:
@@ -103,23 +103,27 @@ def Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_schedul
 
     return model
 
-def plot_training_statistics(file_names, branch=['ResNet', 'Retrieval']):
+def plot_training_statistics(parent_dir=CHECKPOINTS_DIR,filename='training_statistics.npy'):
 
     f, (ax1, ax2) = plt.subplots(2, 1, figsize=(6,5))
-    color = ['blue', 'red']
-    for i in range(len(file_names)):
-        training_statistics = np.load(file_names[i], allow_pickle=True).item()
+    color = ['blue', 'red', 'green', 'black', 'cyan']
+    i = 0
+    for xxxnet in os.listdir(parent_dir):
+        if not os.path.exists(parent_dir+xxxnet+'/'+filename):
+            continue
+        training_statistics = np.load(parent_dir+xxxnet+'/'+filename, allow_pickle=True).item()
         epochs = [*range(len(training_statistics['train'][0]))]
-        ax1.plot(epochs, training_statistics['train'][0], color=color[i], linestyle='solid', linewidth=2, label=branch[i] + ' Training')
-        ax2.plot(epochs, training_statistics['train'][1], color=color[i], linestyle='solid', linewidth=2, label=branch[i] + ' Training')
-        ax2.plot(epochs, training_statistics['val'][1], color=color[i], linestyle='dashed', linewidth=2, label=branch[i] + ' val.')
-        ax1.plot(epochs, training_statistics['val'][0], color=color[i], linestyle='dashed', linewidth=2, label=branch[i] + ' val.')
+        ax1.plot(epochs, training_statistics['train'][0], color=color[i], linestyle='solid', linewidth=2, label=xxxnet + ' Training')
+        ax2.plot(epochs, training_statistics['train'][1], color=color[i], linestyle='solid', linewidth=2, label=xxxnet + ' Training')
+        ax2.plot(epochs, training_statistics['val'][1], color=color[i], linestyle='dashed', linewidth=2, label=xxxnet + ' val.')
+        ax1.plot(epochs, training_statistics['val'][0], color=color[i], linestyle='dashed', linewidth=2, label=xxxnet + ' val.')
         # ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Accuracy")
         ax2.set_xlabel("Epoch")
         ax2.set_ylabel("Loss")
         ax2.grid(True)
         ax1.grid(True)
+        i += 1
 
-    ax1.legend(bbox_to_anchor=(0.10, 1.02), ncol=2)
+    ax1.legend(bbox_to_anchor=(0.10, 1.02), ncol=i)
     plt.show()
