@@ -19,42 +19,11 @@ parser.add_argument("--special", type=lambda x: bool(strtobool(x)), default=Fals
 parser.add_argument("--AI2THOR", type=lambda x: bool(strtobool(x)), default=False, help="True for RobotTHOR false for ITHOR")
 args = parser.parse_args()
 
-def navigation_fcn(server, comfirmed, initialized):
-	navigation = Navigation(scene_type=args.scene_type, scene_num=args.scene_num, save_directory=args.save_directory, AI2THOR=args.AI2THOR, server=server, comfirmed=comfirmed)
+
+if __name__ == '__main__':
+	navigation = Navigation(scene_type=args.scene_type, scene_num=args.scene_num, save_directory=args.save_directory, AI2THOR=args.AI2THOR)
 	navigation.Update_node_generator()
 	navigation.Update_topo_map_env()
 	navigation.Update_planner_env()
-	# Send information to initialize plot map
-	scene_info = navigation.Robot._AI2THOR_controller.get_scene_info()
-	server.send(scene_info)
-	# Navigation task
 	navigation.node_generator.Shuffle_scene()
-	navigation.Closed_loop_nav(current_node_index=2, current_orientation=90, goal_node_index=2, goal_orientation=0)
-
-	# navigation.nav_test_simplified()
-	# while True:
-	# 	if initialized.value:
-	# 		navigation.Closed_loop_nav(goal_node_index=3, goal_orientation=270)
-	# 		navigation.Closed_loop_nav(goal_node_index=2, goal_orientation=270)
-	# 		break
-
-def visualization_fcn(client, comfirmed, initialized):
-	scene_info = client.recv()
-	visualization_panel = Plotter(*scene_info, client=client, comfirmed=comfirmed)
-	initialized.value = 1
-	while True:
-		visualization_panel.show_map()
-
-if __name__ == '__main__':
-	comfirmed = multiprocessing.Value('i')  # Int value: 1 for confirm complete task and other process can go on while 0 otherwise
-	comfirmed.value = 0
-	initialized = multiprocessing.Value('i')  # Int value
-	initialized.value = 0
-	server, client = multiprocessing.Pipe()  # server send date and client receive data
-
-	navi_node = multiprocessing.Process(target=navigation_fcn, args=(server, comfirmed, initialized))
-	visual_node = multiprocessing.Process(target=visualization_fcn, args=(client, comfirmed, initialized))
-	navi_node.start()
-	visual_node.start()
-	navi_node.join()
-	visual_node.join()
+	navigation.nav_test_simplified()
