@@ -4,7 +4,7 @@ from termcolor import colored
 from PIL import Image
 from math import floor, ceil
 from matplotlib.patches import Circle, Rectangle
-from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH, VISBILITY_DISTANCE, FIELD_OF_VIEW, NODES, ADJACENT_NODES_SHIFT_GRID, DOOR_NODE
+from lib.params import SIM_WINDOW_HEIGHT, SIM_WINDOW_WIDTH, VISBILITY_DISTANCE, FIELD_OF_VIEW, NODES, ADJACENT_NODES_SHIFT_GRID, DOOR_NODE, FORWARD_GRID
 from lib.scene_graph_generation import Scene_Graph
 from lib.object_dynamics import shuffle_scene_layout
 import matplotlib.pyplot as plt
@@ -209,6 +209,7 @@ class Agent_Sim():
 
 	def add_edges(self, nodes, ax=None):
 		edges = []
+		epsilon = 0.01*self._grid_size # used to count for numerical error
 		# Iterature through nodes to generate edges
 		for i in range(len(nodes)-1):
 			node_i = nodes[i]
@@ -217,16 +218,16 @@ class Agent_Sim():
 				diff = np.abs(np.array(node_i) - np.array(node_j))
 				is_edge = False
 
-				if diff[0] < self._node_radius:
-					if diff[1] <= ADJACENT_NODES_SHIFT_GRID * self._grid_size:
+				if (diff[0] - FORWARD_GRID * self._grid_size) <= epsilon:
+					if (diff[1] - ADJACENT_NODES_SHIFT_GRID * self._grid_size) <= epsilon:
 						is_edge = self.is_reachable(node_i, node_j)
 						if is_edge:
 							cost = (diff[0] + diff[1]) / self._grid_size
 							edges.append((node_i, node_j, round(cost)))
 
 
-				if diff[1] < self._node_radius:
-					if diff[0] <= ADJACENT_NODES_SHIFT_GRID * self._grid_size:
+				if (diff[1] - FORWARD_GRID * self._grid_size) <= epsilon:
+					if (diff[0] - ADJACENT_NODES_SHIFT_GRID * self._grid_size) <= epsilon:
 						is_edge = self.is_reachable(node_i, node_j)
 						if is_edge:
 							cost = (diff[0] + diff[1]) / self._grid_size
