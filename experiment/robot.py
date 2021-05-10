@@ -48,13 +48,14 @@ logging.basicConfig(level=log_setting[args.log_level])
 
 
 class Robot():
-	def __init__(self, scene_type, scene_num, isResNetLocalization=True, save_directory=None, overwrite_data=False, AI2THOR=False, grid_size=0.25, rotation_step=90, sleep_time=0.005, use_test_scene=False, debug=False, server=None, comfirmed=None):
+	def __init__(self, scene_type, scene_num, netName='rnet', save_directory=None, overwrite_data=False, AI2THOR=False, grid_size=0.25, rotation_step=90, sleep_time=0.005, use_test_scene=False, debug=False, server=None, comfirmed=None):
 
 		self._grid_size = grid_size
 		self._sleep_time = sleep_time
 		self._AI2THOR_controller = AI2THOR_controller(AI2THOR, scene_type, scene_num, grid_size, rotation_step, sleep_time,
 													  save_directory, overwrite_data, use_test_scene, debug=debug)
-		self.isResNetLocalization = isResNetLocalization
+		self.netName = netName
+		self.isImageLocalization = (netName != 'rnet')
 		self._use_test_scene = use_test_scene
 		self._debug = debug
 
@@ -67,7 +68,7 @@ class Robot():
 		self.goal_rotation = None
 
 		self.Set_navigation_network()
-		self.Set_localization_network(self.isResNetLocalization)
+		self.Set_localization_network(self.isImageLocalization)
 
 	def Reset_scene(self, scene_type, scene_num):
 		self._AI2THOR_controller.Reset_scene(scene_type=scene_type, scene_num=scene_num)
@@ -77,14 +78,14 @@ class Robot():
 			self._action_network = network
 			return
 		else:
-			self._action_network = Action_network()
+			self._action_network = Navigation_network(self.netName, isImageNavigation=self.isImageLocalization)
 
-	def Set_localization_network(self, isResNetLocalization, network=None):
+	def Set_localization_network(self, isImageLocalization, network=None):
 		if not network is None:
 			self._localization_network = network
 			return
 		else:
-			self._localization_network = Retrieval_network(isResNetLocalization=isResNetLocalization)
+			self._localization_network = Retrieval_network(self.netName, isImageLocalization=isImageLocalization)
 
 	def HardCodeLocalization(self, goal_pose=None):
 		position_current = list(self.Get_robot_position().values())
@@ -103,23 +104,17 @@ class Robot():
 		else:
 			return True
 	# Used to pre-process the features [scene graph, image] for network prediction (localization and navigation)
-	def feature_preprocess(self, info_goal, info_current):
-		if self.isResNetLocalization:
-			feature_goal = Image.fromarray(info_goal[0])
-			feature_current = Image.fromarray(info_current[0])
+	def feature_preprocess(self, info):
+		if self.isImageLocalization:
+			feature = Image.fromarray(info[0])
 		else:
-			goal_SG = info_goal[1]
-			feature_goal = [Image.fromarray(info_goal[0]), get_adj_matrix(goal_SG['on']),
-							get_adj_matrix(goal_SG['in']), get_adj_matrix(goal_SG['proximity']),
-							np.asarray(goal_SG['fractional_bboxs'], dtype=np.float32),
-							np.asarray(goal_SG['vec'].todense(), dtype=np.float32)]
-			cur_SG = info_current[1]
-			feature_current = [Image.fromarray(info_current[0]), get_adj_matrix(cur_SG['on']),
-							   get_adj_matrix(cur_SG['in']), get_adj_matrix(cur_SG['proximity']),
-							   np.asarray(cur_SG['fractional_bboxs'], dtype=np.float32),
-							   np.asarray(cur_SG['vec'].todense(), dtype=np.float32)]
+			SG = info[1]
+			feature = [Image.fromarray(info[0]), get_adj_matrix(SG['on']),
+					   get_adj_matrix(SG['in']), get_adj_matrix(SG['proximity']),
+					   np.asarray(SG['fractional_bboxs'], dtype=np.float32),
+					   np.asarray(SG['vec'].todense(), dtype=np.float32)]
 
-		return feature_goal, feature_current
+		return copy.deepcopy(feature)
 
 	def Navigation_stop(self, feature_goal, feature_current, goal_pose=None, hardcode=False):
 
@@ -140,8 +135,7 @@ class Robot():
 			else:
 				return True
 
-		feature_goal, feature_current = self.feature_preprocess(feature_goal, feature_current)
-		localized = self._localization_network.is_localized(feature_current, feature_goal)
+		localized = self._localization_network.is_localized(self.feature_preprocess(feature_current),  self.feature_preprocess(feature_goal))
 
 		return localized
 
@@ -208,8 +202,7 @@ class Robot():
 			if distance < 0.5 * self._grid_size and rotation_difference < 10:
 				fail_type = 'localization'
 
-			image_current = self._AI2THOR_controller.Get_frame()
-			action_predict = self._action_network.predict(image_current=image_current, image_goal=image_goal)
+			action_predict = self._action_network.action_prediction(self.feature_preprocess(feature_current),  self.feature_preprocess(feature_goal))
 
 			if not rotation_degree is None and not rotation_move:
 				if rotation_degree > 0:

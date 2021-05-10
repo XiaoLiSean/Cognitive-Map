@@ -18,13 +18,9 @@ if we want lr_final_epoch <= 1e-4
 this constraint will regulate the corresponding value of other params
 '''
 # Traning parameters/setting
-BATCH_SIZE = 26 # common settings for networks {image=26, SG=14}
-NUM_EPOCHS = 70 # common settings for networks {image=50, SG=1000}
+BATCH_SIZE = dict(rnet=14, resnet50=26, vgg16=19, resnext50_32x4d=20, googlenet=400) # common settings for networks {image=26, SG=14}
+NUM_EPOCHS = 60 # common settings for networks {image=50, SG=1000}
 # --------------------------------------------
-'''
-Meanwhile, too large ALPHA_MARGIN will cause overfitting as it's functional
-as a hard constraint on the similarity diff as long as the loss being positive
-'''
 # Training hyper-parameter
 LEARNING_RATE = 0.01 # common settings for networks {image=0.01, SG=0.01}
 MOMENTUM = 0.9 # common settings for networks {image=0.9}

@@ -17,7 +17,9 @@ from Network.navigation_network.params import *
 from Network.navigation_network.datasets import NaviDataset
 from Network.navigation_network.networks import NavigationNet
 from Network.navigation_network.losses import Cross_Entropy_Loss
-from Network.navigation_network.trainer import Training, plot_training_statistics
+from Network.navigation_network.trainer import Training
+from Network.retrieval_network.trainer import plot_training_statistics
+from discrete_RNet_pipeline import show_testing_histogram, show_testing_histogram_comparison
 from os.path import dirname, abspath
 
 # ------------------------------------------------------------------------------
@@ -59,88 +61,27 @@ def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_imag
     bar.finish()
     print('----'*20)
     np.save(checkpoints_prefix + 'testing_statistics.npy', testing_statistics)
-# ------------------------------------------------------------------------------
-# ------------------------------------------------------------------------------
-def show_testing_histogram(test_file_name):
-    fig, ax1 = plt.subplots()
-    testing_statistics = np.load(test_file_name, allow_pickle=True).item()
-    tags = []
-    total = []
-    corrects = []
-    for key in testing_statistics:
-        tags.append(key)
-        total.append(testing_statistics[key]['total'])
-        corrects.append(testing_statistics[key]['corrects'])
-
-    plt.bar(np.arange(len(tags)), total)
-    plt.bar(np.arange(len(tags)), corrects)
-    ax1.set_xticks(np.arange(len(tags)))
-    ax1.set_xticklabels(tags, rotation=90)
-
-    ax2 = ax1.twinx()
-    ax2.plot(np.arange(len(tags)), np.true_divide(np.array(corrects), np.array(total)), 'r--')
-    ax2.set_yticks(np.arange(11)/10)
-    ax2.set_yticklabels(['{:,.1%}'.format(x) for x in np.arange(11)/10])
-    plt.title('Overall Success Rate {:.2%}'.format(np.true_divide(np.sum(np.array(corrects)), np.sum(np.array(total)))))
-
-    fig.tight_layout()
-    plt.show()
-# ------------------------------------------------------------------------------
-def show_testing_histogram_comparison(test_file_names, branch=['ResNet', 'Navi-Net'], axis_off_set=False):
-    fig, ax1 = plt.subplots(figsize=(6,5))
-    img_statistics = np.load(test_file_names[0], allow_pickle=True).item()
-    all_statistics = np.load(test_file_names[1], allow_pickle=True).item()
-    tags = []
-    total = []
-    img_corrects = []
-    all_corrects = []
-    for key in img_statistics:
-        tags.append(key)
-        total.append(img_statistics[key]['total'])
-        img_corrects.append(img_statistics[key]['corrects'])
-        all_corrects.append(all_statistics[key]['corrects'])
-
-    plt.bar(np.arange(len(tags)), total, label='Total Cases')
-    plt.bar(np.arange(len(tags)) - int(axis_off_set)*0.25, all_corrects, width=0.8 - 0.4*int(axis_off_set), label=branch[1] + ' Success')
-    plt.bar(np.arange(len(tags)) + int(axis_off_set)*0.25, img_corrects, width=0.8 - 0.4*int(axis_off_set), label=branch[0] + ' Success')
-    ax1.set_xticks(np.arange(len(tags)))
-    ax1.set_xticklabels(tags, rotation=90)
-    ax1.legend(labels=['Total Cases', branch[1] + ' Success', branch[0] + ' Success'], bbox_to_anchor=(0.40, 0.55))
-
-    ax2 = ax1.twinx()
-    ax2.plot(np.arange(len(tags)), np.true_divide(np.array(img_corrects), np.array(total)), 'b--')
-    ax2.plot(np.arange(len(tags)), np.true_divide(np.array(all_corrects), np.array(total)), 'r--')
-    img_label = branch[0] + ' Success Rate: {:.2%} overall'.format(np.true_divide(np.sum(np.array(img_corrects)), np.sum(np.array(total))))
-    all_label = branch[1] + ' Success Rate: {:.2%} overall'.format(np.true_divide(np.sum(np.array(all_corrects)), np.sum(np.array(total))))
-    ax2.legend(labels=[img_label, all_label], bbox_to_anchor=(0.70, 1.2))
-    ax2.set_yticks(np.arange(11)/10)
-    ax2.set_yticklabels(['{:,.1%}'.format(x) for x in np.arange(11)/10])
-    ax1.grid(True)
-
-    fig.tight_layout()
-    plt.show()
-
 
 # ------------------------------------------------------------------------------
 # -------------------------------Training Pipeline------------------------------
 # ------------------------------------------------------------------------------
-def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix, is_only_image_branch=False):
+def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix, is_only_image_branch=False, benchmark=None):
     dataset_sizes = {}
     # ---------------------------Loading training dataset---------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading training dataset...')
     train_dataset = Dataset(DATA_DIR, is_train=True, load_only_image_data=is_only_image_branch)
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE[benchmark], shuffle=True, num_workers=NUM_WORKERS)
     dataset_sizes.update({'train': len(train_dataset)})
 
     # --------------------------Loading validation dataset--------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading validation dataset...')
     val_dataset = Dataset(DATA_DIR, is_val=True, load_only_image_data=is_only_image_branch)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE[benchmark], shuffle=True, num_workers=NUM_WORKERS)
     dataset_sizes.update({'val': len(val_dataset)})
 
     # ------------------------------Initialize model--------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
-    model = Network(only_image_branch=is_only_image_branch)
+    model = Network(only_image_branch=is_only_image_branch, benchmarkName=benchmark)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Model training on: ", device)
     print("Cuda is_available: ", torch.cuda.is_available())
@@ -163,7 +104,7 @@ def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix, i
     # --------------------------------Training--------------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Training with dataset size --> ', dataset_sizes)
     data_loaders = {'train': train_loader, 'val': val_loader}
-    model_best_fit = Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=checkpoints_prefix)
+    model_best_fit = Training(data_loaders, dataset_sizes, model, loss_fcn, optimizer, lr_scheduler, num_epochs=NUM_EPOCHS, checkpoints_prefix=checkpoints_prefix, batch_size=BATCH_SIZE[benchmark])
 
     # ------------------------------------------------------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Done... Best Fit Model Saved')
@@ -179,8 +120,9 @@ if __name__ == '__main__':
     parser.add_argument("--train", help="train network", action="store_true")
     parser.add_argument("--test", help="test network", action="store_true")
     parser.add_argument("--heatmap", help="test network", action="store_true")
-    parser.add_argument("--image", help="network image branch", action="store_true")
-    parser.add_argument("--all", help="entire network", action="store_true")
+    parser.add_argument("--benchmark", help="network image branch", action="store_true")
+    parser.add_argument("--name", type=str, default='none',  help="benchmark network name: vgg16, resnet50, resnext50_32x4d, googlenet")
+    parser.add_argument("--rnet", help="entire network", action="store_true")
     args = parser.parse_args()
 
     torch.cuda.empty_cache()
@@ -191,16 +133,19 @@ if __name__ == '__main__':
         Dataset = NaviDataset
         Network = NavigationNet
         LossFcn = Cross_Entropy_Loss()
-        if args.image and not args.all:
-            checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
-        elif args.all and not args.image:
-            checkpoints_prefix = CHECKPOINTS_DIR
+        if args.benchmark and not args.rnet:
+            checkpoints_prefix = CHECKPOINTS_DIR + args.name + '/'
+        elif args.rnet and not args.benchmark:
+            checkpoints_prefix = CHECKPOINTS_DIR + 'rnet/'
+            args.name = 'rnet'
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
         TraningFcn = Training
-        model_best_fit = training_pipeline(Dataset, Network, LossFcn, TraningFcn, checkpoints_prefix, is_only_image_branch=args.image)
+        model_best_fit = training_pipeline(Dataset, Network, LossFcn, TraningFcn, checkpoints_prefix, is_only_image_branch=args.benchmark, benchmark=args.name)
         torch.save(model_best_fit.state_dict(), checkpoints_prefix + 'best_fit.pkl')
+        plot_training_statistics(parent_dir=CHECKPOINTS_DIR, filename='training_statistics.npy')
+
     # --------------------------------------------------------------------------
     # Test corresponding networks
     if args.test:

@@ -20,7 +20,7 @@ parser.add_argument("--AI2THOR", type=lambda x: bool(strtobool(x)), default=Fals
 args = parser.parse_args()
 
 def navigation_fcn(server, comfirmed, initialized):
-	navigation = Navigation(scene_type=args.scene_type, scene_num=args.scene_num, save_directory=args.save_directory, AI2THOR=args.AI2THOR, server=server, comfirmed=comfirmed)
+	navigation = Navigation(netName='rnet', scene_type=args.scene_type, scene_num=args.scene_num, save_directory=args.save_directory, AI2THOR=args.AI2THOR, server=server, comfirmed=comfirmed)
 	navigation.Update_node_generator()
 	navigation.Update_topo_map_env()
 	navigation.Update_planner_env()
@@ -29,7 +29,7 @@ def navigation_fcn(server, comfirmed, initialized):
 	server.send(scene_info)
 	# Navigation task
 	navigation.node_generator.Shuffle_scene()
-	navigation.Closed_loop_nav(current_node_index=2, current_orientation=90, goal_node_index=2, goal_orientation=0)
+	navigation.Closed_loop_nav(current_node_index=14, current_orientation=90, goal_node_index=2, goal_orientation=0)
 
 	# navigation.nav_test_simplified()
 	# while True:

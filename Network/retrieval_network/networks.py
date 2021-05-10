@@ -228,7 +228,8 @@ class TripletNetImage(torch.nn.Module):
             model.classifier[6] = torch.nn.Linear(4096, IMAGE_ENCODING_VEC_LENGTH, bias=True)
             self.model = model
         else:
-            print('benchmark network name: vgg16, resnet50, resnext50_32x4d, alexnet')
+            print('benchmark network name: vgg16, resnet50, resnext50_32x4d, googlenet')
+            exit(1)
         # ----------------------------------------------------------------------
     # --------------------------------------------------------------------------
     # --------------------------------------------------------------------------

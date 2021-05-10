@@ -16,11 +16,11 @@ import numpy as np
 # -----------------------------navigation_network-------------------------------
 # ------------------------------------------------------------------------------
 class NavigationNet(torch.nn.Module):
-    def __init__(self, only_image_branch=False):
+    def __init__(self, only_image_branch=False, benchmarkName=None):
         super(NavigationNet, self).__init__()
         self.only_image_branch = only_image_branch
         if self.only_image_branch:
-            self.naviBackbone = TripletNetImage(enableRoIBridge=False, pretrainedResNet=True)
+            self.naviBackbone = TripletNetImage(enableRoIBridge=False, pretrainedXXXNet=True, XXXNetName=benchmarkName)
             feature_embedding_len = IMAGE_ENCODING_VEC_LENGTH
             self.decisionHead = torch.nn.Sequential(
                                             torch.nn.Linear(2*feature_embedding_len, 1024, bias=True),
@@ -31,7 +31,7 @@ class NavigationNet(torch.nn.Module):
                                             torch.nn.ReLU(inplace=True)
                                                     )
         else:
-            self.naviBackbone = RetrievalTriplet(self_pretrained_image=False, pretrainedResNet=True)
+            self.naviBackbone = RetrievalTriplet(self_pretrained_image=False, pretrainedXXXNet=True)
             feature_embedding_len = SCENE_ENCODING_VEC_LENGTH
             self.decisionHead = torch.nn.Sequential(
                                             torch.nn.Linear(2*feature_embedding_len, 1024, bias=True),
