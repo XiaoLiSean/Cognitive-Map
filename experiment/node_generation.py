@@ -186,17 +186,17 @@ class Node_generator():
 
 				if (diff[0] - FORWARD_GRID * self._grid_size) <= epsilon:
 					if (diff[1] - ADJACENT_NODES_SHIFT_GRID * self._grid_size) <= epsilon:
-				        is_edge = self.is_reachable(node_i, node_j)
-				        if is_edge:
-				            self._neighbor_nodes.append([self._node_index_list[node_i_idx], self._node_index_list[node_j_idx]])
-				            self._connected_subnodes.append([1,3])
+						is_edge = self.is_reachable(node_i, node_j)
+						if is_edge:
+							self._neighbor_nodes.append([self._node_index_list[node_i_idx], self._node_index_list[node_j_idx]])
+							self._connected_subnodes.append([1,3])
 
 				if (diff[1] - FORWARD_GRID * self._grid_size) <= epsilon:
 					if (diff[0] - ADJACENT_NODES_SHIFT_GRID * self._grid_size) <= epsilon:
-				        is_edge = self.is_reachable(node_i, node_j)
-				        if is_edge:
-				            self._neighbor_nodes.append([self._node_index_list[node_i_idx], self._node_index_list[node_j_idx]])
-				            self._connected_subnodes.append([0,2])
+						is_edge = self.is_reachable(node_i, node_j)
+						if is_edge:
+							self._neighbor_nodes.append([self._node_index_list[node_i_idx], self._node_index_list[node_j_idx]])
+							self._connected_subnodes.append([0,2])
 
 	def Teleport_agent(self, position, rotation=0):
 		self.Update_event()

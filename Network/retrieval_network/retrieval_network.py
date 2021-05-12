@@ -25,7 +25,7 @@ class Retrieval_network():
 
     def get_network(self):
         if self.isImageLocalization:
-            model = TripletNetImage(enableRoIBridge=False, pretrainedXXXNet=True, XXXNetName=self.netName)
+            model = TripletNetImage(pretrainedXXXNet=True, XXXNetName=self.netName)
         else:
             model = RetrievalTriplet(self_pretrained_image=False, pretrainedXXXNet=True)
         model.to(self.device)
