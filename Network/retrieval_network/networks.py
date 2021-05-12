@@ -26,9 +26,9 @@ class RetrievalTriplet(torch.nn.Module):
         visuial features (RoI feature and entire image feature). By this, the backward gradient flow
         from the sg branch through the RoI align to image branch is cut-off.
         '''
-        self.image_branch = TripletNetImage(enableRoIBridge=True, pretrainedXXXNet=pretrainedXXXNet)
+        self.image_branch = TripletNetImage(pretrainedXXXNet=pretrainedXXXNet, XXXNetName='rnet')
         if self_pretrained_image:
-            self.load_self_pretrained_image(CHECKPOINTS_DIR + 'image_best_fit.pkl')
+            self.load_self_pretrained_image(CHECKPOINTS_DIR + 'image_best_fit.pkl') # remain to be fixed, donot use
 
         self.SG_branch = TripletNetSG(dropout_rate=GCN_dropout_rate, layer_structure=GCN_layers, bias=GCN_bias)
         self.fcn = torch.nn.Sequential(
@@ -38,6 +38,7 @@ class RetrievalTriplet(torch.nn.Module):
                                 torch.nn.ReLU(inplace=True)
                                       )
 
+    # remain to be fixed, donot use
     def load_self_pretrained_image(self, checkpoints):
         pretrained_model = torch.load(checkpoints)
         model_dict = self.image_branch.state_dict()
@@ -198,30 +199,33 @@ class RoIBridge(torch.nn.Module):
 # -------------------------------Image Branch-----------------------------------
 # ------------------------------------------------------------------------------
 class TripletNetImage(torch.nn.Module):
-    def __init__(self, enableRoIBridge=False, pretrainedXXXNet=False, XXXNetName='resnet50'):
+    def __init__(self, pretrainedXXXNet=False, XXXNetName='rnet'):
         super(TripletNetImage, self).__init__()
         self.NetName = XXXNetName
-        if self.NetName == 'resnet50':
+        if self.NetName == 'rnet':
             # Initialize weight using ImageNet pretrained weights
             model = models.resnet50(pretrained=pretrainedXXXNet)
             # The ResNet50-C4 Backbone
             self.backbone = torch.nn.Sequential(*(list(model.children())[:-3]))
             # ResNet Stage 5 except from the last linear classifier
             self.head = torch.nn.Sequential(*(list(model.children())[-3:-1]))
-            self.enableRoIBridge = enableRoIBridge
-            if self.enableRoIBridge:
-                self.RoIBridge = RoIBridge()
+            self.enableRoIBridge = True
+            self.RoIBridge = RoIBridge()
         # ----------------------------------------------------------------------
         # For benchmark testing
+        elif self.NetName == 'resnet50':
+            self.enableRoIBridge = False
+            model = models.resnet50(pretrained=pretrainedXXXNet)
+            self.model = torch.nn.Sequential(*(list(model.children())[:-1]))
+        elif self.NetName == 'resnext50_32x4d':
+            self.enableRoIBridge = False
+            model = models.resnext50_32x4d(pretrained=pretrainedXXXNet)
+            self.model = torch.nn.Sequential(*(list(model.children())[:-1]))
         elif self.NetName == 'vgg16':
             self.enableRoIBridge = False
             model = models.vgg16(pretrained=pretrainedXXXNet)
             model.classifier[6] = torch.nn.Linear(4096, IMAGE_ENCODING_VEC_LENGTH, bias=True)
             self.model = model
-        elif self.NetName == 'resnext50_32x4d':
-            self.enableRoIBridge = False
-            model = models.resnext50_32x4d(pretrained=pretrainedXXXNet)
-            self.model = torch.nn.Sequential(*(list(model.children())[:-1]))
         elif self.NetName == 'googlenet':
             self.enableRoIBridge = False
             model = models.alexnet(pretrained=pretrainedXXXNet)
@@ -262,8 +266,8 @@ class TripletNetImage(torch.nn.Module):
     def get_embedding(self, batch_imgs, batch_fractional_bboxs=None, batch_obj_vecs=None):
         # ----------------------------------------------------------------------
         # For benchmark testing
-        if self.NetName in ['vgg16', 'resnext50_32x4d', 'googlenet']:
-            if self.NetName == 'resnext50_32x4d':
+        if self.NetName in ['vgg16', 'resnext50_32x4d', 'resnet50', 'googlenet']:
+            if self.NetName in ['resnext50_32x4d', 'resnet50']:
                 batch_img_vector_embeddings = torch.squeeze(torch.squeeze(self.model(batch_imgs), dim=2), dim=2)
             else:
                 batch_img_vector_embeddings = self.model(batch_imgs)

@@ -20,7 +20,7 @@ class NavigationNet(torch.nn.Module):
         super(NavigationNet, self).__init__()
         self.only_image_branch = only_image_branch
         if self.only_image_branch:
-            self.naviBackbone = TripletNetImage(enableRoIBridge=False, pretrainedXXXNet=True, XXXNetName=benchmarkName)
+            self.naviBackbone = TripletNetImage(pretrainedXXXNet=True, XXXNetName=benchmarkName)
             feature_embedding_len = IMAGE_ENCODING_VEC_LENGTH
             self.decisionHead = torch.nn.Sequential(
                                             torch.nn.Linear(2*feature_embedding_len, 1024, bias=True),

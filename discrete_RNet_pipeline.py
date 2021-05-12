@@ -41,7 +41,7 @@ def training_pipeline(Dataset, Network, LossFcn, Training, checkpoints_prefix, i
     # ------------------------------Initialize model--------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
     if is_only_image_branch:
-        model = Network(enableRoIBridge=False, pretrainedXXXNet=True, XXXNetName=benchmark) # Train Image Branch
+        model = Network(pretrainedXXXNet=True, XXXNetName=benchmark) # Train Image Branch
     else:
         model = Network(self_pretrained_image=False, pretrainedXXXNet=True)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -88,7 +88,7 @@ def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_imag
     # ------------------------------Initialize model--------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
     if is_only_image_branch:
-        model = Network(enableRoIBridge=False, pretrainedXXXNet=True, XXXNetName=benchmark) # Train Image Branch
+        model = Network(pretrainedXXXNet=True, XXXNetName=benchmark) # Train Image Branch
     else:
         model = Network(self_pretrained_image=False, pretrainedXXXNet=True)
 
@@ -333,9 +333,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     torch.cuda.empty_cache()
-    show_testing_histogram_comparison(parent_dir=CHECKPOINTS_DIR,filename='testing_statistics.npy')
-    exit()
-    
+
     # --------------------------------------------------------------------------
     # Train corresponding networks
     if args.train:
