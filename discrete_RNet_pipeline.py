@@ -176,7 +176,6 @@ def show_testing_histogram_comparison(parent_dir=CHECKPOINTS_DIR,filename='testi
     i = 0
     num = len(os.listdir(parent_dir))
     labels = []
-    legends = []
     for xxxnet in os.listdir(parent_dir):
         if not os.path.exists(parent_dir+xxxnet+'/'+filename):
             continue
@@ -191,10 +190,10 @@ def show_testing_histogram_comparison(parent_dir=CHECKPOINTS_DIR,filename='testi
         ax1.bar(np.arange(len(tags))*(num+1)-(num-i), corrects, width=1)
         ax2.plot(np.arange(len(tags))*(num+1)-(num-i), np.true_divide(np.array(corrects), np.array(total)))
         i += 1
-        labels.append(xxxnet)
-        legends.append(xxxnet + ' Success Rate: {:.2%} overall'.format(np.true_divide(np.sum(np.array(corrects)), np.sum(np.array(total)))))
+        labels.append(xxxnet + ': {:.2%} Success'.format(np.true_divide(np.sum(np.array(corrects)), np.sum(np.array(total)))))
 
-    ax1.legend(labels=labels, bbox_to_anchor=(0.40, 0.55))
+    # ax1.legend(labels=labels, bbox_to_anchor=(0.40, 0.55))
+    ax1.legend(labels=labels, bbox_to_anchor=(0,1.02,1,0.2), loc="lower left", mode="expand", ncol=num)
     ax1.set_xticks(np.arange(len(tags))*(num+1)-num/2.0)
     ax1.set_xticklabels(tags, rotation=90)
 
@@ -334,7 +333,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     torch.cuda.empty_cache()
-
+    show_testing_histogram_comparison(parent_dir=CHECKPOINTS_DIR,filename='testing_statistics.npy')
+    exit()
+    
     # --------------------------------------------------------------------------
     # Train corresponding networks
     if args.train:

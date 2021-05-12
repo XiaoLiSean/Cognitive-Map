@@ -25,7 +25,7 @@ from os.path import dirname, abspath
 # ------------------------------------------------------------------------------
 # -------------------------------Testing Pipeline-------------------------------
 # ------------------------------------------------------------------------------
-def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=False):
+def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=False, benchmark=None):
     # ---------------------------Loading testing dataset---------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading testing dataset...')
     test_dataset = Dataset(DATA_DIR, is_test=True, load_only_image_data=is_only_image_branch)
@@ -33,7 +33,7 @@ def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_imag
 
     # ------------------------------Initialize model--------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
-    model = Network(only_image_branch=is_only_image_branch)
+    model = Network(only_image_branch=is_only_image_branch, benchmarkName=benchmark)
     model.load_state_dict(torch.load(checkpoints_prefix + 'best_fit.pkl'))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Model testing on: ", device)
@@ -126,7 +126,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     torch.cuda.empty_cache()
-
+    show_testing_histogram_comparison(parent_dir=CHECKPOINTS_DIR,filename='testing_statistics.npy')
+    exit()
     # --------------------------------------------------------------------------
     # Train corresponding networks
     if args.train:
@@ -152,21 +153,14 @@ if __name__ == '__main__':
         Dataset = NaviDataset
         Network = NavigationNet
         LossFcn = Cross_Entropy_Loss()
-        if args.image and not args.all:
-            train_file_names = [CHECKPOINTS_DIR+'image_training_history/training_statistics.npy']
-            test_file_names = CHECKPOINTS_DIR+'image_testing_statistics.npy'
-            checkpoints_prefix = CHECKPOINTS_DIR + 'image_'
-        elif args.all and not args.image:
-            train_file_names = [CHECKPOINTS_DIR+'image_training_history/training_statistics.npy', CHECKPOINTS_DIR+'training_history/training_statistics.npy']
-            test_file_names = [CHECKPOINTS_DIR+'image_testing_statistics.npy', CHECKPOINTS_DIR+'testing_statistics.npy']
-            checkpoints_prefix = CHECKPOINTS_DIR
+        if args.benchmark and not args.rnet:
+            checkpoints_prefix = CHECKPOINTS_DIR + args.name + '/'
+        elif args.rnet and not args.benchmark:
+            checkpoints_prefix = CHECKPOINTS_DIR + 'rnet/'
+            args.name = 'rnet'
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
-        plot_training_statistics(train_file_names)
-        #testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=args.image)
-
-        if args.image and not args.all:
-            show_testing_histogram(test_file_names)
-        elif args.all and not args.image:
-            show_testing_histogram_comparison(test_file_names)
+        testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_image_branch=args.benchmark, benchmark=args.name)
+        show_testing_histogram(checkpoints_prefix+'testing_statistics.npy')
+        show_testing_histogram_comparison(parent_dir=CHECKPOINTS_DIR,filename='testing_statistics.npy')
