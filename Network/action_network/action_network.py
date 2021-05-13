@@ -23,10 +23,10 @@ from skimage.transform import resize
 
 # print(os.getcwd())
 current_path = os.getcwd()
-print(current_path)
-print(type(current_path.find('Cognitive-Map') + len('Cognitive-Map/')))
+# print(current_path)
+# print(type(current_path.find('Cognitive-Map') + len('Cognitive-Map/')))
 initial_path = current_path[0:current_path.find('Cognitive-Map') + len('Cognitive-Map/')]
-print(initial_path)
+# print(initial_path)
 if not initial_path[-1] == '/':
 	initial_path = initial_path + '/'
 action_network_path = initial_path + 'Network/action_network/'
@@ -156,7 +156,7 @@ class Action_dataset(torch.utils.data.Dataset):
 class Action_network():
 	def __init__(self, num_classes=6, weight_file_path=action_network_path + 'weight/ithor.pkl'):
 		self._model = resnet18(pretrained=False, num_classes=num_classes)
-		print('torch.cuda.is_available(): ', torch.cuda.is_available())
+		# print('torch.cuda.is_available(): ', torch.cuda.is_available())
 		if torch.cuda.is_available():
 			self._model.cuda()
 		self._model.load_state_dict(torch.load(weight_file_path))
@@ -221,7 +221,7 @@ if __name__ == '__main__':
 	train_loader = DataLoader(dataset=train_data, batch_size=params['batch_size'], shuffle=True)
 	# test_loader = DataLoader(dataset=test_data, batch_size=int(params['batch_size'] / 2), shuffle=False)
 	# dataiter = iter(train_loader)
-	print(len(train_data))
+	# print(len(train_data))
 	# print(len(test_data))
 	# exit()
 
