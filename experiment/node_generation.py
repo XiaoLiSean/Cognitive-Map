@@ -211,7 +211,7 @@ class Node_generator():
 		map_boundary_x = []
 		map_boundary_y = []
 
-		print('self._smaller_grid_map_boundary: ', len(self._smaller_grid_map_boundary))
+		# print('self._smaller_grid_map_boundary: ', len(self._smaller_grid_map_boundary))
 
 		for point in self._smaller_grid_map_boundary:
 			map_boundary_x.append(point[0])
@@ -231,7 +231,7 @@ class Node_generator():
 			# cir1 = Circle(xy = (self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1]), radius=self._node_radius, alpha=0.3)
 			plt.scatter(self._reachable_position[self._node_index_list[i]][0], self._reachable_position[self._node_index_list[i]][1], color='#00FFFF')
 			# ax.add_patch(cir1)
-		print('len(self._node_index_list): ', len(self._node_index_list))
+		# print('len(self._node_index_list): ', len(self._node_index_list))
 
 
 
@@ -418,5 +418,5 @@ class Node_generator():
 				goal_center_point_index = self._reachable_position.index(self._cluster_center_point[goal_center_index])
 				self._node_index_list = self._connect_by_node(self._node_index_list, current_center_point_index, goal_center_point_index)
 		self._node_index_list = list(set(self._node_index_list))
-		print('self._node_index_list: ', self._node_index_list)
+		# print('self._node_index_list: ', self._node_index_list)
 		return

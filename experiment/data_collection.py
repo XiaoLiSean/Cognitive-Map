@@ -40,7 +40,7 @@ parser.add_argument("--AI2THOR", type=lambda x: bool(strtobool(x)), default=Fals
 
 
 args = parser.parse_args()
-print(args)
+# print(args)
 
 if args.scene_num == 0:
 	args.scene_num = random.randint(1, 30)

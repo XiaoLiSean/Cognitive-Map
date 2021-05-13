@@ -115,8 +115,8 @@ class Navigation():
 		case_num = 0
 		fail_case_num = 0
 
-		print('tested_neighbor_case:', tested_neighbor_case)
-		print('failed_neighbor_case: ', failed_neighbor_case)
+		# print('tested_neighbor_case:', tested_neighbor_case)
+		# print('failed_neighbor_case: ', failed_neighbor_case)
 		# impassable_edges.append('node_0_degree_90node_1_degree_90')
 
 		for start in range(len(self._node_list)):
@@ -133,16 +133,16 @@ class Navigation():
 							fail_case_num += 1
 						case_num += 1
 
-		print('fail_case_num: ', fail_case_num)
-		print('case_num: ', case_num)
-		print('self._fail_types: ', self._fail_types)
+		# print('fail_case_num: ', fail_case_num)
+		# print('case_num: ', case_num)
+		# print('self._fail_types: ', self._fail_types)
 
 		loca_neighbor_error = list(filter(lambda x: x == 'localization', self._impassable_reason))
 		loca_neighbor_error_num = len(loca_neighbor_error)
 		navi_neighbor_error_num = len(self._impassable_reason) - loca_neighbor_error_num
 
-		print('loca_neighbor_error_num: ', loca_neighbor_error_num)
-		print('navi_neighbor_error_num: ', navi_neighbor_error_num)
+		# print('loca_neighbor_error_num: ', loca_neighbor_error_num)
+		# print('navi_neighbor_error_num: ', navi_neighbor_error_num)
 
 		nav_test = open('service_task_test.csv', 'a')
 		nav_test_writer = csv.writer(nav_test)
@@ -174,7 +174,7 @@ class Navigation():
 	def Update_node_generator(self):
 		self.node_generator.Init_node_generator()
 		self._node_list = NODES[self.Robot._AI2THOR_controller.Get_scene_name()]
-		print('self._node_list: ', self._node_list)
+		# print('self._node_list: ', self._node_list)
 		self.node_generator.Get_node_from_position(self._node_list)
 		self.node_generator.Get_connected_orientaton_by_geometry()
 		# index of subnodes in reachable points
@@ -182,7 +182,7 @@ class Navigation():
 		# corresponding to _node_pair_list
 		self._subnodes = self.node_generator.Get_connected_subnodes()
 
-		print('self._node_pair_list: ', len(self._node_pair_list))
+		# print('self._node_pair_list: ', len(self._node_pair_list))
 
 	def Update_topo_map_env(self):
 		self.topo_map.Set_env_from_Robot(Robot=self.Robot)
@@ -195,7 +195,7 @@ class Navigation():
 
 	def Switch_scene(self, scene_type, scene_num, shuffle=True):
 
-		print('DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()]: ', DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()])
+		# print('DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()]: ', DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()])
 		door_node_index, door_node_orien = DOOR_NODE[self.Robot._AI2THOR_controller.Get_scene_name()]
 		door_node_orien = int(door_node_orien)
 		door_node_name = self.topo_map.Get_node_name(node_num=door_node_index, orientation=door_node_orien)
@@ -284,7 +284,7 @@ class Navigation():
 			current_orientation = self.Robot._AI2THOR_controller.Get_agent_current_orientation()
 		path = self.planner.Find_dij_path(current_node_index=current_node_index, current_orientation=current_orientation,
 										  goal_node_index=goal_node_index, goal_orientation=goal_orientation)
-		print('path: ', path)
+		# print('path: ', path)
 
 		nav_result = self.Navigate_by_path(path=path)
 
@@ -294,7 +294,7 @@ class Navigation():
 
 		return nav_result
 
-		print('nav_result: ', nav_result)
+		# print('nav_result: ', nav_result)
 		# exit()
 		while isinstance(nav_result, str):
 
@@ -302,17 +302,17 @@ class Navigation():
 			while not match:
 				success, _ = self.Robot._AI2THOR_controller.Random_move_w_weight(all_actions=False, weight=[0.25, 0.25, 0.25, 0.25])
 				match, node_matched_name = self.Node_localize_BF(starting_node_name=nav_result)
-				print('node_matched_name: ', node_matched_name)
+				# print('node_matched_name: ', node_matched_name)
 
 			searching_node_index, searching_node_orientation = self.topo_map.Get_node_index_orien(node_matched_name)
 
 			if node_matched_name in path:
 				path = path[path.index(node_matched_name):]
-				print('path: ', path)
+				# print('path: ', path)
 			else:
 				path = self.planner.Find_dij_path(current_node_index=searching_node_index, current_orientation=searching_node_orientation,
 							  goal_node_index=goal_node_index, goal_orientation=goal_orientation)
-				print('repath: ', path)
+				# print('repath: ', path)
 
 			nav_result = self.Navigate_by_path(path=path)
 
@@ -455,7 +455,7 @@ class Navigation():
 				failed_case = 0
 
 				self._action_success_num += 1
-				print('reach node ', node_path)
+				# print('reach node ', node_path)
 			else:
 				failed_case += 1
 				# self._fail_types[nav_by_actionnet_result[1]] += 1
@@ -482,7 +482,7 @@ class Navigation():
 				# 		self._impassable_reason.append(nav_by_actionnet_result[1])
 
 				self._fail_type[goal_action_type] += 1
-				print('failed case: ', failed_case)
+				# print('failed case: ', failed_case)
 				if failed_case >= self._fail_case_tolerance or node_path == path[-1]:
 					return (node_path, self._fail_types)
 		return (True, self._fail_types)

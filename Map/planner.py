@@ -123,13 +123,6 @@ class Planner():
 		goal_node_name = self.Get_node_name(node_num=goal_node_index, orientation=goal_orientation)
 		goal_dij_index = self.Get_subnode_dij_index(node_name=goal_node_name)
 
-		# if current_dij_index > 102 or goal_dij_index > 102:
-		# 	print('current_dij_index: ', current_dij_index)
-		# 	print('goal_dij_index: ', goal_dij_index)
-		# 	print('current_node_name: ', current_node_name)
-
-		# 	print('goal_node_name: ', goal_node_name)
-
 		result = dij.find_path(self._dij_graph, current_dij_index, goal_dij_index)
 		path = result.nodes
 

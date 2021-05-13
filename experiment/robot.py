@@ -36,7 +36,6 @@ parser.add_argument("--AI2THOR", type=lambda x: bool(strtobool(x)), default=Fals
 
 
 args = parser.parse_args()
-print(args)
 
 if args.scene_num == 0:
 	args.scene_num = random.randint(1, 30)
@@ -374,7 +373,7 @@ class AI2THOR_controller():
 				scene_name = 'FloorPlan_Train' + str(self._scene_type) + '_' + str(self._scene_num)
 			else:
 				scene_name = 'FloorPlan_Val' + str(self._scene_type) + '_' + str(self._scene_num)
-			print('scene_name: ', self._scene_name)
+			# print('scene_name: ', self._scene_name)
 		else:
 			scene_name = 'FloorPlan' + str(scene_setting[self._scene_type] + self._scene_num)
 		return scene_name
