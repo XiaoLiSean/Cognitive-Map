@@ -75,7 +75,7 @@ class Navigation():
 		tested_neighbor_case = 0
 		failed_neighbor_case = 0
 		for start_node_i in range(len(self._node_list)):
-		# for start_node_i in range(0):
+		# for start_node_i in range(1):
 
 			for goal_node_index in neighbor_nodes[start_node_i]:
 
@@ -85,7 +85,7 @@ class Navigation():
 										  goal_node_index=goal_node_index, goal_orientation=orientation_test)
 					if len(path) > 2:
 						continue
-					nav_result = self.Closed_loop_nav(current_node_index=start_node_i, current_orientation=orientation_test,
+					nav_result, _ = self.Closed_loop_nav(current_node_index=start_node_i, current_orientation=orientation_test,
 											goal_node_index=goal_node_index, goal_orientation=orientation_test)
 					tested_neighbor_case += 1
 					if not nav_result is True:
@@ -106,7 +106,7 @@ class Navigation():
 					if len(path) > 2:
 						continue
 
-					nav_result = self.Closed_loop_nav(current_node_index=start_node_i, current_orientation=orientation_test,
+					nav_result, _ = self.Closed_loop_nav(current_node_index=start_node_i, current_orientation=orientation_test,
 											goal_node_index=start_node_i, goal_orientation=self.planner._wrap_to_360(degree=orientation_test+orientation_difference))
 					tested_neighbor_case += 1
 					if not nav_result is True:
@@ -114,45 +114,41 @@ class Navigation():
 
 		case_num = 0
 		fail_case_num = 0
-		# print('num self._node_list: ', len(self._node_list))
-		# print('self._impassable_edges: ', self._impassable_edges)
-		# print('self._impassable_reason: ', self._impassable_reason)
+
 		print('tested_neighbor_case:', tested_neighbor_case)
 		print('failed_neighbor_case: ', failed_neighbor_case)
 		# impassable_edges.append('node_0_degree_90node_1_degree_90')
 
-
 		for start in range(len(self._node_list)):
-		# for start in range(2):
+
 			for goal in range(len(self._node_list)):
 
 				for start_orien in [0, 90, 180, 270]:
+
 					for goal_orien in [0, 90, 180, 270]:
-				# start_orien = random.choice([0, 90, 180, 270])
-				# goal_orien = random.choice([0, 90, 180, 270])
-				# path = self.planner.Find_dij_path(current_node_index=start, current_orientation=start_orien,
-				# 						  goal_node_index=goal, goal_orientation=goal_orien)
-				# if goal > 20:
-				# 	print('goal: ', goal)
+
 						path = self.Find_dij_path_wt_impassable(current_node_index=start, current_orientation=start_orien,
 												  goal_node_index_=goal, goal_orientation=goal_orien)
-
-
 						if path is False:
 							fail_case_num += 1
-
-						# if len(path) > 1:
-						# 	for path_i in range(len(path) - 1):
-						# 		edge_temp = path[path_i] + path[path_i + 1]
-						# 		edge_temp = self._build_impassable_edge_name(start_node_name=path[path_i], goal_node_name=path[path_i + 1])
-						# 		# print('edge_temp: ', edge_temp)
-						# 		if edge_temp in self._impassable_edges:
-						# 			fail_case_num += 1
-
 						case_num += 1
+
 		print('fail_case_num: ', fail_case_num)
 		print('case_num: ', case_num)
 		print('self._fail_types: ', self._fail_types)
+
+		loca_neighbor_error = list(filter(lambda x: x == 'localization', self._impassable_reason))
+		loca_neighbor_error_num = len(loca_neighbor_error)
+		navi_neighbor_error_num = len(self._impassable_reason) - loca_neighbor_error_num
+
+		print('loca_neighbor_error_num: ', loca_neighbor_error_num)
+		print('navi_neighbor_error_num: ', navi_neighbor_error_num)
+
+		nav_test = open('service_task_test.csv', 'a')
+		nav_test_writer = csv.writer(nav_test)
+		nav_test_writer.writerow([case_num, fail_case_num, tested_neighbor_case, failed_neighbor_case, navi_neighbor_error_num, loca_neighbor_error_num,
+		self._fail_types['navigation'], self._fail_types['localization']])
+
 		return fail_case_num / case_num
 
 	def _build_impassable_edge_name(self, start_node_index=None, start_node_orientation=None,
