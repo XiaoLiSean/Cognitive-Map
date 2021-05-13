@@ -12,7 +12,7 @@ sys.path.append('./Network') # import navi and retrieval_network
 sys.path.append('./experiment') # import simulation robot
 from Map import * # import topological map
 from lib.params import *
-
+from progress.bar import Bar
 
 class Navigation():
 	def __init__(self, scene_type, scene_num, save_directory, AI2THOR, isResNetLocalization=False, server=None, comfirmed=None, netName='rnet'):
@@ -62,18 +62,29 @@ class Navigation():
 			node_coordinate = {'x': node_coor[0], 'y': self.topo_map._reachable[0]['y'], 'z': node_coor[1]}
 			node_coor_indexes.append(self.topo_map._reachable.index(node_coordinate))
 
+		neighbor_nodes_pair_num = 0 # total number of pair of adjacent nodes
 		for i, node_coor_index in enumerate(node_coor_indexes):
-
 			for node_pair in self.topo_map._neighbor_nodes_pair:
 				if node_coor_index in node_pair:
 					if node_coor_index == node_pair[0] and not node_coor_indexes.index(node_pair[1]) in neighbor_nodes[i]:
 						neighbor_nodes[i].append(node_coor_indexes.index(node_pair[1]))
+						neighbor_nodes_pair_num += 1
 					if node_coor_index == node_pair[1] and not node_coor_indexes.index(node_pair[0]) in neighbor_nodes[i]:
 						neighbor_nodes[i].append(node_coor_indexes.index(node_pair[0]))
+						neighbor_nodes_pair_num += 1
 
 		self._impassable_edges = []
 		tested_neighbor_case = 0
 		failed_neighbor_case = 0
+		# ----------------------------------------------------------------------
+		# Test adjacent nodes
+		# ----------------------------------------------------------------------
+		print('-----'*20)
+		print('Scene {} testing on {}'.format(self.Robot._AI2THOR_controller._scene_name, self.Robot.netName))
+		print('-----'*10)
+		print('Testing adjacent nodes pair...')
+		bar = Bar('Processing', max=len(self._node_list)*8 + neighbor_nodes_pair_num*4)
+
 		for start_node_i in range(len(self._node_list)):
 		# for start_node_i in range(1):
 
@@ -95,6 +106,7 @@ class Navigation():
 						# 				  goal_node_index=goal_node_index, goal_node_orientation=orientation_test)
 						# 				  )
 						failed_neighbor_case += 1
+					bar.next()
 
 			for orientation_test in [0, 90, 180, 270]:
 
@@ -111,6 +123,14 @@ class Navigation():
 					tested_neighbor_case += 1
 					if not nav_result is True:
 						failed_neighbor_case += 1
+					bar.next()
+		bar.finish()
+
+		# ----------------------------------------------------------------------
+		# Test all node pairs
+		# ----------------------------------------------------------------------
+		print('Testing all nodes pairs...')
+		bar = Bar('Processing', max=(len(self._node_list)**2)*4)
 
 		case_num = 0
 		fail_case_num = 0
@@ -132,6 +152,8 @@ class Navigation():
 						if path is False:
 							fail_case_num += 1
 						case_num += 1
+						bar.next()
+		bar.finish()
 
 		# print('fail_case_num: ', fail_case_num)
 		# print('case_num: ', case_num)
@@ -148,7 +170,13 @@ class Navigation():
 		nav_test_writer = csv.writer(nav_test)
 		nav_test_writer.writerow([case_num, fail_case_num, tested_neighbor_case, failed_neighbor_case, navi_neighbor_error_num, loca_neighbor_error_num,
 		self._fail_types['navigation'], self._fail_types['localization']])
-
+		print('Adjacent success rate: {}/{}({:.0%}) \t fail rate: ({:.0%} navi, {:.0%} loca)'.format(tested_neighbor_case-failed_neighbor_case,
+		tested_neighbor_case, (tested_neighbor_case-failed_neighbor_case)/tested_neighbor_case, navi_neighbor_error_num/tested_neighbor_case,
+		loca_neighbor_error_num/tested_neighbor_case))
+		print('Total success rate: {}/{}({:.0%}) \t fail rate:  ({:.0%} navi, {:.0%} loca)'.format(case_num-fail_case_num, case_num, (case_num-fail_case_num)/case_num,
+		self._fail_types['navigation']/case_num, self._fail_types['localization']/case_num))
+		print('-----'*20)
+		
 		return fail_case_num / case_num
 
 	def _build_impassable_edge_name(self, start_node_index=None, start_node_orientation=None,

@@ -1,13 +1,12 @@
 #!/bin/bash
 
-scene_type_list=(1 2 3 4)
-scene_num_list=(26 27 28 29 30)
+scene_type_list=(3)
+scene_num_list=(28 29 30)
 
 file_name="service_test_pipeline.py"
 if [ -e $file_name ];then
 	for scene_type in ${scene_type_list[@]}; do
 		for scene_num in ${scene_num_list[@]}; do
-			echo scene_type $scene_type scene_num ${scene_num}
 			for n in $(seq 1 $num_trial);do
 				if [ $scene_type -eq ${scene_type_list[0]} -a $scene_num -eq ${scene_num_list[0]} ];then
 						python $file_name --scene_type $scene_type --scene_num $scene_num --test_data False
