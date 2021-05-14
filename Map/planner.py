@@ -126,7 +126,7 @@ class Planner():
 			result = dij.find_path(self._dij_graph, current_dij_index, goal_dij_index)
 			path = result.nodes
 		except:
-			print('Planning error')
+			print('Planning error for Navigation from ({},{}) to ({},{})'.format(current_node_index, current_orientation, goal_node_index, goal_orientation))
 			path = []
 
 		path_nodes_name = []
