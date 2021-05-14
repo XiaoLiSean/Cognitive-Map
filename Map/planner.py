@@ -13,7 +13,6 @@ import logging
 import os
 import sys
 
-
 class Planner():
 	def __init__(self):
 		self._subnode_plan = False
@@ -123,8 +122,12 @@ class Planner():
 		goal_node_name = self.Get_node_name(node_num=goal_node_index, orientation=goal_orientation)
 		goal_dij_index = self.Get_subnode_dij_index(node_name=goal_node_name)
 
-		result = dij.find_path(self._dij_graph, current_dij_index, goal_dij_index)
-		path = result.nodes
+		try:
+			result = dij.find_path(self._dij_graph, current_dij_index, goal_dij_index)
+			path = result.nodes
+		except:
+			print('Planning error')
+			path = []
 
 		path_nodes_name = []
 		for node_dij_index in path:

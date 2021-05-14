@@ -151,7 +151,8 @@ class Navigation():
 												  goal_node_index_=goal, goal_orientation=goal_orien)
 						if path is False:
 							fail_case_num += 1
-						case_num += 1
+						if not len(path) == 0:
+							case_num += 1
 						bar.next()
 		bar.finish()
 
@@ -168,7 +169,7 @@ class Navigation():
 
 		nav_test = open('service_task_test.csv', 'a')
 		nav_test_writer = csv.writer(nav_test)
-		nav_test_writer.writerow([case_num, fail_case_num, tested_neighbor_case, failed_neighbor_case, navi_neighbor_error_num, loca_neighbor_error_num,
+		nav_test_writer.writerow([str(scene_type) + str(scene_num), case_num, fail_case_num, tested_neighbor_case, failed_neighbor_case, navi_neighbor_error_num, loca_neighbor_error_num,
 		self._fail_types['navigation'], self._fail_types['localization']])
 		print('Adjacent success rate: {}/{}({:.0%}) \t fail rate: ({:.0%} navi, {:.0%} loca)'.format(tested_neighbor_case-failed_neighbor_case,
 		tested_neighbor_case, (tested_neighbor_case-failed_neighbor_case)/tested_neighbor_case, navi_neighbor_error_num/tested_neighbor_case,
@@ -379,6 +380,9 @@ class Navigation():
 			# 	print('goal_node_index: ', goal_node_index)
 
 			# print(path_temp)
+
+			if len(path_temp) == 0:
+				return path_temp
 
 			if len(path_temp) > 1:
 				for path_i in range(len(path_temp) - 1):
