@@ -95,6 +95,7 @@ class Navigation():
 					path = self.planner.Find_dij_path(current_node_index=start_node_i, current_orientation=orientation_test,
 										  goal_node_index=goal_node_index, goal_orientation=orientation_test)
 					if len(path) > 2:
+						bar.next()
 						continue
 					nav_result, _ = self.Closed_loop_nav(current_node_index=start_node_i, current_orientation=orientation_test,
 											goal_node_index=goal_node_index, goal_orientation=orientation_test)
@@ -116,6 +117,7 @@ class Navigation():
 											  goal_node_index=start_node_i, goal_orientation=self.planner._wrap_to_360(degree=orientation_test+orientation_difference))
 
 					if len(path) > 2:
+						bar.next()
 						continue
 
 					nav_result, _ = self.Closed_loop_nav(current_node_index=start_node_i, current_orientation=orientation_test,
