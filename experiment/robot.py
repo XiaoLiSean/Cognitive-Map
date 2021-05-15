@@ -59,7 +59,7 @@ class Robot():
 		self._debug = debug
 
 		self._total_action_num = 6
-		self._Navigation_max_try = 18
+		self._Navigation_max_try = 2*(ADJACENT_NODES_SHIFT_GRID+FORWARD_GRID)
 
 		self.multithread_node = dict(server=server, comfirmed=comfirmed)
 		self.image_goal = None
