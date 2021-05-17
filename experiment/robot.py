@@ -65,6 +65,7 @@ class Robot():
 		self.image_goal = None
 		self.goal_position = None
 		self.goal_rotation = None
+		self._navinet_collision_by_obstacle = False # boolean variable used to detect collision
 
 		self.Set_navigation_network()
 		self.Set_localization_network(self.isImageLocalization)
@@ -157,6 +158,9 @@ class Robot():
 
 	def Navigate_by_ActionNet(self, image_goal, goal_pose, goal_scene_graph, max_steps, rotation_degree=None):
 
+		is_collision_by_obstacle = False # used to determine if a navigation sequence has collision
+		self._navinet_collision_by_obstacle = False
+
 		goal_position = self._AI2THOR_controller.Get_list_form(pos_or_rot=goal_pose['position'])
 		goal_rotation = self._AI2THOR_controller.Get_list_form(pos_or_rot=goal_pose['rotation'])
 
@@ -220,6 +224,11 @@ class Robot():
 
 			if action_predict in move_action:
 				success, moving_index = self._AI2THOR_controller.Move_navigation_specialized(self._AI2THOR_controller._agent_current_pos_index, direction=move_direction[action_predict.item()], move=True)
+
+				is_collision_by_obstacle = self._AI2THOR_controller._event.metadata['lastActionSuccess']
+				if is_collision_by_obstacle:
+					self._navinet_collision_by_obstacle = True
+
 				if success:
 					self._AI2THOR_controller._agent_current_pos_index = moving_index
 					pre_action = action_predict.item()
@@ -540,6 +549,7 @@ class AI2THOR_controller():
 
 		position_list = self.Get_list_form(pos_or_rot=position)
 		self._event = self._controller.step(action='Teleport', x=position_list[0], y=position_list[1], z=position_list[2])
+
 		if position_localize:
 			self.Self_localize()
 

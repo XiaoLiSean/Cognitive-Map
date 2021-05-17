@@ -32,6 +32,7 @@ class Navigation():
 		self._node_list = None
 		self._impassable_edges = []
 		self._impassable_reason = []
+		self._is_collision_by_obstacle = False # boolean variable used to detect collision
 
 	def nav_test(self):
 		for scene_type in range(1, 4):
@@ -76,6 +77,7 @@ class Navigation():
 		self._impassable_edges = []
 		tested_neighbor_case = 0
 		failed_neighbor_case = 0
+		collision_neighbor_case = 0
 		# ----------------------------------------------------------------------
 		# Test adjacent nodes
 		# ----------------------------------------------------------------------
@@ -100,6 +102,7 @@ class Navigation():
 					nav_result, _ = self.Closed_loop_nav(current_node_index=start_node_i, current_orientation=orientation_test,
 											goal_node_index=goal_node_index, goal_orientation=orientation_test)
 					tested_neighbor_case += 1
+
 					if not nav_result is True:
 						# self._impassable_edges.append('node_' + str(start_node_i) + '_degree_' + str(orientation_test) + 'node_' + str(goal_node_index) + '_degree_' + str(orientation_test))
 						# self._impassable_edges.append(
@@ -107,6 +110,12 @@ class Navigation():
 						# 				  goal_node_index=goal_node_index, goal_node_orientation=orientation_test)
 						# 				  )
 						failed_neighbor_case += 1
+						# Added to count collision cases in navigation between adjancent nodes
+						if self._is_collision_by_obstacle:
+							collision_neighbor_case += 1
+							self._is_collision_by_obstacle = False
+							self.Robot._navinet_collision_by_obstacle = False
+
 					bar.next()
 
 			for orientation_test in [0, 90, 180, 270]:
@@ -176,9 +185,9 @@ class Navigation():
 		nav_test_writer = csv.writer(nav_test)
 		nav_test_writer.writerow([self.Robot._AI2THOR_controller._scene_name, case_num, fail_case_num, tested_neighbor_case, failed_neighbor_case, navi_neighbor_error_num, loca_neighbor_error_num,
 		self._fail_types['navigation'], self._fail_types['localization']])
-		print('Adjacent success rate: {}/{}({:.0%}) \t fail rate: ({:.0%} navi, {:.0%} loca)'.format(tested_neighbor_case-failed_neighbor_case,
-		tested_neighbor_case, (tested_neighbor_case-failed_neighbor_case)/tested_neighbor_case, navi_neighbor_error_num/tested_neighbor_case,
-		loca_neighbor_error_num/tested_neighbor_case))
+		print('Adjacent success rate: {}/{}({:.0%}) \t fail rate: ({:.0%} navi, {:.0%} loca, {:.0%} collision)'.format(tested_neighbor_case-failed_neighbor_case,
+		tested_neighbor_case, (tested_neighbor_case-failed_neighbor_case)/tested_neighbor_case, (navi_neighbor_error_num-collision_neighbor_case)/tested_neighbor_case,
+		loca_neighbor_error_num/tested_neighbor_case, collision_neighbor_case/tested_neighbor_case))
 		print('Total success rate: {}/{}({:.0%}) \t fail rate:  ({:.0%} navi, {:.0%} loca)'.format(case_num-fail_case_num, case_num, (case_num-fail_case_num)/case_num,
 		self._fail_types['navigation']/case_num, self._fail_types['localization']/case_num))
 		print('-----'*20)
@@ -487,6 +496,7 @@ class Navigation():
 				nav_by_actionnet_result = True
 			else:
 				nav_by_actionnet_result = self.Robot.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, goal_scene_graph=goal_scene_graph, max_steps=self.Robot._Navigation_max_try, rotation_degree=rotation_degree)
+				self._is_collision_by_obstacle = self.Robot._navinet_collision_by_obstacle
 
 			if nav_by_actionnet_result is True:
 				failed_case = 0
