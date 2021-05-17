@@ -24,7 +24,7 @@ class Navigation():
 		self._fail_case_tolerance = 1
 		self._valid_action_type = VALID_ACTION_TYPE
 		self._fail_type = {'translation': 0, 'rotation': 0}
-		self._fail_types = {'navigation': 0, 'localization': 0}
+		self._fail_types = {'navigation': 0, 'localization': 0, 'collision': 0}
 		self._action_case_num = 0
 		self._action_success_num = 0
 		self._nav_test_case_num = 0
@@ -517,7 +517,10 @@ class Navigation():
 										  goal_node_index=goal_node_index, goal_node_orientation=orientation_goal)
 					if not impassable_edge in self._impassable_edges:
 						self._impassable_edges.append(impassable_edge)
-						self._impassable_reason.append(nav_by_actionnet_result[1])
+						if self._is_collision_by_obstacle:
+							self._impassable_reason.append('collision')
+						else:
+							self._impassable_reason.append(nav_by_actionnet_result[1])
 
 				# if node_path_num == 0 and len(path) > 1:
 				# 	start_node_index, orientation_start = self.topo_map.Get_node_index_orien(node_name=path[node_path_num])
