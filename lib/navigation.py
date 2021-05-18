@@ -88,7 +88,7 @@ class Navigation():
 		bar = Bar('Processing', max=len(self._node_list)*8 + neighbor_nodes_pair_num*4)
 
 		# for start_node_i in range(len(self._node_list)):
-		for start_node_i in range(0):
+		for start_node_i in range(len(self._node_list)):
 
 			for goal_node_index in neighbor_nodes[start_node_i]:
 
