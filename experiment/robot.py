@@ -225,7 +225,9 @@ class Robot():
 			if action_predict in move_action:
 				success, moving_index = self._AI2THOR_controller.Move_navigation_specialized(self._AI2THOR_controller._agent_current_pos_index, direction=move_direction[action_predict.item()], move=True)
 
-				is_collision_by_obstacle = self._AI2THOR_controller._event.metadata['lastActionSuccess']
+				# is_collision_by_obstacle = self._AI2THOR_controller._event.metadata['lastActionSuccess']
+				# print('not success: ', not success)
+				is_collision_by_obstacle = not success
 				if is_collision_by_obstacle:
 					self._navinet_collision_by_obstacle = True
 

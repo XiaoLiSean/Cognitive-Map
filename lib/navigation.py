@@ -87,8 +87,8 @@ class Navigation():
 		print('Testing adjacent nodes pair...')
 		bar = Bar('Processing', max=len(self._node_list)*8 + neighbor_nodes_pair_num*4)
 
-		# for start_node_i in range(len(self._node_list)):
-		for start_node_i in range(0):
+		for start_node_i in range(len(self._node_list)):
+		# for start_node_i in range(0):
 
 			for goal_node_index in neighbor_nodes[start_node_i]:
 
@@ -115,6 +115,7 @@ class Navigation():
 							collision_neighbor_case += 1
 							self._is_collision_by_obstacle = False
 							self.Robot._navinet_collision_by_obstacle = False
+					# print('self._impassable_reason: ', self._impassable_reason)
 
 					bar.next()
 
@@ -137,15 +138,22 @@ class Navigation():
 					bar.next()
 		bar.finish()
 
-		print('self._impassable_edges: ', self._impassable_edges)
-		print('self._impassable_reason: ', self._impassable_reason)
+		# print('self._impassable_edges: ', self._impassable_edges)
+		# print('self._impassable_reason: ', self._impassable_reason)
 
-		self._impassable_edges = ['node_0_degree_270_node_1_degree_270', 'node_0_degree_180_node_3_degree_180',
-								  'node_0_degree_180_node_0_degree_90', 'node_0_degree_180_node_0_degree_270',
-								  'node_0_degree_270_node_0_degree_180', 'node_0_degree_270_node_0_degree_0',
-								  'node_0_degree_0_node_0_degree_90']
-		self._impassable_reason = ['collision', 'collision', 'localization', 'navigation','collision', 'navigation','collision']
-		tested_neighbor_case = 10
+		# self._impassable_edges = ['node_0_degree_270_node_1_degree_270', 'node_0_degree_0_node_3_degree_0', 'node_0_degree_180_node_3_degree_180', 'node_1_degree_90_node_0_degree_90',
+		# 'node_1_degree_270_node_2_degree_270', 'node_1_degree_0_node_3_degree_0', 'node_1_degree_180_node_3_degree_180', 'node_2_degree_180_node_4_degree_180', 'node_3_degree_0_node_1_degree_0',
+		# 'node_3_degree_270_node_4_degree_270', 'node_3_degree_180_node_5_degree_180', 'node_4_degree_0_node_2_degree_0', 'node_4_degree_0_node_6_degree_0', 'node_4_degree_180_node_6_degree_180',
+		# 'node_5_degree_0_node_3_degree_0', 'node_5_degree_270_node_6_degree_270', 'node_5_degree_0_node_7_degree_0', 'node_5_degree_180_node_7_degree_180', 'node_5_degree_0_node_5_degree_270',
+		# 'node_5_degree_180_node_5_degree_270', 'node_6_degree_0_node_4_degree_0', 'node_6_degree_90_node_5_degree_90', 'node_6_degree_270_node_5_degree_270', 'node_6_degree_180_node_8_degree_180', 'node_7_degree_0_node_5_degree_0',
+		# 'node_7_degree_90_node_8_degree_90', 'node_7_degree_0_node_7_degree_270', 'node_7_degree_90_node_7_degree_0', 'node_7_degree_180_node_7_degree_270',
+		# 'node_7_degree_270_node_7_degree_0', 'node_8_degree_0_node_6_degree_0', 'node_8_degree_90_node_7_degree_90', 'node_8_degree_270_node_7_degree_270']
+		
+		# self._impassable_reason = ['collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision',
+		# 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision',
+		# 'collision', 'collision', 'collision', 'collision', 'collision', 'collision',
+		# 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision']
+		# tested_neighbor_case = 120
 		# ----------------------------------------------------------------------
 		# Test all node pairs
 		# ----------------------------------------------------------------------
@@ -189,8 +197,8 @@ class Navigation():
 
 		# print('loca_neighbor_error_num: ', loca_neighbor_error_num)
 		# print('navi_neighbor_error_num: ', navi_neighbor_error_num)
-
-		print('self._fail_types: ', self._fail_types)
+		# print('len(self._impassable_reason): ', len(self._impassable_reason))
+		# print('self._fail_types: ', self._fail_types)
 
 
 		nav_test = open('service_task_test.csv', 'a')
@@ -200,8 +208,8 @@ class Navigation():
 		print('Adjacent success rate: {}/{}({:.0%}) \t fail rate: ({:.0%} navi, {:.0%} loca, {:.0%} collision)'.format(tested_neighbor_case-failed_neighbor_case,
 		tested_neighbor_case, (tested_neighbor_case-failed_neighbor_case)/tested_neighbor_case, (navi_neighbor_error_num-collision_neighbor_case)/tested_neighbor_case,
 		loca_neighbor_error_num/tested_neighbor_case, collision_neighbor_case/tested_neighbor_case))
-		print('Total success rate: {}/{}({:.0%}) \t fail rate:  ({:.0%} navi, {:.0%} loca)'.format(case_num-fail_case_num, case_num, (case_num-fail_case_num)/case_num,
-		self._fail_types['navigation']/case_num, self._fail_types['localization']/case_num))
+		print('Total success rate: {}/{}({:.0%}) \t fail rate:  ({:.0%} navi, {:.0%} loca, {:.0%} collision)'.format(case_num-fail_case_num, case_num, (case_num-fail_case_num)/case_num,
+		self._fail_types['navigation']/case_num, self._fail_types['localization']/case_num, self._fail_types['collision']/case_num))
 		print('-----'*20)
 
 		return fail_case_num / case_num
@@ -518,6 +526,8 @@ class Navigation():
 				nav_by_actionnet_result = self.Robot.Navigate_by_ActionNet(image_goal=goal_frame, goal_pose=goal_pose, goal_scene_graph=goal_scene_graph, max_steps=self.Robot._Navigation_max_try, rotation_degree=rotation_degree)
 				self._is_collision_by_obstacle = self.Robot._navinet_collision_by_obstacle
 
+			# print('nav_by_actionnet_result: ', nav_by_actionnet_result)
+
 			if nav_by_actionnet_result is True:
 				failed_case = 0
 
@@ -537,7 +547,8 @@ class Navigation():
 										  goal_node_index=goal_node_index, goal_node_orientation=orientation_goal)
 					if not impassable_edge in self._impassable_edges:
 						self._impassable_edges.append(impassable_edge)
-						if self._is_collision_by_obstacle:
+						print('self._is_collision_by_obstacle: ', self._is_collision_by_obstacle)
+						if self._is_collision_by_obstacle and not nav_by_actionnet_result[1] == 'localization':
 							self._impassable_reason.append('collision')
 						else:
 							self._impassable_reason.append(nav_by_actionnet_result[1])
