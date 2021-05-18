@@ -87,8 +87,8 @@ class Navigation():
 		print('Testing adjacent nodes pair...')
 		bar = Bar('Processing', max=len(self._node_list)*8 + neighbor_nodes_pair_num*4)
 
-		for start_node_i in range(len(self._node_list)):
-		# for start_node_i in range(1):
+		# for start_node_i in range(len(self._node_list)):
+		for start_node_i in range(0):
 
 			for goal_node_index in neighbor_nodes[start_node_i]:
 
@@ -137,6 +137,15 @@ class Navigation():
 					bar.next()
 		bar.finish()
 
+		print('self._impassable_edges: ', self._impassable_edges)
+		print('self._impassable_reason: ', self._impassable_reason)
+
+		self._impassable_edges = ['node_0_degree_270_node_1_degree_270', 'node_0_degree_180_node_3_degree_180',
+								  'node_0_degree_180_node_0_degree_90', 'node_0_degree_180_node_0_degree_270',
+								  'node_0_degree_270_node_0_degree_180', 'node_0_degree_270_node_0_degree_0',
+								  'node_0_degree_0_node_0_degree_90']
+		self._impassable_reason = ['collision', 'collision', 'localization', 'navigation','collision', 'navigation','collision']
+		tested_neighbor_case = 10
 		# ----------------------------------------------------------------------
 		# Test all node pairs
 		# ----------------------------------------------------------------------
@@ -180,6 +189,9 @@ class Navigation():
 
 		# print('loca_neighbor_error_num: ', loca_neighbor_error_num)
 		# print('navi_neighbor_error_num: ', navi_neighbor_error_num)
+
+		print('self._fail_types: ', self._fail_types)
+
 
 		nav_test = open('service_task_test.csv', 'a')
 		nav_test_writer = csv.writer(nav_test)
@@ -382,6 +394,7 @@ class Navigation():
 		abort = False
 		edges_changed_temp = []
 		a_large_cost = 100000
+		fail_case_reasons = {'navigation': 0, 'localization': 0, 'collision': 0}
 
 		for i in range(max_try):
 
@@ -413,6 +426,8 @@ class Navigation():
 						start_node_index, _ = self.topo_map.Get_node_index_orien(node_name=path_temp[path_i])
 						goal_node_index, _ = self.topo_map.Get_node_index_orien(node_name=path_temp[path_i + 1])
 
+						fail_case_reasons[self._impassable_reason[self._impassable_edges.index(edge_temp)]] += 1
+
 						if self.planner._subnode_plan:
 							start_node_index = self.planner.Get_subnode_dij_index(node_name=path_temp[path_i])
 							goal_node_index = self.planner.Get_subnode_dij_index(node_name=path_temp[path_i + 1])
@@ -422,7 +437,12 @@ class Navigation():
 
 						if self.planner._dij_graph[start_node_index][goal_node_index] == a_large_cost:
 							abort = True
-							self._fail_types[self._impassable_reason[self._impassable_edges.index(edge_temp)]] += 1
+							self._fail_types['navigation'] += fail_case_reasons['navigation'] / (fail_case_reasons['navigation'] + fail_case_reasons['localization'] + fail_case_reasons['collision'])
+							self._fail_types['localization'] += fail_case_reasons['localization'] / (fail_case_reasons['navigation'] + fail_case_reasons['localization'] + fail_case_reasons['collision'])
+							self._fail_types['collision'] += fail_case_reasons['collision'] / (fail_case_reasons['navigation'] + fail_case_reasons['localization'] + fail_case_reasons['collision'])
+							# print('collision: ', fail_case_reasons['collision'] / (fail_case_reasons['navigation'] + fail_case_reasons['localization'] + fail_case_reasons['collision']))
+							# print('localization: ', fail_case_reasons['localization'] / (fail_case_reasons['navigation'] + fail_case_reasons['localization'] + fail_case_reasons['collision']))
+							# print('navigation: ', fail_case_reasons['navigation'] / (fail_case_reasons['navigation'] + fail_case_reasons['localization'] + fail_case_reasons['collision']))
 							# print('path_temp: ', path_temp)
 							# print(self._impassable_reason[self._impassable_edges.index(edge_temp)])
 							# print(edge_temp)
