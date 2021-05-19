@@ -193,10 +193,13 @@ class Navigation():
 
 		loca_neighbor_error = list(filter(lambda x: x == 'localization', self._impassable_reason))
 		loca_neighbor_error_num = len(loca_neighbor_error)
-		navi_neighbor_error_num = len(self._impassable_reason) - loca_neighbor_error_num
+		collision_neighbor_error = list(filter(lambda x: x == 'collision', self._impassable_reason))
+		collision_neighbor_error_num = len(collision_neighbor_error)
+		navi_neighbor_error_num = len(self._impassable_reason) - loca_neighbor_error_num - collision_neighbor_error_num
 
 		# print('loca_neighbor_error_num: ', loca_neighbor_error_num)
 		# print('navi_neighbor_error_num: ', navi_neighbor_error_num)
+		# print('collision_neighbor_error_num: ', collision_neighbor_error_num)
 		# print('len(self._impassable_reason): ', len(self._impassable_reason))
 		# print('self._fail_types: ', self._fail_types)
 
@@ -204,12 +207,12 @@ class Navigation():
 		nav_test = open('./Network/service_test/' + self.Robot.netName + '.csv', 'a')
 		nav_test_writer = csv.writer(nav_test)
 		nav_test_writer.writerow([self.Robot._AI2THOR_controller._scene_name, case_num, fail_case_num, tested_neighbor_case,
-		failed_neighbor_case, navi_neighbor_error_num-collision_neighbor_case, loca_neighbor_error_num, collision_neighbor_case,
+		failed_neighbor_case, navi_neighbor_error_num, loca_neighbor_error_num, collision_neighbor_error_num,
 		self._fail_types['navigation'], self._fail_types['localization'], self._fail_types['collision']])
 
 		print('Adjacent success rate: {}/{}({:.0%}) \t fail rate: ({:.0%} navi, {:.0%} loca, {:.0%} collision)'.format(tested_neighbor_case-failed_neighbor_case,
-		tested_neighbor_case, (tested_neighbor_case-failed_neighbor_case)/tested_neighbor_case, (navi_neighbor_error_num-collision_neighbor_case)/tested_neighbor_case,
-		loca_neighbor_error_num/tested_neighbor_case, collision_neighbor_case/tested_neighbor_case))
+		tested_neighbor_case, (tested_neighbor_case-failed_neighbor_case)/tested_neighbor_case, navi_neighbor_error_num/tested_neighbor_case,
+		loca_neighbor_error_num/tested_neighbor_case, collision_neighbor_error_num/tested_neighbor_case))
 		print('Total success rate: {}/{}({:.0%}) \t fail rate:  ({:.0%} navi, {:.0%} loca, {:.0%} collision)'.format(case_num-fail_case_num, case_num, (case_num-fail_case_num)/case_num,
 		self._fail_types['navigation']/case_num, self._fail_types['localization']/case_num, self._fail_types['collision']/case_num))
 		print('-----'*20)
