@@ -148,7 +148,7 @@ class Navigation():
 		# 'node_5_degree_180_node_5_degree_270', 'node_6_degree_0_node_4_degree_0', 'node_6_degree_90_node_5_degree_90', 'node_6_degree_270_node_5_degree_270', 'node_6_degree_180_node_8_degree_180', 'node_7_degree_0_node_5_degree_0',
 		# 'node_7_degree_90_node_8_degree_90', 'node_7_degree_0_node_7_degree_270', 'node_7_degree_90_node_7_degree_0', 'node_7_degree_180_node_7_degree_270',
 		# 'node_7_degree_270_node_7_degree_0', 'node_8_degree_0_node_6_degree_0', 'node_8_degree_90_node_7_degree_90', 'node_8_degree_270_node_7_degree_270']
-		
+
 		# self._impassable_reason = ['collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision',
 		# 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision', 'collision',
 		# 'collision', 'collision', 'collision', 'collision', 'collision', 'collision',
@@ -201,7 +201,7 @@ class Navigation():
 		# print('self._fail_types: ', self._fail_types)
 
 
-		nav_test = open('service_task_test.csv', 'a')
+		nav_test = open('./Network/service_test' + self.Robot.netName + '.csv', 'a')
 		nav_test_writer = csv.writer(nav_test)
 		nav_test_writer.writerow([self.Robot._AI2THOR_controller._scene_name, case_num, fail_case_num, tested_neighbor_case,
 		failed_neighbor_case, navi_neighbor_error_num-collision_neighbor_case, loca_neighbor_error_num, collision_neighbor_case,
@@ -549,7 +549,6 @@ class Navigation():
 										  goal_node_index=goal_node_index, goal_node_orientation=orientation_goal)
 					if not impassable_edge in self._impassable_edges:
 						self._impassable_edges.append(impassable_edge)
-						print('self._is_collision_by_obstacle: ', self._is_collision_by_obstacle)
 						if self._is_collision_by_obstacle and not nav_by_actionnet_result[1] == 'localization':
 							self._impassable_reason.append('collision')
 						else:
