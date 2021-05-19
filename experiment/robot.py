@@ -267,7 +267,7 @@ class Robot():
 		rotation_difference = np.abs(goal_rotation[1] - rotation_current[1])
 
 		if distance > 0.5 * self._grid_size or rotation_difference > 10:
-			error_type = 'localization'
+			fail_type = 'localization'
 			return (False, fail_type)
 
 		return True

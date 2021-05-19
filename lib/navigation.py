@@ -201,7 +201,7 @@ class Navigation():
 		# print('self._fail_types: ', self._fail_types)
 
 
-		nav_test = open('./Network/service_test' + self.Robot.netName + '.csv', 'a')
+		nav_test = open('./Network/service_test/' + self.Robot.netName + '.csv', 'a')
 		nav_test_writer = csv.writer(nav_test)
 		nav_test_writer.writerow([self.Robot._AI2THOR_controller._scene_name, case_num, fail_case_num, tested_neighbor_case,
 		failed_neighbor_case, navi_neighbor_error_num-collision_neighbor_case, loca_neighbor_error_num, collision_neighbor_case,

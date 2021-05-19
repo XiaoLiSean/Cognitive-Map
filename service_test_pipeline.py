@@ -104,11 +104,10 @@ def plot_statistics():
 
 if __name__ == '__main__':
 	'''netName \in ['rnet', 'resnet50', 'vgg16', 'googlenet', 'resnext50_32x4d']'''
-
-	navigation = Navigation(netName='vgg16', scene_type=args.scene_type, scene_num=args.scene_num, save_directory=args.save_directory, AI2THOR=args.AI2THOR)
+	navigation = Navigation(netName='resnet50', scene_type=args.scene_type, scene_num=args.scene_num, save_directory=args.save_directory, AI2THOR=args.AI2THOR)
 	navigation.Update_node_generator()
 	navigation.Update_topo_map_env()
 	navigation.Update_planner_env()
 	navigation.node_generator.Shuffle_scene()
 	navigation.nav_test_simplified()
-	plot_statistics()
+	#plot_statistics()
