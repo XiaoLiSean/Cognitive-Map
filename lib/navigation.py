@@ -178,6 +178,9 @@ class Navigation():
 						path = self.Find_dij_path_wt_impassable(current_node_index=start, current_orientation=start_orien,
 												  goal_node_index_=goal, goal_orientation=goal_orien)
 
+						if start == goal and start_orien == goal_orien:
+							continue
+
 						if type(path) == list and len(path) == 0:
 							continue
 						else:
