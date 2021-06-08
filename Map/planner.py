@@ -20,6 +20,7 @@ class Planner():
 		self._graph = None
 		self._grid_size = 0.25
 		self._dij_graph = dij.Graph()
+		self._added_pair = []
 
 	def Set_env_from_topo_map(self, topo_map):
 		self._grid_size = copy.deepcopy(topo_map._grid_size)
@@ -71,16 +72,30 @@ class Planner():
 
 		for current_node_name, neighbor_nodes in self._graph.adj.items():
 
+			current_node_name_split = current_node_name.replace('_', ' ').split()
+			current_node_index, current_node_ori = current_node_name_split[1], current_node_name_split[3]
+
 			current_node_dij_index = self.Get_subnode_dij_index(node_name=current_node_name)
 
 			for neighbor_node_name, weight_dict in neighbor_nodes.items():
 
+				neighbor_node_name_split = neighbor_node_name.replace('_', ' ').split()
+				neighbor_node_index, neighbor_node_ori = neighbor_node_name_split[1], neighbor_node_name_split[3]
+
+				if current_node_ori == neighbor_node_ori:
+					if [neighbor_node_index, current_node_index] in self._added_pair:
+						continue
+				self._added_pair.append([current_node_index, neighbor_node_index])
+
 				neighbor_node_dij_index = self.Get_subnode_dij_index(node_name=neighbor_node_name)
+
 				self._dij_graph.add_edge(current_node_dij_index, neighbor_node_dij_index, weight_dict['weight'])
 
 		return
 
 	def _build_node_dij_graph(self):
+
+
 
 		for current_node_name, neighbor_nodes in self._graph.adj.items():
 

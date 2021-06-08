@@ -8,6 +8,7 @@ from PIL import Image
 import numpy as np
 import time, copy, random
 import logging, argparse, os, sys, csv
+import torch
 
 from experiment.node_generation import *
 from experiment.experiment_config import *
@@ -66,6 +67,10 @@ class Robot():
 		self.goal_position = None
 		self.goal_rotation = None
 		self._navinet_collision_by_obstacle = False # boolean variable used to detect collision
+		self._passed_position = []
+		# self._hardcode_actions = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 3, 3, 3, 3]
+		self._hardcode_actions = [0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0]
+		self._action_num = 0
 
 		self.Set_navigation_network()
 		self.Set_localization_network(self.isImageLocalization)
@@ -120,6 +125,8 @@ class Robot():
 
 		position_current = list(self.Get_robot_position().values())
 		rotation_current = list(self.Get_robot_orientation().values())
+
+		self._localization_network.is_localized(self.feature_preprocess(feature_current),  self.feature_preprocess(feature_goal))
 
 		if hardcode is True:
 			if goal_pose is None:
@@ -185,7 +192,7 @@ class Robot():
 		if not rotation_degree is None:
 			rotation_move = False
 
-		while not self.Navigation_stop(feature_goal=feature_goal, feature_current=feature_current, goal_pose=goal_pose, hardcode=False):
+		while not self.Navigation_stop(feature_goal=feature_goal, feature_current=feature_current, goal_pose=goal_pose, hardcode=True):
 			# ------------------------------------------------------------------
 			# Send information to plotter
 			# ------------------------------------------------------------------
@@ -198,6 +205,9 @@ class Robot():
 
 			position_current = list(self.Get_robot_position().values())
 			rotation_current = list(self.Get_robot_orientation().values())
+
+			self._passed_position.append(position_current)
+			# print('self._passed_position： ', self._passed_position)
 
 			distance = np.linalg.norm(np.array(list(map(lambda x, y: x - y, goal_position, position_current))))
 			rotation_difference = np.abs(goal_rotation[1] - rotation_current[1])
@@ -214,6 +224,7 @@ class Robot():
 					action_predict[0] = 2
 				rotation_move = True
 
+
 			if loop_action[action_predict] == pre_action:
 				_, self._AI2THOR_controller._agent_current_pos_index = self._AI2THOR_controller.Random_move_w_weight()
 				pre_action = None
@@ -222,9 +233,14 @@ class Robot():
 			if self._debug:
 				print('action_predict: ', action_predict)
 
+			if self._action_num < len(self._hardcode_actions):
+				action_predict = torch.Tensor([self._hardcode_actions[self._action_num]])
+				self._action_num += 1
+
 			if action_predict in move_action:
 				success, moving_index = self._AI2THOR_controller.Move_navigation_specialized(self._AI2THOR_controller._agent_current_pos_index, direction=move_direction[action_predict.item()], move=True)
 
+				position_current = list(self.Get_robot_position().values())
 				# is_collision_by_obstacle = self._AI2THOR_controller._event.metadata['lastActionSuccess']
 				# print('not success: ', not success)
 				is_collision_by_obstacle = not success
@@ -428,7 +444,8 @@ class AI2THOR_controller():
 		closest_point_index = self.Node_localize(node_position=moving_point)
 
 		if closest_point_index is False:
-			return (False, -1)
+			# return (False, -1)
+			return (False, starting_point_index)
 		if move:
 			self.Teleport_agent(position=self._point_list[closest_point_index], save_image=False)
 		return (True, closest_point_index)

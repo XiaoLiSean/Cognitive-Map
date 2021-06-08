@@ -8,6 +8,7 @@ from sklearn.cluster import KMeans
 from PIL import Image
 import time, copy, random
 import logging, os, sys
+import time
 sys.path.append('./Network') # import navi and retrieval_network
 sys.path.append('./experiment') # import simulation robot
 from Map import * # import topological map
@@ -33,6 +34,7 @@ class Navigation():
 		self._impassable_edges = []
 		self._impassable_reason = []
 		self._is_collision_by_obstacle = False # boolean variable used to detect collision
+		self._passed_position = []
 
 	def nav_test(self):
 		for scene_type in range(1, 4):
@@ -356,6 +358,11 @@ class Navigation():
 		path = self.planner.Find_dij_path(current_node_index=current_node_index, current_orientation=current_orientation,
 										  goal_node_index=goal_node_index, goal_orientation=goal_orientation)
 		# print('path: ', path)
+
+		path = ['node_1_degree_0', 'node_16_degree_0', 'node_16_degree_0', 'node_3_degree_0', 'node_5_degree_0',
+			    'node_7_degree_0', 'node_7_degree_270', 'node_12_degree_270', 'node_12_degree_180']
+
+		# time.sleep(10)
 
 		nav_result = self.Navigate_by_path(path=path)
 
