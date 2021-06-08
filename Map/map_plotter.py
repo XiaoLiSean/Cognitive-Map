@@ -143,10 +143,9 @@ class Plotter():
 		self.toggleMap.set_title("{}: Node radius {} [m]\n\n\n".format(self.scene_name, str(self.node_radius)))
 		self.toggleMap.set_aspect('equal', 'box')
 		legend_elements = [Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='lightskyblue', alpha=0.3, label='Topological Nodes'),
-						   Line2D([0], [0], linestyle='--', color='red', lw=2, label='Topological Edges'),
-						   Line2D([0], [0], linestyle='--', color='blue', lw=2, label='Robot Path'),
-						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='darkred', alpha=0.5, label='Start Subnodes'),
-						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='darkgreen', alpha=0.5, label='Goal Subnodes'),
+						   Line2D([0], [0], linestyle='--', color='red', lw=2, alpha=0.3, label='Topological Edges'),
+						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='red', alpha=0.5, label='Goal Subnodes'),
+						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='yellow', alpha=0.5, label='Robot Pose'),
 						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='green', alpha=0.5, label='Reached Goal Subnodes')]
 
 		self.toggleMap.legend(handles=legend_elements, loc='center', bbox_to_anchor=(0.5, 1.05), fancybox=True, shadow=True, ncol=5)
@@ -206,6 +205,7 @@ class Plotter():
 		# ----------------------------------------------------------------------
 		is_initial_map = True
 		rob_icon = Image.open('icon/robot.png')
+		step_idx = 0
 		while True:
 			# ------------------------------------------------------------------
 			# Delect robot icon for new position plot
@@ -255,6 +255,8 @@ class Plotter():
 			
 			cur_img = self.currentView.imshow(info['cur_img'])
 			goal_img = self.goalView.imshow(info['goal_img'])
+			# Image.fromarray(info['cur_img']).save('pathImg/'+str(step_idx)+'current.jpg')
+			# Image.fromarray(info['goal_img']).save('pathImg/'+str(step_idx)+'goal.jpg')
 
 			    
 			self._step_num += 1
@@ -283,5 +285,6 @@ class Plotter():
 
 			self.multithread_node['comfirmed'].value = 1
 			is_initial_map = False
+			step_idx += 1
 
 		plt.show()

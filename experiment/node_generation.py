@@ -189,14 +189,20 @@ class Node_generator():
 						is_edge = self.is_reachable(node_i, node_j)
 						if is_edge:
 							self._neighbor_nodes.append([self._node_index_list[node_i_idx], self._node_index_list[node_j_idx]])
-							self._connected_subnodes.append([1,3])
+							if node_j[0] > node_i[0]:
+								self._connected_subnodes.append([1,3]) # i to j in subnode 1 [90 deg], j to i in subnode 3 [270 deg]
+							else:
+								self._connected_subnodes.append([3,1]) # i to j in subnode 3 [270 deg], j to i in subnode 1 [90 deg]
 
 				if (diff[1] - FORWARD_GRID * self._grid_size) <= epsilon:
 					if (diff[0] - ADJACENT_NODES_SHIFT_GRID * self._grid_size) <= epsilon:
 						is_edge = self.is_reachable(node_i, node_j)
 						if is_edge:
 							self._neighbor_nodes.append([self._node_index_list[node_i_idx], self._node_index_list[node_j_idx]])
-							self._connected_subnodes.append([0,2])
+							if node_j[1] > node_i[1]:
+								self._connected_subnodes.append([0,2]) # i to j in subnode 0 [0 deg], j to i in subnode 2 [180 deg]
+							else:
+								self._connected_subnodes.append([2,0]) # i to j in subnode 2 [180 deg], j to i in subnode 0 [0 deg]
 
 	def Teleport_agent(self, position, rotation=0):
 		self.Update_event()
