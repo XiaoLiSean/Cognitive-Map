@@ -85,7 +85,7 @@ class Plotter():
 
 
 				if is_edge:
-					self.toggleMap.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0)
+					self.toggleMap.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0, alpha=0.3)
 
 	def add_nodes(self):
 		nodes_x = []
@@ -140,7 +140,7 @@ class Plotter():
 		self.toggleMap.set_title("{}: Node radius {} [m]\n\n\n".format(self.scene_name, str(self.node_radius)))
 		self.toggleMap.set_aspect('equal', 'box')
 		legend_elements = [Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='lightskyblue', alpha=0.3, label='Topological Nodes'),
-						   Line2D([0], [0], linestyle='--', color='red', lw=2, label='Topological Edges'),
+						   Line2D([0], [0], linestyle='--', color='red', lw=2, alpha=0.3, label='Topological Edges'),
 						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='red', alpha=0.5, label='Goal Subnodes'),
 						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='yellow', alpha=0.5, label='Robot Pose'),
 						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='green', alpha=0.5, label='Reached Goal Subnodes')]
@@ -173,6 +173,7 @@ class Plotter():
 		# ----------------------------------------------------------------------
 		is_initial_map = True
 		rob_icon = Image.open('icon/robot.png')
+		step_idx = 0
 		while True:
 			# ------------------------------------------------------------------
 			# Delect robot icon for new position plot
@@ -221,6 +222,8 @@ class Plotter():
 			# ------------------------------------------------------------------
 			cur_img = self.currentView.imshow(info['cur_img'])
 			goal_img = self.goalView.imshow(info['goal_img'])
+			# Image.fromarray(info['cur_img']).save('pathImg/'+str(step_idx)+'current.jpg')
+			# Image.fromarray(info['goal_img']).save('pathImg/'+str(step_idx)+'goal.jpg')
 
 			width = info['cur_img'].shape[1]
 			height = info['cur_img'].shape[0]
@@ -242,5 +245,6 @@ class Plotter():
 
 			self.multithread_node['comfirmed'].value = 1
 			is_initial_map = False
+			step_idx += 1
 
 		plt.show()

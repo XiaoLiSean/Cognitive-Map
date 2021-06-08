@@ -5,8 +5,8 @@ from Map.map_plotter import Plotter
 from distutils.util import strtobool
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--scene_type", type=int, default=2,  help="Choose scene type for simulation, 1 for Kitchens, 2 for Living rooms, 3 for Bedrooms, 4 for Bathrooms")
-parser.add_argument("--scene_num", type=int, default=26,  help="Choose scene num for simulation, from 1 - 30")
+parser.add_argument("--scene_type", type=int, default=1,  help="Choose scene type for simulation, 1 for Kitchens, 2 for Living rooms, 3 for Bedrooms, 4 for Bathrooms")
+parser.add_argument("--scene_num", type=int, default=30,  help="Choose scene num for simulation, from 1 - 30")
 parser.add_argument("--grid_size", type=float, default=0.25,  help="Grid size of AI2THOR simulation")
 parser.add_argument("--rotation_step", type=float, default=10,  help="Rotation step of AI2THOR simulation")
 parser.add_argument("--sleep_time", type=float, default=0.005,  help="Sleep time between two actions")
@@ -29,7 +29,13 @@ def navigation_fcn(server, comfirmed, initialized):
 	server.send(scene_info)
 	# Navigation task
 	navigation.node_generator.Shuffle_scene()
-	navigation.Closed_loop_nav(current_node_index=2, current_orientation=90, goal_node_index=6, goal_orientation=0)
+	navigation.Closed_loop_nav(current_node_index=10, current_orientation=270, goal_node_index=10, goal_orientation=180)
+	navigation.Closed_loop_nav(current_node_index=10, current_orientation=180, goal_node_index=9, goal_orientation=180)
+	navigation.Closed_loop_nav(current_node_index=9, current_orientation=180, goal_node_index=3, goal_orientation=0)
+	# navigation.Closed_loop_nav(current_node_index=1, current_orientation=0, goal_node_index=16, goal_orientation=0)
+	# navigation.Closed_loop_nav(current_node_index=16, current_orientation=0, goal_node_index=3, goal_orientation=0)
+	# navigation.Closed_loop_nav(current_node_index=3, current_orientation=0, goal_node_index=4, goal_orientation=0)
+	# navigation.Closed_loop_nav(current_node_index=4, current_orientation=0, goal_node_index=4, goal_orientation=90)
 
 	# navigation.nav_test_simplified()
 	# while True:

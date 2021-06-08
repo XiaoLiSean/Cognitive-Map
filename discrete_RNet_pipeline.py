@@ -7,6 +7,7 @@ import torch
 import argparse, os, copy, pickle, time
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from PIL import Image
 from progress.bar import Bar
 from torchvision import transforms
@@ -114,17 +115,6 @@ def testing_pipeline(Dataset, Network, LossFcn, checkpoints_prefix, is_only_imag
         else:
             testing_statistics.update({iFloorPlan:dict(total=1, corrects=is_correct.item())})
 
-        # if is_correct.item() == 0:
-        #     triplet_name = test_dataset.triplets[batch_idx]
-        #     store_fail_case(checkpoints_prefix, triplet_name)
-        #     # Store Unique success case (Only Retrieval Network success while other three fail)
-        #     if is_only_image_branch:
-        #         all_fail_cases['img'].append(test_dataset.triplets[batch_idx])
-        # elif is_correct.item() == 1 and not is_only_image_branch:
-        #     # Store Unique success case (Only Retrieval Network success while other three fail)
-        #     triplet_name = test_dataset.triplets[batch_idx]
-        #     store_success_case(checkpoints_prefix, triplet_name)
-
         bar.next()
 
     bar.finish()
@@ -191,6 +181,7 @@ def show_testing_histogram_comparison(parent_dir=CHECKPOINTS_DIR,filename='testi
         ax2.plot(np.arange(len(tags))*(num+1)-(num-i), np.true_divide(np.array(corrects), np.array(total)))
         i += 1
         labels.append(xxxnet + ': {:.2%} Success'.format(np.true_divide(np.sum(np.array(corrects)), np.sum(np.array(total)))))
+        print('{}: {}/{}'.format(xxxnet, np.sum(np.array(corrects)), np.sum(np.array(total))))
 
     # ax1.legend(labels=labels, bbox_to_anchor=(0.40, 0.55))
     ax1.legend(labels=labels, bbox_to_anchor=(0,1.02,1,0.2), loc="lower left", mode="expand", ncol=num)
@@ -224,7 +215,7 @@ def store_success_case(checkpoints_prefix, triplet_name):
 # ------------------------------------------------------------------------------
 # ---------------------------Thresholding and Heatmap---------------------------
 # ------------------------------------------------------------------------------
-def thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=False):
+def thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=False, benchmark=None):
     # ---------------------------Loading testing dataset---------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Loading thresholding/val dataset...')
     dataset = Dataset(DATA_DIR, is_val=True, load_only_image_data=is_only_image_branch)
@@ -233,9 +224,9 @@ def thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=Fals
     # ------------------------------Initialize model--------------------------------
     print('----'*20 + '\n' + colored('Network Info: ','blue') + 'Initialize model...')
     if is_only_image_branch:
-        model = Network(enableRoIBridge=False) # Train Image Branch
+        model = Network(pretrainedXXXNet=True, XXXNetName=benchmark) # Train Image Branch
     else:
-        model = Network()
+        model = Network(self_pretrained_image=False, pretrainedXXXNet=True)
 
     model.load_state_dict(torch.load(checkpoints_prefix + 'best_fit.pkl'))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -256,10 +247,10 @@ def thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=Fals
         Vec_A = model.get_embedding(*A)
         Vec_B = model.get_embedding(*B)
         score = CosineSimilarity(Vec_A, Vec_B).item()
-        x_A = dataset.pairs[batch_idx][0].split('_')[2]
-        z_A = dataset.pairs[batch_idx][0].split('_')[3]
-        x_B = dataset.pairs[batch_idx][1].split('_')[2]
-        z_B = dataset.pairs[batch_idx][1].split('_')[3]
+        x_A = dataset.pairs[batch_idx][0].split('_')[1]
+        z_A = dataset.pairs[batch_idx][0].split('_')[2]
+        x_B = dataset.pairs[batch_idx][1].split('_')[1]
+        z_B = dataset.pairs[batch_idx][1].split('_')[2]
 
         d_x = abs(int(x_A)-int(x_B))
         d_z = abs(int(z_A)-int(z_B))
@@ -272,51 +263,58 @@ def thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=Fals
     bar.finish()
     print('----'*20)
     np.save(checkpoints_prefix + 'thresholding_staticstics.npy', staticstics)
-    plot_heatmap(staticstics)
+    plot_heatmap(staticstics, save_dir=checkpoints_prefix)
 
 # ------------------------------------------------------------------------------
 # Visualize Test Staticstics
-def plot_heatmap(staticstics):
-    map_len = 2*staticstics['n'].shape[0] - 1
-    mid_idx = staticstics['n'].shape[0] - 1
+def plot_heatmap(staticstics, save_dir=None):
+    # map_len = 2*staticstics['n'].shape[0] - 1
+    # mid_idx = staticstics['n'].shape[0] - 1
+    span_len = 21
+    map_len = span_len*2 - 1
+    mid_idx = span_len - 1
 
     # Processing the staticstics data to make a symetrical heatmap
     new_staticstics = dict(n=np.zeros((map_len, map_len)), sum=np.zeros((map_len, map_len)), sq_sum=np.zeros((map_len, map_len)))
     for key in staticstics:
-        new_staticstics[key][mid_idx:, mid_idx:] = staticstics[key]
-        new_staticstics[key][0:mid_idx+1, mid_idx:] = np.flip(staticstics[key],0)
-        new_staticstics[key][mid_idx:, 0:mid_idx+1] = np.flip(staticstics[key],1)
-        new_staticstics[key][0:mid_idx+1, 0:mid_idx+1] = np.flip(staticstics[key],(0,1))
+        new_staticstics[key][mid_idx:, mid_idx:] = staticstics[key][0:mid_idx+1, 0:mid_idx+1]
+        new_staticstics[key][0:mid_idx+1, mid_idx:] = np.flip(staticstics[key][0:mid_idx+1, 0:mid_idx+1], 0)
+        new_staticstics[key][mid_idx:, 0:mid_idx+1] = np.flip(staticstics[key][0:mid_idx+1, 0:mid_idx+1], 1)
+        new_staticstics[key][0:mid_idx+1, 0:mid_idx+1] = np.flip(staticstics[key][0:mid_idx+1, 0:mid_idx+1], (0,1))
 
     staticstics = copy.deepcopy(new_staticstics)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2)
+    # Calculate staticstics
     num = copy.deepcopy(staticstics['n'])
     num[staticstics['sum'] == 0] = 1.0
     mean = np.true_divide(staticstics['sum'], num)
-    img_mean = ax1.imshow(mean)
-    img_mean.set_clim(0,1)
-    fig.colorbar(img_mean, ax=ax1, shrink=0.6)
-
     std = np.true_divide(staticstics['sq_sum'], num) - np.true_divide(np.power(staticstics['sum'], 2), np.power(num, 2))
     sigma = np.power(std, 0.5)
-    print(sigma)
-    sigma_max = np.amax(sigma)
-    sigma_min = np.amin(sigma)
-    #sigma = (sigma - sigma_min) / (sigma_max - sigma_min)
-    img_sigma = ax2.imshow(sigma)
-    #img_sigma.set_clim(0,1)
+
+    # Plot heatmap
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(17,8))
+    img_mean = ax1.imshow(mean, cmap=cm.coolwarm)
+    img_mean.set_clim(0,1)
+    fig.colorbar(img_mean, ax=ax1, shrink=0.6)
+    img_sigma = ax2.imshow(sigma, cmap=cm.coolwarm)
     fig.colorbar(img_sigma, ax=ax2, shrink=0.6)
 
+    print(mean[int((map_len-1)*0.5):,int((map_len-1)*0.5):])
+    print(sigma[int((map_len-1)*0.5):,int((map_len-1)*0.5):])
+    print(staticstics['n'][int((map_len-1)*0.5):, int((map_len-1)*0.5):], )
+
+    # configure heatmap
     for ax, data in zip([ax1, ax2], [mean, sigma]):
-        tick_step = 5
+        tick_step = 4
         ax.set_xticks(np.arange(0, map_len+1, tick_step))
         ax.set_yticks(np.arange(0, map_len+1, tick_step))
-        ax.set_xticklabels(np.arange(0, map_len+1, tick_step))
-        ax.set_yticklabels(np.arange(0, map_len+1, tick_step))
-
+        ax.set_xticklabels(np.arange(0, map_len+1, tick_step)-mid_idx)
+        ax.set_yticklabels(np.arange(0, map_len+1, tick_step)-mid_idx)
+        ax.set_xlabel('Deviation from anchor along x-axis [in unit of $d$]')
+        ax.set_ylabel('Deviation from anchor along y-axis [in unit of $d$]')
     # fig.suptitle('Heatmap for view angle difference of {} degree'.format(angles[k]))
 
+    plt.savefig(save_dir+"heatmap.svg")
     plt.show()
 
 # ------------------------------------------------------------------------------
@@ -333,7 +331,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     torch.cuda.empty_cache()
-
+    # show_testing_histogram_comparison(parent_dir=CHECKPOINTS_DIR,filename='testing_statistics.npy')
     # --------------------------------------------------------------------------
     # Train corresponding networks
     if args.train:
@@ -365,6 +363,7 @@ if __name__ == '__main__':
         elif args.rnet and not args.benchmark:
             Network = RetrievalTriplet
             checkpoints_prefix = CHECKPOINTS_DIR + 'rnet/'
+            args.name = 'rnet'
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
@@ -378,13 +377,14 @@ if __name__ == '__main__':
         Dataset = PairDataset
         if args.benchmark and not args.rnet:
             Network = TripletNetImage
-            checkpoints_prefix = CHECKPOINTS_DIR
+            checkpoints_prefix = CHECKPOINTS_DIR + args.name + '/'
         elif args.rnet and not args.benchmark:
             Network = RetrievalTriplet
-            checkpoints_prefix = CHECKPOINTS_DIR
+            checkpoints_prefix = CHECKPOINTS_DIR + 'rnet/'
+            args.name = 'rnet'
         else:
             print('----'*20 + '\n' + colored('Network Error: ','red') + 'Please specify a branch (image/all)')
 
-        staticstics = np.load(checkpoints_prefix + '_thresholding_staticstics.npy', allow_pickle=True).item()
-        plot_heatmap(staticstics)
-        thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=args.benchmark)
+        #thresholding(Dataset, Network, checkpoints_prefix, is_only_image_branch=args.benchmark,  benchmark=args.name)
+        staticstics = np.load(checkpoints_prefix + 'thresholding_staticstics.npy', allow_pickle=True).item()
+        plot_heatmap(staticstics, save_dir=checkpoints_prefix)

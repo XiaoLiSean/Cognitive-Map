@@ -126,6 +126,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     torch.cuda.empty_cache()
+    show_testing_histogram_comparison(parent_dir=CHECKPOINTS_DIR,filename='testing_statistics.npy')
 
     # --------------------------------------------------------------------------
     # Train corresponding networks
