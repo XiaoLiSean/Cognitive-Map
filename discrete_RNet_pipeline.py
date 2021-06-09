@@ -294,14 +294,16 @@ def plot_heatmap(staticstics, save_dir=None):
     # Plot heatmap
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(17,8))
     img_mean = ax1.imshow(mean, cmap=cm.coolwarm)
-    img_mean.set_clim(0,1)
+    img_mean.set_clim(np.min(mean),np.max(mean))
     fig.colorbar(img_mean, ax=ax1, shrink=0.6)
     img_sigma = ax2.imshow(sigma, cmap=cm.coolwarm)
+    img_sigma.set_clim(np.min(sigma),np.max(sigma))
     fig.colorbar(img_sigma, ax=ax2, shrink=0.6)
 
-    print(mean[int((map_len-1)*0.5):,int((map_len-1)*0.5):])
-    print(sigma[int((map_len-1)*0.5):,int((map_len-1)*0.5):])
-    print(staticstics['n'][int((map_len-1)*0.5):, int((map_len-1)*0.5):], )
+
+    print(mean[mid_idx:mid_idx+4,mid_idx:mid_idx+4])
+    print(sigma[mid_idx:mid_idx+4,mid_idx:mid_idx+4])
+    print(staticstics['n'][mid_idx:mid_idx+4, mid_idx:mid_idx+4], )
 
     # configure heatmap
     for ax, data in zip([ax1, ax2], [mean, sigma]):

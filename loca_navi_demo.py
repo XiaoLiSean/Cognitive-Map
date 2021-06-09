@@ -29,7 +29,7 @@ def navigation_fcn(server, comfirmed, initialized):
 	server.send(scene_info)
 	# Navigation task
 	navigation.node_generator.Shuffle_scene()
-	navigation.Closed_loop_nav(current_node_index=3, current_orientation=0, goal_node_index=12, goal_orientation=0)
+	navigation.Closed_loop_nav(current_node_index=10, current_orientation=0, goal_node_index=5, goal_orientation=0)
 	# navigation.Closed_loop_nav(current_node_index=10, current_orientation=180, goal_node_index=9, goal_orientation=180)
 	# navigation.Closed_loop_nav(current_node_index=9, current_orientation=180, goal_node_index=3, goal_orientation=0)
 	# navigation.Closed_loop_nav(current_node_index=1, current_orientation=0, goal_node_index=16, goal_orientation=0)

@@ -192,7 +192,7 @@ class Robot():
 		if not rotation_degree is None:
 			rotation_move = False
 
-		while not self.Navigation_stop(feature_goal=feature_goal, feature_current=feature_current, goal_pose=goal_pose, hardcode=True):
+		while not self.Navigation_stop(feature_goal=feature_goal, feature_current=feature_current, goal_pose=goal_pose, hardcode=False):
 			# ------------------------------------------------------------------
 			# Send information to plotter
 			# ------------------------------------------------------------------

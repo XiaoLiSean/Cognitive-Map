@@ -33,8 +33,8 @@ class Planner():
 			self._neighbor_index_nodes.append([self._node_index_list.index(neighbor_node[0]),
 												self._node_index_list.index(neighbor_node[1])])
 		self._connected_subnodes = connected_subnodes
-		print('self._neighbor_index_nodes: ', self._neighbor_index_nodes)
-		print('self._connected_subnodes: ', self._connected_subnodes)
+		# print('self._neighbor_index_nodes: ', self._neighbor_index_nodes)
+		# print('self._connected_subnodes: ', self._connected_subnodes)
 
 	def Set_planning_method(self, using_subnode=False):
 		self._subnode_plan = using_subnode
@@ -100,7 +100,7 @@ class Planner():
 
 
 
-				
+
 
 				if current_node_ori == neighbor_node_ori:
 
