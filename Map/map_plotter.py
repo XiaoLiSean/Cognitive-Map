@@ -7,8 +7,6 @@ from termcolor import colored
 from PIL import Image
 import numpy as np
 import time
-import cv2
-import matplotlib
 
 class Plotter():
 	def __init__(self, scene_name, scene_bbox, grid_size, reachable_points, objects, client=None, comfirmed=None):
@@ -24,7 +22,6 @@ class Plotter():
 		self.reachable_points = reachable_points
 		self.objects = objects
 		self.multithread_node = dict(client=client, comfirmed=comfirmed)
-		self._step_num = 0
 
 	def is_reachable(self, pi, pj):
 		map = self.reachable_points
@@ -88,7 +85,7 @@ class Plotter():
 
 
 				if is_edge:
-					self.toggleMap.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0, alpha=0.3)
+					self.toggleMap.plot([node_i[0], node_j[0]], [node_i[1], node_j[1]], 'r--', linewidth=2.0)
 
 	def add_nodes(self):
 		nodes_x = []
@@ -143,7 +140,7 @@ class Plotter():
 		self.toggleMap.set_title("{}: Node radius {} [m]\n\n\n".format(self.scene_name, str(self.node_radius)))
 		self.toggleMap.set_aspect('equal', 'box')
 		legend_elements = [Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='lightskyblue', alpha=0.3, label='Topological Nodes'),
-						   Line2D([0], [0], linestyle='--', color='red', lw=2, alpha=0.3, label='Topological Edges'),
+						   Line2D([0], [0], linestyle='--', color='red', lw=2, label='Topological Edges'),
 						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='red', alpha=0.5, label='Goal Subnodes'),
 						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='yellow', alpha=0.5, label='Robot Pose'),
 						   Wedge((0.0, 0.0), 1.2*self.grid_size, 90 - 60, 90 + 60, width=self.grid_size, color='green', alpha=0.5, label='Reached Goal Subnodes')]
@@ -170,42 +167,12 @@ class Plotter():
 			if show_edges:
 				self.add_edges(NODES[self.scene_name])
 
-		passed_pos = [[1.75, 0.9277882, -1.5], [1.75, 0.9277883, -1.25], [1.75, 0.927788436, -1.0], [2.0, 0.927788436, -1.0],
-		[2.0, 0.927788556, -0.75], [2.0, 0.9277887, -0.5], [2.0, 0.927788734, -0.25], [2.0, 0.927788734, 0.0],
-		[2.0, 0.927788734, 0.25], [2.0, 0.927788734, 0.5], [2.0, 0.927788734, 0.75], [2.0, 0.927788734, 1.0],
-		[2.0, 0.927788734, 1.25], [2.0, 0.927788734, 1.5],
-		[2.0, 0.927788734, 1.5], [1.75, 0.927788734, 1.5], [1.5, 0.927788734, 1.5], [1.25, 0.927788734, 1.5]]
-
-		passed_pos_xz = []
-		for pos in passed_pos:
-			passed_pos_xz.append([pos[0], pos[2]])
-
-		for i in range(len(passed_pos_xz) - 1):
-			self.toggleMap.plot([passed_pos_xz[i][0], passed_pos_xz[i+1][0]], [passed_pos_xz[i][1], passed_pos_xz[i+1][1]], '-', color='blue', linestyle='--', linewidth=1)
-			self.toggleMap.annotate("",
-                xy=(passed_pos_xz[i + 1][0], passed_pos_xz[i + 1][1]),
-                xytext=(passed_pos_xz[i][0] + (passed_pos_xz[i+1][0] - passed_pos_xz[i][0]) * 0.9, passed_pos_xz[i][1] + (passed_pos_xz[i+1][1] - passed_pos_xz[i][1]) * 0.9),
-                # xycoords="figure points",
-                arrowprops=dict(arrowstyle="->", color="blue"))
-		# circ = Circle(xy = (passed_pos_xz[0][0], passed_pos_xz[0][1]), radius=0.2*self.node_radius, alpha=0.3, color = 'red')
-		# self.toggleMap.add_patch(circ)
-		# circ = Circle(xy = (passed_pos_xz[-1][0], passed_pos_xz[-1][1]), radius=0.2*self.node_radius, alpha=0.3, color = 'red')
-		# self.toggleMap.add_patch(circ)
-
-		wedge_start = Wedge((passed_pos_xz[0][0], passed_pos_xz[0][1]), 1.2*self.grid_size, - 0 + 90 - 60, - 0 + 90 + 60, width=self.grid_size, color='darkred', alpha=0.5)
-		wedge_goal = Wedge((passed_pos_xz[-1][0], passed_pos_xz[-1][1]), 1.2*self.grid_size, - 180 + 90 - 60, - 180 + 90 + 60, width=self.grid_size, color='darkgreen', alpha=0.5)
-		self.toggleMap.add_patch(wedge_start)
-		self.toggleMap.add_patch(wedge_goal)
-
-		
-
 		plt.show(block=False)
 		# ----------------------------------------------------------------------
 		# Plot map and agent motion in real time
 		# ----------------------------------------------------------------------
 		is_initial_map = True
 		rob_icon = Image.open('icon/robot.png')
-		step_idx = 0
 		while True:
 			# ------------------------------------------------------------------
 			# Delect robot icon for new position plot
@@ -221,8 +188,8 @@ class Plotter():
 					bbox_reached_goal.remove()
 					del bbox_reached_goal
 				else:
-					# wedge_goal.remove()
-					# del wedge_goal
+					wedge_goal.remove()
+					del wedge_goal
 					bbox_robot.remove()
 					del bbox_robot
 					bbox_goal.remove()
@@ -243,25 +210,17 @@ class Plotter():
 			# ------------------------------------------------------------------
 			pose_goal = info['goal_pose']
 			# plot goal robot field of view
-			# if info['is_reached']:
-			# 	wedge_goal = Wedge((pose_goal[0], pose_goal[1]), 1.2*self.grid_size, - pose_goal[2] + 90 - 60, - pose_goal[2] + 90 + 60, width=self.grid_size, color='green', alpha=0.5)
-			# else:
-			# 	wedge_goal = Wedge((pose_goal[0], pose_goal[1]), 1.2*self.grid_size, - pose_goal[2] + 90 - 60, - pose_goal[2] + 90 + 60, width=self.grid_size, color='red', alpha=0.5)
+			if info['is_reached']:
+				wedge_goal = Wedge((pose_goal[0], pose_goal[1]), 1.2*self.grid_size, - pose_goal[2] + 90 - 60, - pose_goal[2] + 90 + 60, width=self.grid_size, color='green', alpha=0.5)
+			else:
+				wedge_goal = Wedge((pose_goal[0], pose_goal[1]), 1.2*self.grid_size, - pose_goal[2] + 90 - 60, - pose_goal[2] + 90 + 60, width=self.grid_size, color='red', alpha=0.5)
 
-			# self.toggleMap.add_patch(wedge_goal)
+			self.toggleMap.add_patch(wedge_goal)
 			# ------------------------------------------------------------------
 			# Plot Images
 			# ------------------------------------------------------------------
-			
 			cur_img = self.currentView.imshow(info['cur_img'])
 			goal_img = self.goalView.imshow(info['goal_img'])
-			# Image.fromarray(info['cur_img']).save('pathImg/'+str(step_idx)+'current.jpg')
-			# Image.fromarray(info['goal_img']).save('pathImg/'+str(step_idx)+'goal.jpg')
-
-			    
-			self._step_num += 1
-			matplotlib.image.imsave("images/cur_img_{}.png".format(self._step_num), info['cur_img'])
-			matplotlib.image.imsave("images/goal_img_{}.png".format(self._step_num), info['goal_img'])
 
 			width = info['cur_img'].shape[1]
 			height = info['cur_img'].shape[0]
@@ -281,10 +240,7 @@ class Plotter():
 			plt.show(block=False)
 			plt.pause(0.5)
 
-			self.fig.savefig('images/plot/plot_{}.png'.format(self._step_num),dpi=600,format='png')
-
 			self.multithread_node['comfirmed'].value = 1
 			is_initial_map = False
-			step_idx += 1
 
 		plt.show()

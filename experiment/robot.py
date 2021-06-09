@@ -233,9 +233,9 @@ class Robot():
 			if self._debug:
 				print('action_predict: ', action_predict)
 
-			if self._action_num < len(self._hardcode_actions):
-				action_predict = torch.Tensor([self._hardcode_actions[self._action_num]])
-				self._action_num += 1
+			# if self._action_num < len(self._hardcode_actions):
+			# 	action_predict = torch.Tensor([self._hardcode_actions[self._action_num]])
+			# 	self._action_num += 1
 
 			if action_predict in move_action:
 				success, moving_index = self._AI2THOR_controller.Move_navigation_specialized(self._AI2THOR_controller._agent_current_pos_index, direction=move_direction[action_predict.item()], move=True)

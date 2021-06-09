@@ -22,10 +22,19 @@ class Planner():
 		self._dij_graph = dij.Graph()
 		self._added_pair = []
 
-	def Set_env_from_topo_map(self, topo_map):
+	def Set_env_from_topo_map(self, topo_map, node_index_list, neighbor_nodes, connected_subnodes):
 		self._grid_size = copy.deepcopy(topo_map._grid_size)
 		self._graph = topo_map.Export_graph()
 		self._dij_graph = dij.Graph()
+		self._node_index_list = node_index_list
+		self._neighbor_nodes = neighbor_nodes
+		self._neighbor_index_nodes = []
+		for neighbor_node in self._neighbor_nodes:
+			self._neighbor_index_nodes.append([self._node_index_list.index(neighbor_node[0]),
+												self._node_index_list.index(neighbor_node[1])])
+		self._connected_subnodes = connected_subnodes
+		print('self._neighbor_index_nodes: ', self._neighbor_index_nodes)
+		print('self._connected_subnodes: ', self._connected_subnodes)
 
 	def Set_planning_method(self, using_subnode=False):
 		self._subnode_plan = using_subnode
@@ -70,21 +79,58 @@ class Planner():
 
 	def _build_subnode_dij_graph(self):
 
+		def _wrap_to_360(degree):
+			while degree >= 360:
+				degree -=360
+			while degree < 0:
+				degree +=360
+			return int(degree)
+
 		for current_node_name, neighbor_nodes in self._graph.adj.items():
 
 			current_node_name_split = current_node_name.replace('_', ' ').split()
-			current_node_index, current_node_ori = current_node_name_split[1], current_node_name_split[3]
+			current_node_index, current_node_ori = int(current_node_name_split[1]), int(current_node_name_split[3])
 
 			current_node_dij_index = self.Get_subnode_dij_index(node_name=current_node_name)
 
 			for neighbor_node_name, weight_dict in neighbor_nodes.items():
 
 				neighbor_node_name_split = neighbor_node_name.replace('_', ' ').split()
-				neighbor_node_index, neighbor_node_ori = neighbor_node_name_split[1], neighbor_node_name_split[3]
+				neighbor_node_index, neighbor_node_ori = int(neighbor_node_name_split[1]), int(neighbor_node_name_split[3])
+
+
+
+				
 
 				if current_node_ori == neighbor_node_ori:
-					if [neighbor_node_index, current_node_index] in self._added_pair:
+
+					node_order = True
+					ori_order = True
+
+					if [neighbor_node_index, current_node_index] in self._neighbor_index_nodes:
+						connected_subnodes_index = self._neighbor_index_nodes.index([neighbor_node_index, current_node_index])
+						node_order = False
+
+					elif [current_node_index, neighbor_node_index] in self._neighbor_index_nodes:
+						connected_subnodes_index = self._neighbor_index_nodes.index([current_node_index, neighbor_node_index])
+						node_order = True
+
+					neighbor_node_ori_index = self._orientations.index(neighbor_node_ori)
+					opposite_ori_index = self._orientations.index(_wrap_to_360(neighbor_node_ori + 180))
+
+					if not neighbor_node_ori_index in self._connected_subnodes[connected_subnodes_index]:
+						connected_subnodes_index += 1
+
+
+					if self._connected_subnodes[connected_subnodes_index].index(neighbor_node_ori_index) >\
+						self._connected_subnodes[connected_subnodes_index].index(opposite_ori_index):
+						ori_order = False
+					else:
+						ori_order = True
+
+					if not node_order == ori_order:
 						continue
+
 				self._added_pair.append([current_node_index, neighbor_node_index])
 
 				neighbor_node_dij_index = self.Get_subnode_dij_index(node_name=neighbor_node_name)

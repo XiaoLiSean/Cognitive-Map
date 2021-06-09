@@ -263,7 +263,7 @@ class Navigation():
 		return self.topo_map
 
 	def Update_planner_env(self):
-		self.planner.Set_env_from_topo_map(topo_map=self.topo_map)
+		self.planner.Set_env_from_topo_map(topo_map=self.topo_map, node_index_list=self.node_generator._node_index_list, neighbor_nodes=self._node_pair_list, connected_subnodes=self._subnodes)
 		self.planner.Build_dij_graph()
 
 	def Switch_scene(self, scene_type, scene_num, shuffle=True):
@@ -359,8 +359,8 @@ class Navigation():
 										  goal_node_index=goal_node_index, goal_orientation=goal_orientation)
 		# print('path: ', path)
 
-		path = ['node_1_degree_0', 'node_16_degree_0', 'node_16_degree_0', 'node_3_degree_0', 'node_5_degree_0',
-			    'node_7_degree_0', 'node_7_degree_270', 'node_12_degree_270', 'node_12_degree_180']
+		# path = ['node_1_degree_0', 'node_16_degree_0', 'node_16_degree_0', 'node_3_degree_0', 'node_5_degree_0',
+		# 	    'node_7_degree_0', 'node_7_degree_270', 'node_12_degree_270', 'node_12_degree_180']
 
 		# time.sleep(10)
 
