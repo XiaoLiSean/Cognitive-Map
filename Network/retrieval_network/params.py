@@ -1,5 +1,5 @@
 '''
-Retrieval Network, Written by Xiao
+Retrieval Network
 For robot localization in a dynamic environment.
 '''
 import sys

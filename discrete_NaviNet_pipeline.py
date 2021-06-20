@@ -1,5 +1,5 @@
 '''
-Retrieval Network Testing in Discrete World, Written by Xiao
+Retrieval Network Testing in Discrete World
 For robot localization in a dynamic environment.
 '''
 # Import params and similarity from lib module

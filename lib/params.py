@@ -86,7 +86,6 @@ This part is used to document node list (manual construction)
 # TOPOLOGICAL MAP NODES [X,Z]
 # ------------------------------------------------------------------------------
 # node A and node B have same z coordnates and x coordnates is shifted by ADJACENT_NODES_SHIFT_GRID grids ---> consider to be adjacent to each other
-# This is set based on yidong's navigation heatmap
 ADJACENT_NODES_SHIFT_GRID = 2
 FORWARD_GRID = ADJACENT_NODES_SHIFT_GRID*2
 NODES = {'FloorPlan26': [[-2.00, 3.75], [-1.25, 3.75], [-2.00, 3.00], [-1.25, 3.00],

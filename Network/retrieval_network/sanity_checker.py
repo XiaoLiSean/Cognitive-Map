@@ -1,5 +1,5 @@
 '''
-Retrieval Network, Written by Xiao
+Retrieval Network
 For robot localization in a dynamic environment.
 This file is used to check the effeciveness of the scene graph branch solely in localization
 '''

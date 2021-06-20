@@ -1,5 +1,5 @@
 '''
-Navigation Network, Written by Xiao
+Navigation Network
 For robot localization in a dynamic environment.
 '''
 import torch

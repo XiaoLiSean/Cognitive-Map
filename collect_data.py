@@ -427,18 +427,13 @@ def regenerate_trajectory(fraction):
 # ------------------------------------------------------------------------------
 # manually update topological map info
 # ------------------------------------------------------------------------------
-def iter_test_scene(is_xiao=False, is_yidong=False):
+def iter_test_scene():
     # Initialize robot
     robot = Agent_Sim()
     test_idx_initial = int(SCENE_NUM_PER_TYPE*(TRAIN_FRACTION+VAL_FRACTION)) + 1
     test_idx_end = SCENE_NUM_PER_TYPE + 1
     add_on = [2, 3, 2, 3]
     for idx, scene_type in enumerate(SCENE_TYPES):
-        if is_xiao:
-            test_idx_end = test_idx_initial + add_on[idx]
-        if is_yidong:
-            test_idx_initial = test_idx_end - ( 5 - add_on[idx])
-
         for scene_num in range(test_idx_initial, test_idx_end):
             robot.reset_scene(scene_type=scene_type, scene_num=scene_num, ToggleMapView=True, Show_doorway=False, shore_toggle_map=False)
             robot.show_map(show_nodes=True, show_edges=True)
@@ -454,8 +449,6 @@ if __name__ == '__main__':
     parser.add_argument("--gen_pair_in_val", help="regenerate pair data for heatmap plotting of retrieval network", action="store_true")
     parser.add_argument("--collect_partition", nargs="+", default=[])
     parser.add_argument("--topo", help="manually update topological map info", action="store_true")
-    parser.add_argument("--yidong", help="manually collect topological map node for yidong", action="store_true")
-    parser.add_argument("--xiao", help="manually collect topological map node for xiao", action="store_true")
     args = parser.parse_args()
 
     # --------------------------------------------------------------------------
@@ -480,4 +473,4 @@ if __name__ == '__main__':
         data_collection(partition_num, args.collect_partition)
     # Used to see visualization of each test scene and record the topological node manually
     elif args.topo:
-        iter_test_scene(is_xiao=args.xiao, is_yidong=args.yidong)
+        iter_test_scene()

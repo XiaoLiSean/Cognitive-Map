@@ -129,7 +129,7 @@ class Node_generator():
 	def Get_connected_subnodes(self):
 		return self._connected_subnodes
 # ------------------------------------------------------------------------------
-# Modified by Xiao
+# Modified
 # ------------------------------------------------------------------------------
 	def get_reachable_coordinate(self):
 		self._event = self._controller.step(action='GetReachablePositions')
