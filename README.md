@@ -18,7 +18,7 @@ It usually takes 5-8 hours to collect the dataset for training the navigation an
 3. To generate pair-wise threshold testing dataset from previous triplet validation dataset for **similarity measure** ```python collect_data.py --gen_pair_in_val```
 4. To generate training and validation dataset for **Navigation** ```python collect_data.py --regenerate_NaviNet```
 
-### Train and test the SeanNet/benchmarks based localization networks
+### Train and test localization networks
 1. Train SeanNet-based localization network: ```python discrete_RNet_pipeline.py --train --rnet```
 2. Generate heatmaps (similarity score versus positional deviation in x and y direction) as in the paper to obtain the localization threshold ```python discrete_RNet_pipeline.py --heatmap --rnet```
 3. Train Benchmarks-based localization network: ```python discrete_RNet_pipeline.py --train --benchmark --name benchmarkName``` where you can replace the variable benchmarkName with benchmarks with name ['resnet50', 'vgg16', 'googlenet', 'resnext50_32x4d']
@@ -28,7 +28,12 @@ It usually takes 5-8 hours to collect the dataset for training the navigation an
 7. Test Benchmarks-based localization network: ```python discrete_RNet_pipeline.py --test --benchmark --name benchmarkName```
 
 
-### Train and test the SeanNet/benchmarks based navigation networks
+### Train and test navigation networks
+1. Train SeanNet-based navigation network: ```python discrete_Navi_pipeline.py --test --rnet```
+2. Train Benchmarks-based navigation network: ```python discrete_Navi_pipeline.py --test --benchmark --name benchmarkName```
+3. Test SeanNet-based navigation network: ```python discrete_Navi_pipeline.py --test --rnet```
+4. Test Benchmarks-based navigation network: ```python discrete_Navi_pipeline.py --test --benchmark --name benchmarkName```
+
 
 ## Navigation demo
-1. Run navigation demo using XXX
+After successfully training the localization and navigation networks with corresponding network architectures, you can run ```python visual_navi_demo.py``` to obtain a visual navigation demonstration with trainned networks for visual localization.
