@@ -232,7 +232,7 @@ def generate_pairs(file_path, fraction=None):
 # ------------------------------------------------------------------------------
 # collect train, validation and test data for networks
 # ------------------------------------------------------------------------------
-def data_collection(partition_num, partition_list):
+def data_collection(partition_num=1, partition_list=[1]):
     # Initialize robot
     robot = Robot()
     scene_list = []
@@ -469,7 +469,7 @@ if __name__ == '__main__':
         generate_pairs_in_validation(fraction=0.005)
     # Used to collect data
     elif len(args.collect_partition) > 0:
-        partition_num = 30
+        partition_num = 1
         data_collection(partition_num, args.collect_partition)
     # Used to see visualization of each test scene and record the topological node manually
     elif args.topo:
