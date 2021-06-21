@@ -15,8 +15,8 @@ obj_2_idx_dic = np.load(INFO_FILE_PATH + '/' + 'obj_2_idx_dic.npy', allow_pickle
 idx_2_obj_list = np.load(INFO_FILE_PATH + '/' + 'idx_2_obj_list.npy')
 OBJ_TYPE_NUM = len(idx_2_obj_list) # Maximum numbers of objectType in iTHOR Env.
 # ------------------------------------------------------------------------------
-ITHOR_FLOOR_PLANS = np.load(INFO_FILE_PATH + '/' + 'iTHOR_FloorPlan.npy') # list of floorplan name for iTHOR
-ROBOTHOR_FLOOR_PLANS = np.load(INFO_FILE_PATH + '/' + 'RoboTHOR_FloorPlan.npy') # list of floorplan name for RoboTHOR
+# ITHOR_FLOOR_PLANS = np.load(INFO_FILE_PATH + '/' + 'iTHOR_FloorPlan.npy') # list of floorplan name for iTHOR
+# ROBOTHOR_FLOOR_PLANS = np.load(INFO_FILE_PATH + '/' + 'RoboTHOR_FloorPlan.npy') # list of floorplan name for RoboTHOR
 # ------------------------------------------------------------------------------
 THIRD_PARTY_PATH = dirname(dirname(abspath(__file__))) + '/3rdparty' # File path for 3rdparty info
 GLOVE_FILE_NAME = 'glove.42B.300d.txt' # file name of glove vector
