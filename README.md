@@ -1,7 +1,8 @@
-# Cognitive-Map
-Scene Graph Centric Cognitive Map and Implementations
+SeanNet: Semantic Understanding Network forLocalization Under Object Dynamics
 
 ## Build environment
+Generally, our codebase is tested functional on platforms of macOS, Ubuntu 18, and Ubuntu 20. To set up the conda virtual environment and build up the required packages, please download the code and run the command ```conda env create -f environment.yml``` in the root folder.
+
 1. Test to get scene graph example
 
 ## Download Required Files
