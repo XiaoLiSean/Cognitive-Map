@@ -6,7 +6,7 @@ Generally, our codebase has been tested functional on platforms of macOS, Ubuntu
 ## Prepare System Required Files
 1. ```mkdir AI2THOR_info```
 2. ```mkdir 3rdparty```
-3. Download "glove.42B.300d.txt" from the GloVe official website (https://nlp.stanford.edu/projects/glove/)  
+3. Download "glove.42B.300d.txt" from the GloVe official website (https://nlp.stanford.edu/projects/glove/) to the folder ```3rdparty```
 4. Excute program ```python prepare_files.py``` to generate all needed filed
 5. Test if all the files are successfully generated using ```python test_build.py```
 If the AI2THOR window pops out with scene graph alongside the image, then the environment is successfully built and the required files are generated
