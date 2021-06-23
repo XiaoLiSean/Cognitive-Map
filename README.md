@@ -29,8 +29,8 @@ It usually takes 5-8 hours to collect the dataset for training the navigation an
 
 
 ### Train and test navigation networks
-1. Train SeanNet-based navigation network: ```python discrete_Navi_pipeline.py --test --rnet```
-2. Train Benchmarks-based navigation network: ```python discrete_Navi_pipeline.py --test --benchmark --name benchmarkName```
+1. Train SeanNet-based navigation network: ```python discrete_Navi_pipeline.py --train --rnet```
+2. Train Benchmarks-based navigation network: ```python discrete_Navi_pipeline.py --train --benchmark --name benchmarkName```
 3. Test SeanNet-based navigation network: ```python discrete_Navi_pipeline.py --test --rnet```
 4. Test Benchmarks-based navigation network: ```python discrete_Navi_pipeline.py --test --benchmark --name benchmarkName```
 
