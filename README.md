@@ -1,5 +1,7 @@
 SeanNet: Semantic Understanding Network for localization Under Object Dynamics
 
+We aim for domestic robots to perform long-term indoor service. Under the object-level scene dynamics induced by daily human activities, a robot needs to robustly localize itself in the environment subject to scene uncertainties. Previous works have addressed visual-based localization in static environments, yet the object-level scene dynamics challenge existing methods for the long-term deployment of the robot. This paper proposes a SEmantic understANding Network (SeanNet) architecture that enables an effective learning process with coupled visual and semantic inputs. With a dataset that contains object dynamics, we propose a cascaded contrastive learning scheme to train the SeanNet for learning a vector scene embedding. Subsequently, we can measure the similarity between the current observed scene and the target scene, whereby enables robust localization under object-level scene dynamics. In our experiments, we benchmark SeanNet against state-of-the-art image-encoding networks (baselines) on scene similarity measures. The SeanNet architecture with the proposed training method can achieve an 85.02\% accuracy which is higher than baselines. We further integrate the SeanNet and the other networks as the localizers into a visual navigation application. We demonstrate that SeanNet achieves higher success rates compared to the baselines.
+
 ## Build environment
 Generally, our codebase has been tested functional on platforms of macOS, Ubuntu 18, and Ubuntu 20. To set up the conda virtual environment and build up the required packages, please download the code and run the command ```conda env create -f environment.yml``` in the root folder. After successfully building up the environment, there are a few files to construct for global usage. 
 
@@ -34,6 +36,34 @@ It usually takes 5-8 hours to collect the dataset for training the navigation an
 3. Test SeanNet-based navigation network: ```python discrete_Navi_pipeline.py --test --rnet```
 4. Test Benchmarks-based navigation network: ```python discrete_Navi_pipeline.py --test --benchmark --name benchmarkName```
 
+## Similarity Measure with SeanNet in Simulation
+
+![tripletEx1](https://user-images.githubusercontent.com/58400416/189503366-e4f0fe99-3163-4b91-91c8-b7e6a26dcc85.png)
+
+![tripletEx2](https://user-images.githubusercontent.com/58400416/189503376-91f98ae9-6514-42c5-9312-533fe2574de7.png)
+
+![tripletEx3](https://user-images.githubusercontent.com/58400416/189503380-d51ec0a6-3735-4c71-ae17-6dca03c7d297.png)
+
+## Similarity Measure with SeanNet in Real World
+
+![realWorldEx1](https://user-images.githubusercontent.com/58400416/189503432-1f2a8cd9-3663-4eca-a26d-534c7ac9561f.png)
+
+![realWorldEx2](https://user-images.githubusercontent.com/58400416/189503435-7e4f2997-80d8-41b9-9431-d139a222ede6.png)
+
 
 ## Navigation demo
+
 After successfully training the localization and navigation networks with corresponding network architectures, you can run ```python visual_navi_demo.py``` to obtain a visual navigation demonstration with trainned networks for visual localization.
+
+https://user-images.githubusercontent.com/58400416/189503280-cd64943f-2771-4940-9612-02ea132fc8ab.mp4
+
+
+Please cite as: 
+```
+@article{li2021seannet,
+  title={SeanNet: Semantic Understanding Network for Localization Under Object Dynamics},
+  author={Li, Xiao and Du, Yidong and Zeng, Zhen and Jenkins, Odest Chadwicke},
+  journal={arXiv preprint arXiv:2110.02276},
+  year={2021}
+}
+```
